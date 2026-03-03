@@ -1,0 +1,37 @@
+##############################################
+# NetworkChaos -- Latence Frontend -> Auth
+# Simule une degradation reseau entre le
+# frontend Nginx et le service d'authentification.
+##############################################
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: latency-front-to-auth
+  namespace: rca-sandbox
+  labels:
+    experiment: network-delay-auth
+    project: rca-research
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces:
+      - rca-sandbox
+    labelSelectors:
+      app: frontend
+  delay:
+    latency: "500ms"
+    correlation: "100"
+    jitter: "50ms"
+  loss:
+    loss: "5"
+    correlation: "50"
+  direction: to
+  target:
+    selector:
+      namespaces:
+        - rca-sandbox
+      labelSelectors:
+        app: auth
+    mode: all
+  duration: "5m"

@@ -1,0 +1,22 @@
+##############################################
+# PodChaos -- Kill du pod Cache (Redis)
+# Cible : Pod Redis, tue immediatement.
+# Kubernetes le relancera automatiquement.
+##############################################
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: kill-cache-pod
+  namespace: rca-sandbox
+  labels:
+    experiment: pod-kill-cache
+    project: rca-research
+spec:
+  action: pod-kill
+  mode: all
+  selector:
+    namespaces:
+      - rca-sandbox
+    labelSelectors:
+      app: cache
+  gracePeriod: 0

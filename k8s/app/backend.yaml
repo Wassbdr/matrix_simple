@@ -1,0 +1,232 @@
+##############################################
+# Backend FastAPI — ConfigMap + Deployment + Service
+##############################################
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-script
+  namespace: rca-sandbox
+data:
+  main.py: |
+    from fastapi import FastAPI, HTTPException
+    from prometheus_fastapi_instrumentator import Instrumentator
+    import psycopg2
+    import redis
+    import os
+    import time
+    import logging
+    import json
+
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    app = FastAPI(title="RCA Backend API")
+
+    # Prometheus metrics instrumentation
+    Instrumentator().instrument(app).expose(app)
+
+    db_url = os.environ.get("DATABASE_URL", "postgresql://myuser:mypassword@database:5432/rca_db")
+    redis_host = os.environ.get("REDIS_HOST", "cache.rca-sandbox.svc.cluster.local")
+    redis_port = int(os.environ.get("REDIS_PORT", 6379))
+
+    @app.get("/")
+    def read_root():
+        return {"status": "ok", "message": "Backend is running"}
+
+    @app.get("/health")
+    def health_check():
+        return {"status": "healthy"}
+
+    @app.get("/ready")
+    def readiness_check():
+        try:
+            conn = psycopg2.connect(db_url, connect_timeout=3)
+            cur = conn.cursor()
+            cur.execute("SELECT 1;")
+            cur.fetchone()
+            cur.close()
+            conn.close()
+            return {"status": "ready", "database": "connected"}
+        except Exception as e:
+            logger.error(f"Readiness check failed: {e}")
+            raise HTTPException(status_code=503, detail="Database not ready")
+
+    @app.get("/api/data")
+    def get_data():
+        start = time.time()
+        
+        # Try Cache First
+        try:
+            r = redis.Redis(host=redis_host, port=redis_port, db=0, socket_timeout=2)
+            cached_data = r.get("api_data")
+            if cached_data:
+                elapsed = round((time.time() - start) * 1000, 2)
+                return {"status": "ok", "source": "cache", "latency_ms": elapsed, "data": json.loads(cached_data)}
+        except Exception as e:
+            logger.warning(f"Cache miss or error: {e}")
+
+        # Fallback to DB
+        try:
+            conn = psycopg2.connect(db_url, connect_timeout=5)
+            cur = conn.cursor()
+            cur.execute("SELECT 1;")
+            cur.fetchone()
+            cur.close()
+            conn.close()
+            
+            # Set Cache for next time
+            data = [1, 2, 3, 4, 5]
+            try:
+                r = redis.Redis(host=redis_host, port=redis_port, db=0, socket_timeout=2)
+                r.setex("api_data", 10, json.dumps(data))
+            except Exception as e:
+                logger.warning(f"Failed to set cache: {e}")
+
+            elapsed = round((time.time() - start) * 1000, 2)
+            return {"status": "ok", "source": "database", "latency_ms": elapsed, "data": data}
+        except Exception as e:
+            logger.error(f"Database query failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/data")
+    def write_data():
+        start = time.time()
+        try:
+            conn = psycopg2.connect(db_url, connect_timeout=5)
+            cur = conn.cursor()
+            # Simulation of write operation
+            cur.execute("SELECT 1;")
+            cur.fetchone()
+            cur.close()
+            conn.close()
+            elapsed = round((time.time() - start) * 1000, 2)
+            return {"status": "ok", "operation": "write", "latency_ms": elapsed}
+        except Exception as e:
+            logger.error(f"Database write failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+  requirements.txt: |
+    fastapi==0.104.1
+    uvicorn==0.24.0
+    psycopg2-binary==2.9.9
+    redis==5.0.1
+    prometheus-fastapi-instrumentator==6.1.0
+    opentelemetry-distro==0.42b0
+    opentelemetry-exporter-otlp==1.21.0
+    opentelemetry-instrumentation-fastapi==0.42b0
+    opentelemetry-instrumentation-psycopg2==0.42b0
+    opentelemetry-instrumentation-redis==0.42b0
+    opentelemetry-instrumentation-requests==0.42b0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: rca-sandbox
+  labels:
+    app: backend
+    tier: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+        tier: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      initContainers:
+      - name: install-deps
+        image: python:3.9-slim
+        command:
+        - sh
+        - -c
+        - |
+          pip install --target=/deps -r /app/requirements.txt
+        volumeMounts:
+        - name: script
+          mountPath: /app
+        - name: deps
+          mountPath: /deps
+      containers:
+      - name: backend
+        image: python:3.9-slim
+        command:
+        - sh
+        - -c
+        - |
+          export PYTHONPATH=/deps:$PYTHONPATH
+          export PATH=/deps/bin:$PATH
+          opentelemetry-instrument \
+            --traces_exporter otlp \
+            --metrics_exporter none \
+            --service_name backend-service \
+            uvicorn main:app --host 0.0.0.0 --port 8080
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://myuser:mypassword@database.rca-sandbox.svc.cluster.local:5432/rca_db"
+        - name: OTEL_SERVICE_NAME
+          value: "backend-service"
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://rca-jaeger-collector.rca-sandbox.svc.cluster.local:4317"
+        - name: OTEL_EXPORTER_OTLP_PROTOCOL
+          value: "grpc"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 40
+          periodSeconds: 20
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: script
+          mountPath: /app
+        - name: deps
+          mountPath: /deps
+        workingDir: /app
+      volumes:
+      - name: script
+        configMap:
+          name: backend-script
+      - name: deps
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: rca-sandbox
+  labels:
+    app: backend
+    tier: backend
+spec:
+  selector:
+    app: backend
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+  type: ClusterIP

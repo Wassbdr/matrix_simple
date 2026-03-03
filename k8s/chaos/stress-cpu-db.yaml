@@ -1,0 +1,25 @@
+##############################################
+# StressChaos -- Saturation CPU isolee
+# Cible : Pod de la base de donnees uniquement
+# Sature le CPU avec 4 workers a 100% pendant 5m.
+##############################################
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: stress-cpu-database
+  namespace: rca-sandbox
+  labels:
+    experiment: stress-cpu-db
+    project: rca-research
+spec:
+  mode: all
+  selector:
+    namespaces:
+      - rca-sandbox
+    labelSelectors:
+      app: database
+  stressors:
+    cpu:
+      workers: 4
+      load: 100
+  duration: "5m"

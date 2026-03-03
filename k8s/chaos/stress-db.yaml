@@ -1,0 +1,46 @@
+##############################################
+# Expérience 1 : StressChaos — Saturation CPU
+# Cible : Pod de la base de données
+##############################################
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: stress-database-cpu
+  namespace: rca-sandbox
+  labels:
+    experiment: stress-cpu
+    project: rca-research
+spec:
+  mode: all
+  selector:
+    namespaces:
+      - rca-sandbox
+    labelSelectors:
+      app: database
+  stressors:
+    cpu:
+      workers: 4
+      load: 100
+  duration: "3m"
+---
+##############################################
+# Expérience 2 : PodChaos — Kill du pod DB
+# Cible : Pod de la base de données
+##############################################
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: kill-database-pod
+  namespace: rca-sandbox
+  labels:
+    experiment: pod-kill
+    project: rca-research
+spec:
+  action: pod-kill
+  mode: one
+  selector:
+    namespaces:
+      - rca-sandbox
+    labelSelectors:
+      app: database
+  gracePeriod: 0

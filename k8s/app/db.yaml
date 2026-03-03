@@ -1,0 +1,108 @@
+##############################################
+# PostgreSQL — Base de données pour le RCA Lab
+##############################################
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: rca-sandbox
+  labels:
+    app: database
+    tier: database
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: database
+  namespace: rca-sandbox
+  labels:
+    app: database
+    tier: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: database
+  template:
+    metadata:
+      labels:
+        app: database
+        tier: database
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5432"
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_USER
+          value: myuser
+        - name: POSTGRES_PASSWORD
+          value: mypassword
+        - name: POSTGRES_DB
+          value: rca_db
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        ports:
+        - containerPort: 5432
+          name: postgres
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - myuser
+            - -d
+            - rca_db
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - myuser
+            - -d
+            - rca_db
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: postgres-data
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: database
+  namespace: rca-sandbox
+  labels:
+    app: database
+    tier: database
+spec:
+  selector:
+    app: database
+  ports:
+  - port: 5432
+    targetPort: 5432
+    name: postgres
+  type: ClusterIP

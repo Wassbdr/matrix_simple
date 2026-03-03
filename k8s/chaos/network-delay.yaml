@@ -1,0 +1,36 @@
+##############################################
+# NetworkChaos — Latence + Perte de paquets
+# Frontend → Backend
+##############################################
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: latency-and-loss-front-to-back
+  namespace: rca-sandbox
+  labels:
+    experiment: network-delay
+    project: rca-research
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces:
+      - rca-sandbox
+    labelSelectors:
+      app: frontend
+  delay:
+    latency: "500ms"
+    correlation: "100"
+    jitter: "50ms"
+  loss:
+    loss: "5"
+    correlation: "50"
+  direction: to
+  target:
+    selector:
+      namespaces:
+        - rca-sandbox
+      labelSelectors:
+        app: backend
+    mode: all
+  duration: "5m"

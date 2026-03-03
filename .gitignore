@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# PyTorch artifacts
+*.pt
+checkpoints/
+
+# Dataset outputs
+dataset_*.csv
+synthetic_dataset.csv
+
+# Logs
+port_forward.log
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
