@@ -1,4 +1,4 @@
-# RCA Sandbox -- Environnement de Laboratoire
+# RCA Sandbox — Environnement de Laboratoire
 
 Environnement Kubernetes isole pour la recherche sur le **Root Cause Analysis (RCA)** base sur l'**Information Bottleneck** et l'**apprentissage contrastif spatio-temporel**. Deploye sur le cluster distant `observit-cluster1` (Rancher), entierement dans le namespace `rca-sandbox`.
 
@@ -50,26 +50,41 @@ Environnement Kubernetes isole pour la recherche sur le **Root Cause Analysis (R
 ```
 matrix_simple/
 ├── k8s/
-│   ├── namespace.yaml                  # Namespace rca-sandbox
+│   ├── namespace.yaml                      # Namespace rca-sandbox
 │   ├── app/
-│   │   ├── db.yaml                     # PostgreSQL (Deployment + Service + PVC)
-│   │   ├── cache.yaml                  # Redis (Deployment + Service)
-│   │   ├── auth.yaml                   # FastAPI Auth (ConfigMap + Deployment + Service)
-│   │   ├── backend.yaml                # FastAPI Backend (ConfigMap + Deployment + Service)
-│   │   └── frontend.yaml               # Nginx (ConfigMap + Deployment + Service)
+│   │   ├── db.yaml                         # PostgreSQL (Deployment + Service + PVC)
+│   │   ├── cache.yaml                      # Redis (Deployment + Service)
+│   │   ├── auth.yaml                       # FastAPI Auth (ConfigMap + Deployment + Service)
+│   │   ├── backend.yaml                    # FastAPI Backend (ConfigMap + Deployment + Service)
+│   │   └── frontend.yaml                   # Nginx (ConfigMap + Deployment + Service)
 │   └── chaos/
-│       ├── network-delay.yaml          # NetworkChaos : latence Frontend <-> Backend
-│       └── stress-db.yaml              # StressChaos (CPU) + PodChaos (kill)
+│       ├── network-delay.yaml              # NetworkChaos : latence Frontend <-> Backend
+│       ├── network-delay-frontend-auth.yaml # NetworkChaos : latence Frontend <-> Auth
+│       ├── stress-db.yaml                  # StressChaos (CPU) + PodChaos (kill) Database
+│       ├── stress-cpu-db.yaml              # StressChaos isole (CPU) Database
+│       └── pod-kill-cache.yaml             # PodChaos : kill Cache (Redis)
 ├── rca_pipeline/
-│   ├── locustfile.py                   # Generateur de trafic (80% lecture, 20% ecriture)
-│   ├── dataset_builder.py              # Orchestrateur Chaos Mesh + Extracteur Prometheus
-│   ├── graph_builder.py                # Convertisseur CSV -> PyTorch Geometric Data
-│   └── verify_tensors.py               # Verificateur de tenseurs (dimensions, NaN, scaling)
+│   ├── locustfile.py                       # Generateur de trafic (80% lecture, 20% ecriture)
+│   ├── dataset_builder.py                  # Orchestrateur Chaos Mesh + Extracteur Prometheus
+│   ├── graph_builder.py                    # Convertisseur CSV -> PyTorch Geometric Data
+│   ├── verify_tensors.py                   # Verificateur de tenseurs (dimensions, NaN, scaling)
+│   ├── model.py                            # STGCN + GIB + RootCauseClassifier
+│   ├── losses.py                           # InfoNCE + GIB sparsity + root cause CE loss
+│   ├── train.py                            # Entrainement 2 phases (contrastif + supervise)
+│   ├── verify_training.py                  # Sanity check (overfit + gradients + mask collapse)
+│   ├── benchmark.py                        # Benchmark multi-modeles (STGCN, GCN, RF)
+│   ├── baselines.py                        # Modeles baseline (PureGCN, RandomForest)
+│   ├── infer.py                            # Inference RCA (classificateur + vote majoritaire)
+│   ├── evaluate.py                         # Evaluation (Precision/Recall/F1 par classe)
+│   ├── visualize.py                        # Double visualisation K8S + prediction RCA
+│   └── augment.py                          # Augmentation contrastive (bruit, jitter, masking)
 ├── scripts/
-│   ├── 00-check-context.sh             # Verifie le contexte kubectl
-│   ├── 02-deploy-observability.sh      # Helm : Prometheus, Jaeger, Loki, Grafana
-│   ├── 03-deploy-app.sh                # Deploie l'application 5-tiers
-│   └── 04-install-chaos-mesh.sh        # Installe Chaos Mesh (scope rca-sandbox)
+│   ├── 00-check-context.sh                 # Verifie le contexte kubectl
+│   ├── 02-deploy-observability.sh          # Helm : Prometheus, Jaeger, Loki, Grafana
+│   ├── 03-deploy-app.sh                    # Deploie l'application 5-tiers
+│   └── 04-install-chaos-mesh.sh            # Installe Chaos Mesh (scope rca-sandbox)
+├── requirements.txt                        # Dependances Python
+├── .gitignore                              # Exclusions Git
 └── README.md
 ```
 
@@ -168,17 +183,26 @@ locust -f rca_pipeline/locustfile.py --headless -u 20 -r 5 -H http://localhost:8
 
 Le script `dataset_builder.py` orchestre la boucle d'experimentation :
 1. Demarre Locust en tache de fond
-2. Attend 5 minutes (baseline saine)
+2. Attend N secondes (baseline saine)
 3. Applique un fichier Chaos Mesh via `kubectl apply -f`
-4. Attend 5 minutes (periode d'anomalie)
+4. Attend N secondes (periode d'anomalie)
 5. Supprime le chaos via `kubectl delete`
-6. Interroge l'API Prometheus pour extraire les metriques (step=10s)
-7. Exporte le resultat en `dataset_<run_id>.csv`
+6. Interroge l'API Prometheus pour extraire les metriques (step=2s)
+7. Exporte en CSV avec colonnes `label` (0/1) et `root_cause`
 
-**Metriques PromQL extraites** : CPU usage, RAM usage, Network TX/RX, Error rate.
+**Metriques PromQL extraites (5)** : CPU usage, RAM usage, Network TX/RX, Error rate (pod restarts).
 
 ```bash
-python3 rca_pipeline/dataset_builder.py
+# Exemple : scenario PodKill Cache avec labeling
+python3 rca_pipeline/dataset_builder.py \
+    --chaos-file k8s/chaos/pod-kill-cache.yaml \
+    --locust-file rca_pipeline/locustfile.py \
+    --frontend-url http://localhost:8080 \
+    --users 30 \
+    --baseline-duration 300 \
+    --anomaly-duration 300 \
+    --root-cause cache \
+    --output-dir datasets/
 ```
 
 ### Etape 3 : Construction des graphes (graph_builder.py)
@@ -193,7 +217,7 @@ Le script `graph_builder.py` convertit les CSV en objets `torch_geometric.data.D
 ```bash
 python3 -c "
 from rca_pipeline.graph_builder import GraphBuilder
-builder = GraphBuilder('dataset_XXXXXXXX.csv')
+builder = GraphBuilder('datasets/dataset_merged.csv')
 snapshots = builder.build_snapshots()
 windows = builder.create_sliding_windows(snapshots, window_size=6)
 builder.save_windows(windows, 'dataset_windows.pt')
@@ -215,42 +239,128 @@ verify_tensors('dataset_windows.pt')
 "
 ```
 
+### Etape 5 : Entrainement du modele (train.py)
+
+Le modele `SpatioTemporalRCA` (defini dans `model.py`) enchaine :
+1. **Convolution temporelle** (Conv1d x2) : reduit la dimension W en vecteur latent
+2. **Convolution spatiale** (GCNConv x2) : message passing sur le graphe
+3. **Graph Information Bottleneck** : MLP + Bernoulli relaxe -> masque sparse M
+4. **Sortie** : Z = M * H (representation compressee)
+5. **Classificateur** : `RootCauseClassifier` predit quel noeud est la cause racine
+
+**Entrainement en 2 phases :**
+
+| Phase | Objectif | Perte | Epochs |
+|-------|---------|-------|--------|
+| **Phase 1** — Pre-entrainement contrastif | Separer embeddings sains vs anomaux | `L_InfoNCE + β * L_GIB` | 100 |
+| **Phase 2** — Fine-tuning supervise | Identifier le noeud cause racine | `L_CE + 0.1 * L_sparsity` | 150 |
+
+Phase 1 utilise un annealing lineaire de β de 0 a `beta_max` sur `warmup_epochs`.
+Phase 2 entraine le `RootCauseClassifier` sur les fenetres anomales etiquetees.
+
+```bash
+cd rca_pipeline && python3 train.py \
+    --dataset ../dataset_windows.pt \
+    --epochs 100 \
+    --supervised-epochs 150 \
+    --hidden-dim 32 \
+    --beta-max 1.0 \
+    --warmup-epochs 20
+```
+
+### Etape 6 : Benchmark (benchmark.py)
+
+Compare 3 modeles sur un split stratifie (toutes les causes racines dans train et test) :
+
+```bash
+cd rca_pipeline && python3 benchmark.py \
+    --dataset ../dataset_windows.pt \
+    --checkpoint checkpoints/stgcn_rca_final.pt
+```
+
+**Resultat type :**
+
+```
+================================================================================
+MODEL                | PRECISION       | RECALL          | F1-SCORE       
+--------------------------------------------------------------------------------
+STGCN + GIB          | 1.0000          | 1.0000          | 1.0000         
+Pure GCN (Supervised) | 0.5000          | 0.6667          | 0.5556         
+Random Forest        | 1.0000          | 1.0000          | 1.0000         
+================================================================================
+```
+
+### Etape 7 : Evaluation detaillee (evaluate.py)
+
+Rapport par classe (precision, recall, F1 pour chaque cause racine) :
+
+```bash
+cd rca_pipeline && python3 evaluate.py \
+    --checkpoint checkpoints/stgcn_rca_final.pt \
+    --dataset ../dataset_windows.pt
+```
+
+### Etape 8 : Inference RCA (infer.py)
+
+Charge un checkpoint et identifie la cause racine via le classificateur :
+- Vote majoritaire sur N fenetres anomales pour le verdict final
+
+```bash
+cd rca_pipeline && python3 infer.py \
+    --checkpoint checkpoints/stgcn_rca_final.pt \
+    --dataset ../dataset_windows.pt \
+    --num-windows 10
+```
+
+### Etape 9 : Visualisation (visualize.py)
+
+Double visualisation cote-a-cote :
+- **Panneau gauche** : topologie Kubernetes (services, technologies, connexions)
+- **Panneau droit** : prediction du modele (heatmap des probabilites de cause racine)
+- **Barre inferieure** : comparaison cause reelle vs prediction
+
+```bash
+cd rca_pipeline && python3 visualize.py \
+    --checkpoint checkpoints/stgcn_rca_final.pt \
+    --dataset ../dataset_windows.pt \
+    --output graph_heatmap.png
+```
+
+---
+
+## Data Augmentation Contrastive (augment.py)
+
+4 strategies composables pour generer des positifs diversifies :
+
+| Strategie | Fonction | Description |
+|-----------|----------|-------------|
+| Bruit gaussien | `add_gaussian_noise(x, sigma)` | Perturbation isotrope des features |
+| Jitter temporel | `temporal_jitter(x, max_shift)` | Decalage circulaire sur l'axe temps |
+| Masquage features | `feature_masking(x, mask_ratio)` | Mise a zero aleatoire de canaux |
+| Edge dropout | `edge_dropout(edge_index, drop_ratio)` | Suppression d'aretes du graphe |
+
+```python
+from augment import augment_positive
+x_positive_aug = augment_positive(x, noise_sigma=0.1, jitter_shift=1, feature_mask_ratio=0.2)
+```
+
 ---
 
 ## Scenarios de Chaos
 
-### A. Latence Reseau (Frontend <-> Auth)
+| Scenario | Fichier YAML | Cible | Effet |
+|----------|--------------|-------|-------|
+| Latence Auth | `network-delay-frontend-auth.yaml` | Frontend -> Auth | 500ms + 5% perte |
+| Stress CPU DB | `stress-cpu-db.yaml` | Database | 4 workers CPU 100% |
+| PodKill Cache | `pod-kill-cache.yaml` | Cache (Redis) | Kill immediat |
+| Latence Backend | `network-delay.yaml` | Frontend -> Backend | 500ms + 5% perte |
+| Stress + Kill DB | `stress-db.yaml` | Database | CPU 100% + PodKill |
 
 ```bash
-kubectl apply -f k8s/chaos/network-delay-frontend-auth.yaml
-# Annuler :
-kubectl delete -f k8s/chaos/network-delay-frontend-auth.yaml
-```
-
-### B. Stress CPU sur Database
-
-```bash
-kubectl apply -f k8s/chaos/stress-cpu-db.yaml
-# Annuler :
-kubectl delete -f k8s/chaos/stress-cpu-db.yaml
-```
-
-### C. PodKill sur Cache (Redis)
-
-```bash
+# Appliquer un scenario
 kubectl apply -f k8s/chaos/pod-kill-cache.yaml
-# Annuler :
+# Annuler
 kubectl delete -f k8s/chaos/pod-kill-cache.yaml
-```
-
-### D. Scenarios historiques
-
-```bash
-# Latence reseau Frontend <-> Backend (500ms + 5% perte)
-kubectl apply -f k8s/chaos/network-delay.yaml
-
-# Stress CPU + Kill sur Database
-kubectl apply -f k8s/chaos/stress-db.yaml
 ```
 
 ---
@@ -269,11 +379,17 @@ X(t+1) = f(A, X(t)) + B * U(t)
 | `A` | `data.edge_index` | Matrice d'adjacence [2, 4] |
 | `U(t)` | Trafic Locust entrant | Signal exogene |
 | `f()` | GCN / GAT layer | Propagation spatiale (Message Passing) |
+| `M` | GIB mask probabilities | Isolation du sous-graphe causal |
+| `C()` | `RootCauseClassifier` | Prediction supervisee de la cause racine |
 
-La perte **InfoNCE** consomme les fenetres glissantes :
+**Entrainement en 2 phases :**
+
+Phase 1 — La perte **InfoNCE** consomme les fenetres glissantes :
 - **Ancre (Z_anchor)** : fenetre `[t, t+W]` encode
 - **Positif (Z_positive)** : fenetre augmentee ou `[t+1, t+W+1]` en regime sain
 - **Negatif (Z_negative)** : fenetre echantillonnee pendant l'injection de chaos
+
+Phase 2 — La perte **Cross-Entropy** entraine le classificateur `C()` sur les fenetres anomales pour predire quel noeud est responsable de l'anomalie.
 
 ---
 

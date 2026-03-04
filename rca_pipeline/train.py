@@ -2,26 +2,31 @@
 Training loop for the Spatio-Temporal RCA model with Graph Information
 Bottleneck and InfoNCE contrastive learning.
 
-Workflow:
-    1. Load windowed PyTorch Geometric Data objects from disk.
-    2. Split into healthy (baseline) and anomalous (chaos) windows.
-    3. Construct contrastive triplets: (anchor, positive, negative).
-    4. Train the SpatioTemporalRCA model with beta-annealing warm-up.
+Two-phase training:
+    Phase 1 — Contrastive pre-training (InfoNCE + GIB sparsity):
+        Learns to separate healthy vs anomalous embeddings.
+    Phase 2 — Supervised fine-tuning (root cause classification):
+        Trains the model to predict which node is the root cause
+        using labeled anomalous windows.
 """
 
 import torch
 import torch.optim as optim
 from torch_geometric.data import Data
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 import logging
 import argparse
 import os
 
 from model import SpatioTemporalRCA
-from losses import total_loss
+from losses import total_loss, root_cause_loss
+from augment import augment_positive
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+NODE_NAMES = ['frontend', 'auth', 'backend', 'cache', 'database']
+NAME_TO_IDX = {name: i for i, name in enumerate(NODE_NAMES)}
 
 
 # ---------------------------------------------------------------------------
@@ -40,33 +45,22 @@ def load_dataset(filepath: str) -> List[Data]:
         raise
 
 
-def split_healthy_anomalous(
+def split_by_labels(
     dataset: List[Data],
-    healthy_ratio: float = 0.5,
 ) -> Tuple[List[Data], List[Data]]:
     """
-    Splits the dataset into healthy (first half = baseline period) and
-    anomalous (second half = chaos injection period) windows.
-
-    This corresponds to the dataset_builder.py protocol:
-        - Minutes 0-5  : healthy baseline
-        - Minutes 5-10 : chaos injection
-
-    With 10s steps and a window of W, the midpoint is at index ~30.
-    We use a configurable ratio for flexibility.
-
-    Args:
-        dataset: Full list of Data windows in chronological order.
-        healthy_ratio: Fraction of the dataset considered healthy.
+    Splits the dataset into healthy and anomalous windows based on actual
+    labels (y==0 for healthy, y==1 for anomalous), NOT by position.
 
     Returns:
         (healthy_windows, anomalous_windows)
     """
-    split_idx = int(len(dataset) * healthy_ratio)
-    healthy = dataset[:split_idx]
-    anomalous = dataset[split_idx:]
+    healthy = [d for d in dataset if d.y is not None and d.y.item() == 0]
+    anomalous = [d for d in dataset if d.y is not None and d.y.item() == 1
+                 and hasattr(d, 'root_cause') and len(d.root_cause) > 0
+                 and d.root_cause[0] in NAME_TO_IDX]
     logger.info(
-        "Split dataset: %d healthy windows, %d anomalous windows.",
+        "Split dataset by labels: %d healthy windows, %d anomalous windows (with valid root cause).",
         len(healthy),
         len(anomalous),
     )
@@ -138,18 +132,6 @@ def graph_level_embedding(z: torch.Tensor) -> torch.Tensor:
 def compute_beta(epoch: int, warmup_epochs: int, beta_max: float) -> float:
     """
     Linear warm-up schedule for the GIB coefficient beta.
-
-    During the first `warmup_epochs`, beta increases linearly from 0
-    to beta_max. This allows the contrastive loss to first structure
-    the latent space before the information bottleneck compresses it.
-
-    Args:
-        epoch: Current epoch index (0-based).
-        warmup_epochs: Number of epochs for the warm-up phase.
-        beta_max: Maximum beta value after warm-up.
-
-    Returns:
-        Current beta value.
     """
     if warmup_epochs <= 0:
         return beta_max
@@ -171,31 +153,36 @@ def train(
     warmup_epochs: int = 20,
     temperature: float = 0.07,
     checkpoint_dir: str = "checkpoints",
+    supervised_epochs: int = 100,
+    supervised_lr: float = 5e-4,
 ) -> None:
     """
-    Main training procedure.
+    Two-phase training procedure.
 
-    Args:
-        dataset_path: Path to the .pt file containing windowed Data objects.
-        num_epochs: Total number of training epochs.
-        lr: Learning rate for AdamW.
-        weight_decay: L2 regularization for AdamW.
-        hidden_dim: Hidden dimension of the STGCN encoder.
-        beta_max: Maximum GIB coefficient after warm-up.
-        warmup_epochs: Number of epochs to linearly ramp beta from 0 to beta_max.
-        temperature: InfoNCE temperature parameter.
-        checkpoint_dir: Directory to save model checkpoints.
+    Phase 1: Contrastive pre-training (InfoNCE + GIB sparsity)
+    Phase 2: Supervised fine-tuning on anomalous windows for root cause prediction.
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info("Using device: %s", device)
 
-    # -- Load and split dataset --
+    # -- Load and split dataset by actual labels --
     dataset = load_dataset(dataset_path)
-    healthy, anomalous = split_healthy_anomalous(dataset)
+    healthy, anomalous = split_by_labels(dataset)
 
     if len(healthy) < 2:
         logger.error("Need at least 2 healthy windows to form anchor/positive pairs.")
         return
+
+    if len(anomalous) < 1:
+        logger.error("Need at least 1 anomalous window with root cause label.")
+        return
+
+    # Log root cause distribution
+    rc_dist: Dict[str, int] = {}
+    for d in anomalous:
+        rc = d.root_cause[0]
+        rc_dist[rc] = rc_dist.get(rc, 0) + 1
+    logger.info("Root cause distribution in anomalous windows: %s", rc_dist)
 
     # -- Build contrastive batch --
     x_anchor, x_positive, x_negative, edge_index = build_contrastive_batch(
@@ -220,13 +207,12 @@ def train(
 
     os.makedirs(checkpoint_dir, exist_ok=True)
 
-    # -- Training loop --
+    # ===================================================================
+    # Phase 1: Contrastive pre-training
+    # ===================================================================
     logger.info(
-        "Starting training: epochs=%d, lr=%.1e, beta_max=%.2f, warmup=%d",
+        "=== PHASE 1: Contrastive pre-training (%d epochs) ===",
         num_epochs,
-        lr,
-        beta_max,
-        warmup_epochs,
     )
 
     for epoch in range(num_epochs):
@@ -236,19 +222,22 @@ def train(
         beta = compute_beta(epoch, warmup_epochs, beta_max)
 
         # Forward pass on anchors
-        # shape: z_a [batch, num_nodes, hidden_dim], probs_a [batch, num_nodes, 1]
         z_a, probs_a = model(x_anchor, edge_index)
 
-        # Forward pass on positives
-        # shape: z_p [batch, num_nodes, hidden_dim], _ (probs not used)
-        z_p, _ = model(x_positive, edge_index)
+        # Apply Contrastive Data Augmentation to positives dynamically
+        x_positive_aug = augment_positive(
+            x_positive, 
+            noise_sigma=0.05, 
+            jitter_shift=1, 
+            feature_mask_ratio=0.1
+        )
+        # Forward pass on augmented positives
+        z_p, _ = model(x_positive_aug, edge_index)
 
         # Forward pass on negatives
-        # shape: z_n [num_neg, num_nodes, hidden_dim], _ (probs not used)
         z_n, _ = model(x_negative, edge_index)
 
         # Aggregate to graph-level embeddings
-        # shape: [batch, hidden_dim], [batch, hidden_dim], [num_neg, hidden_dim]
         z_a_graph = graph_level_embedding(z_a)
         z_p_graph = graph_level_embedding(z_p)
         z_n_graph = graph_level_embedding(z_n)
@@ -265,15 +254,14 @@ def train(
 
         # Backward pass
         loss.backward()
-        # Gradient clipping for stability
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
         # Logging
-        if epoch % 10 == 0 or epoch == num_epochs - 1:
+        if epoch % 20 == 0 or epoch == num_epochs - 1:
             mask_density = probs_a.mean().item()
             logger.info(
-                "Epoch %04d/%04d | Loss: %.4f | Beta: %.4f | Mask density: %.4f",
+                "[Phase1] Epoch %04d/%04d | Loss: %.4f | Beta: %.4f | Mask density: %.4f",
                 epoch,
                 num_epochs,
                 loss.item(),
@@ -281,14 +269,68 @@ def train(
                 mask_density,
             )
 
+    # ===================================================================
+    # Phase 2: Supervised fine-tuning for root cause classification
+    # ===================================================================
+    logger.info(
+        "=== PHASE 2: Supervised fine-tuning (%d epochs) ===",
+        supervised_epochs,
+    )
+
+    # Build supervised batch from anomalous windows
+    sup_x = torch.stack([d.x for d in anomalous]).to(device)  # [N, V, F, W]
+    sup_targets = torch.tensor(
+        [NAME_TO_IDX[d.root_cause[0]] for d in anomalous],
+        dtype=torch.long,
+    ).to(device)  # [N]
+
+    logger.info("Supervised batch shape: %s, targets shape: %s", sup_x.shape, sup_targets.shape)
+
+    # Use a separate optimizer for fine-tuning with lower LR
+    ft_optimizer = optim.AdamW(model.parameters(), lr=supervised_lr, weight_decay=weight_decay)
+
+    for epoch in range(supervised_epochs):
+        model.train()
+        ft_optimizer.zero_grad()
+
+        # Forward pass
+        z, probs = model(sup_x, edge_index)
+
+        # Root cause classification
+        rc_logits = model.classify_root_cause(z)  # [N, num_nodes]
+
+        # Combined loss: classification + sparsity (to keep mask sparse)
+        cls_loss = root_cause_loss(rc_logits, sup_targets)
+        sparsity = probs.mean()
+        loss = cls_loss + 0.1 * sparsity
+
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        ft_optimizer.step()
+
+        if epoch % 20 == 0 or epoch == supervised_epochs - 1:
+            # Compute accuracy
+            preds = rc_logits.argmax(dim=1)
+            acc = (preds == sup_targets).float().mean().item()
+            logger.info(
+                "[Phase2] Epoch %04d/%04d | Loss: %.4f | Accuracy: %.4f | Mask density: %.4f",
+                epoch,
+                supervised_epochs,
+                loss.item(),
+                acc,
+                probs.mean().item(),
+            )
+
     # -- Save final checkpoint --
     checkpoint_path = os.path.join(checkpoint_dir, "stgcn_rca_final.pt")
     torch.save(
         {
             "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "epoch": num_epochs,
+            "optimizer_state_dict": ft_optimizer.state_dict(),
+            "epoch": num_epochs + supervised_epochs,
             "beta_max": beta_max,
+            "num_features": num_features,
+            "hidden_dim": hidden_dim,
         },
         checkpoint_path,
     )
@@ -307,7 +349,8 @@ if __name__ == "__main__":
         default="dataset_windows.pt",
         help="Path to the .pt dataset file.",
     )
-    parser.add_argument("--epochs", type=int, default=100)
+    parser.add_argument("--epochs", type=int, default=100, help="Contrastive pre-training epochs")
+    parser.add_argument("--supervised-epochs", type=int, default=150, help="Supervised fine-tuning epochs")
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--hidden-dim", type=int, default=32)
     parser.add_argument("--beta-max", type=float, default=1.0)
@@ -323,4 +366,5 @@ if __name__ == "__main__":
         beta_max=args.beta_max,
         warmup_epochs=args.warmup_epochs,
         temperature=args.temperature,
+        supervised_epochs=args.supervised_epochs,
     )

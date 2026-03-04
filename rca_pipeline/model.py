@@ -11,6 +11,8 @@ Architecture:
        a differentiable sparse mask M over nodes, isolating the causal
        sub-graph.
     4. Output Z = M * H, where H is the spatial embedding.
+    5. Root Cause Classifier maps GIB mask probabilities to a root cause
+       node prediction (supervised fine-tuning).
 """
 
 import torch
@@ -144,6 +146,37 @@ class GraphInformationBottleneck(nn.Module):
         return mask, probs
 
 
+class RootCauseClassifier(nn.Module):
+    """
+    Supervised classification head that maps node-level hidden representations
+    to a root cause prediction. Uses the GIB-masked spatial embeddings
+    to predict which node is the root cause.
+
+    Input : z [batch, num_nodes, hidden_dim] (GIB-masked embeddings)
+    Output: logits [batch, num_nodes] (one logit per node = per possible root cause)
+    """
+
+    def __init__(self, hidden_dim: int, num_nodes: int) -> None:
+        super().__init__()
+        self.classifier = nn.Sequential(
+            nn.Linear(num_nodes * hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(hidden_dim, num_nodes),
+        )
+
+    def forward(self, z: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            z: shape [batch, num_nodes, hidden_dim]
+        Returns:
+            logits: shape [batch, num_nodes]
+        """
+        batch_size = z.size(0)
+        z_flat = z.view(batch_size, -1)  # [batch, num_nodes * hidden_dim]
+        return self.classifier(z_flat)
+
+
 class SpatioTemporalRCA(nn.Module):
     """
     Full model: Temporal Conv -> Spatial Conv -> GIB -> Z = M * H.
@@ -169,6 +202,7 @@ class SpatioTemporalRCA(nn.Module):
         self.temporal_block = TemporalConvBlock(num_features, hidden_dim, temporal_kernel)
         self.spatial_block = SpatialConvBlock(hidden_dim)
         self.gib = GraphInformationBottleneck(hidden_dim, gib_temperature)
+        self.root_cause_head = RootCauseClassifier(hidden_dim, num_nodes)
 
         logger.info(
             "SpatioTemporalRCA initialized: features=%d, hidden=%d, nodes=%d",
@@ -225,3 +259,14 @@ class SpatioTemporalRCA(nn.Module):
         probs = probs.view(batch_size, self.num_nodes, 1)
 
         return z, probs
+
+    def classify_root_cause(self, z: torch.Tensor) -> torch.Tensor:
+        """
+        Predicts root cause node from GIB-masked embeddings.
+
+        Args:
+            z: shape [batch, num_nodes, hidden_dim]
+        Returns:
+            logits: shape [batch, num_nodes]
+        """
+        return self.root_cause_head(z)

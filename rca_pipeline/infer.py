@@ -32,14 +32,20 @@ NODE_NAMES: Dict[int, str] = {
 
 def load_model(checkpoint_path: str, hidden_dim: int = 32) -> SpatioTemporalRCA:
     """Loads a trained model from a checkpoint file."""
-    model = SpatioTemporalRCA(num_features=5, hidden_dim=hidden_dim, num_nodes=5)
     try:
         checkpoint = torch.load(checkpoint_path, weights_only=False, map_location="cpu")
+        # Read dimensions from checkpoint
+        num_features = checkpoint.get('num_features',
+            checkpoint['model_state_dict']['temporal_block.conv1.weight'].size(1))
+        hd = checkpoint.get('hidden_dim', hidden_dim)
+        model = SpatioTemporalRCA(num_features=num_features, hidden_dim=hd, num_nodes=5)
         model.load_state_dict(checkpoint["model_state_dict"])
         logger.info(
-            "Loaded checkpoint from %s (epoch %d)",
+            "Loaded checkpoint from %s (epoch %d, features=%d, hidden=%d)",
             checkpoint_path,
             checkpoint.get("epoch", -1),
+            num_features,
+            hd,
         )
     except Exception as e:
         logger.error("Failed to load checkpoint: %s", e)

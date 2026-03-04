@@ -138,3 +138,21 @@ def total_loss(
     l_total = l_contrastive + beta * l_sparsity
 
     return l_total
+
+
+def root_cause_loss(
+    logits: torch.Tensor,
+    targets: torch.Tensor,
+) -> torch.Tensor:
+    """
+    Cross-entropy loss for root cause classification.
+
+    Args:
+        logits: shape [batch, num_nodes] — predicted root cause logits.
+        targets: shape [batch] — ground truth root cause node indices.
+
+    Returns:
+        Scalar cross-entropy loss.
+    """
+    return F.cross_entropy(logits, targets)
+

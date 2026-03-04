@@ -126,13 +126,13 @@ class ExperimentRunner:
             "ram_usage": f'sum(container_memory_working_set_bytes{{namespace="{namespace}", container!=""}}) by (pod)',
             "network_tx": f'sum(rate(container_network_transmit_bytes_total{{namespace="{namespace}"}}[1m])) by (pod)',
             "network_rx": f'sum(rate(container_network_receive_bytes_total{{namespace="{namespace}"}}[1m])) by (pod)',
-            "error_rate": f'sum(rate(kube_pod_container_status_restarts_total{{namespace="{namespace}"}}[1m])) by (pod)'
+            "error_rate": f'sum(rate(kube_pod_container_status_restarts_total{{namespace="{namespace}"}}[1m])) by (pod)',
         }
         
         dataset_records = []
         
         for metric_name, query in queries.items():
-            results = self.prometheus.query_range(query, start_ts, end_ts, "10s")
+            results = self.prometheus.query_range(query, start_ts, end_ts, "2s")
             for result in results:
                 pod_name = result["metric"].get("pod", "unknown")
                 for timestamp, value in result["values"]:
@@ -171,7 +171,13 @@ class ExperimentRunner:
                     "label": is_anomaly,
                     "root_cause": self.root_cause if is_anomaly else "",
                 }
-            pivoted[key][row["metric"]] = float(row["value"])
+            
+            # For latency, avoid NaN if requests are 0
+            val = float(row["value"])
+            import math
+            if math.isnan(val) or math.isinf(val):
+                val = 0.0
+            pivoted[key][row["metric"]] = val
             
         rows = list(pivoted.values())
         rows.sort(key=lambda x: (x["timestamp"], x["pod"]))

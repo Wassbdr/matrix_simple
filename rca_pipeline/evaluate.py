@@ -3,130 +3,131 @@ Evaluation script for the RCA model.
 
 Computes Precision, Recall, and F1-score for root cause identification
 by comparing the model's predicted root cause node against the known
-ground truth (the pod targeted by the Chaos Mesh experiment).
+ground truth labels in the dataset.
+
+Uses the supervised root cause classifier head for predictions.
 
 Usage:
     python3 evaluate.py \
         --checkpoint checkpoints/stgcn_rca_final.pt \
-        --dataset dataset_windows.pt \
-        --ground-truth cache
+        --dataset ../dataset_windows.pt
 """
 
 import torch
+import torch.nn.functional as F
 import argparse
 import logging
 from typing import List, Dict, Tuple
+from collections import Counter
 
 from torch_geometric.data import Data
+from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
 from model import SpatioTemporalRCA
-from infer import load_model, load_windows, identify_root_cause, NODE_NAMES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+NODE_NAMES = ['frontend', 'auth', 'backend', 'cache', 'database']
+NAME_TO_IDX = {name: i for i, name in enumerate(NODE_NAMES)}
 
-def compute_metrics(
-    predictions: List[str],
-    ground_truth: str,
-) -> Dict[str, float]:
-    """
-    Computes per-class Precision, Recall, and F1 for the root cause
-    identification task.
 
-    In the RCA setting:
-        - True Positive  = model predicts the correct root cause node
-        - False Positive = model predicts a wrong node as root cause
-        - False Negative = model fails to predict the correct root cause
+def load_model(checkpoint_path: str) -> SpatioTemporalRCA:
+    """Loads a trained model from a checkpoint file."""
+    checkpoint = torch.load(checkpoint_path, weights_only=False, map_location="cpu")
+    num_features = checkpoint.get('num_features',
+        checkpoint['model_state_dict']['temporal_block.conv1.weight'].size(1))
+    hidden_dim = checkpoint.get('hidden_dim',
+        checkpoint['model_state_dict']['temporal_block.conv1.weight'].size(0))
 
-    Args:
-        predictions: List of predicted root cause node names.
-        ground_truth: The actual root cause node name.
+    model = SpatioTemporalRCA(num_features=num_features, hidden_dim=hidden_dim, num_nodes=5)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model.eval()
+    logger.info("Loaded checkpoint from %s (features=%d, hidden=%d)", checkpoint_path, num_features, hidden_dim)
+    return model
 
-    Returns:
-        Dictionary with precision, recall, f1, and accuracy.
-    """
-    if not predictions:
-        logger.warning("No predictions to evaluate.")
-        return {"precision": 0.0, "recall": 0.0, "f1": 0.0, "accuracy": 0.0}
 
-    true_positives = sum(1 for p in predictions if p == ground_truth)
-    false_positives = sum(1 for p in predictions if p != ground_truth)
-    total = len(predictions)
-
-    # In a single-label multi-class setting with one ground truth:
-    # Precision = TP / (TP + FP) = fraction of correct predictions
-    # Recall = TP / total_anomalous_windows (all should predict ground_truth)
-    precision = true_positives / total if total > 0 else 0.0
-    recall = true_positives / total if total > 0 else 0.0
-    f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
-    accuracy = true_positives / total if total > 0 else 0.0
-
-    return {
-        "precision": round(precision, 4),
-        "recall": round(recall, 4),
-        "f1": round(f1, 4),
-        "accuracy": round(accuracy, 4),
-    }
+def get_anomalies(dataset: List[Data]) -> List[Data]:
+    """Extract anomalous windows with valid root cause labels."""
+    return [d for d in dataset
+            if d.y is not None and d.y.item() == 1
+            and hasattr(d, 'root_cause') and len(d.root_cause) > 0
+            and d.root_cause[0] in NAME_TO_IDX]
 
 
 def evaluate(
     checkpoint_path: str,
     dataset_path: str,
-    ground_truth: str,
-    hidden_dim: int = 32,
-    healthy_ratio: float = 0.5,
+    train_ratio: float = 0.8,
 ) -> None:
     """
-    Evaluates the model on anomalous windows and reports metrics.
-
-    Args:
-        checkpoint_path: Path to the trained checkpoint.
-        dataset_path: Path to the windowed .pt dataset.
-        ground_truth: Name of the actual root cause node (e.g. 'cache', 'database').
-        hidden_dim: Must match the training configuration.
-        healthy_ratio: Fraction of windows that are healthy (first half).
+    Evaluates the model on anomalous windows using stratified split.
+    Reports per-class and weighted metrics.
     """
-    if ground_truth not in NODE_NAMES.values():
-        logger.error(
-            "Unknown ground truth '%s'. Must be one of: %s",
-            ground_truth,
-            list(NODE_NAMES.values()),
-        )
+    model = load_model(checkpoint_path)
+
+    logger.info("Loading dataset from %s", dataset_path)
+    dataset = torch.load(dataset_path, weights_only=False)
+
+    anomalies = get_anomalies(dataset)
+    logger.info("Total anomalous windows with valid labels: %d", len(anomalies))
+
+    if not anomalies:
+        logger.error("No anomalous windows with root cause labels found.")
         return
 
-    model = load_model(checkpoint_path, hidden_dim)
-    windows = load_windows(dataset_path)
+    # Stratified split: ensure each root cause type appears in train and test
+    by_rc: Dict[str, List[Data]] = {}
+    for d in anomalies:
+        rc = d.root_cause[0]
+        by_rc.setdefault(rc, []).append(d)
 
-    # Split: anomalous windows are the second half
-    split_idx = int(len(windows) * healthy_ratio)
-    anomalous_windows = windows[split_idx:]
-    logger.info("Evaluating on %d anomalous windows. Ground truth: %s", len(anomalous_windows), ground_truth)
+    test_anomalies: List[Data] = []
+    for rc, items in by_rc.items():
+        split = max(1, int(len(items) * train_ratio))
+        test_anomalies.extend(items[split:])
 
-    # Predict root cause for each anomalous window
-    predictions: List[str] = []
-    for window in anomalous_windows:
-        name, prob, _ = identify_root_cause(model, window)
-        predictions.append(name)
+    logger.info("Evaluating on %d test anomalous windows.", len(test_anomalies))
+
+    # Show distribution
+    test_dist = Counter([d.root_cause[0] for d in test_anomalies])
+    logger.info("Test root cause distribution: %s", dict(test_dist))
+
+    # Predict root cause for each test window
+    y_true, y_pred = [], []
+    edge_index = test_anomalies[0].edge_index
+
+    with torch.no_grad():
+        for data in test_anomalies:
+            x = data.x.unsqueeze(0)  # [1, V, F, W]
+            z, _ = model(x, data.edge_index)
+            rc_logits = model.classify_root_cause(z)  # [1, num_nodes]
+            pred_idx = rc_logits.argmax(dim=1).item()
+
+            y_true.append(NAME_TO_IDX[data.root_cause[0]])
+            y_pred.append(pred_idx)
 
     # Compute metrics
-    metrics = compute_metrics(predictions, ground_truth)
+    p = precision_score(y_true, y_pred, average='weighted', zero_division=0)
+    r = recall_score(y_true, y_pred, average='weighted', zero_division=0)
+    f1 = f1_score(y_true, y_pred, average='weighted', zero_division=0)
 
     # Display results
     logger.info("=" * 60)
     logger.info("EVALUATION RESULTS")
-    logger.info("  Ground truth root cause : %s", ground_truth)
-    logger.info("  Total anomalous windows : %d", len(anomalous_windows))
-    logger.info("  Precision               : %.4f", metrics["precision"])
-    logger.info("  Recall                  : %.4f", metrics["recall"])
-    logger.info("  F1-score                : %.4f", metrics["f1"])
-    logger.info("  Accuracy                : %.4f", metrics["accuracy"])
+    logger.info("  Total test windows    : %d", len(test_anomalies))
+    logger.info("  Precision (weighted)  : %.4f", p)
+    logger.info("  Recall    (weighted)  : %.4f", r)
+    logger.info("  F1-score  (weighted)  : %.4f", f1)
     logger.info("=" * 60)
 
-    # Distribution of predictions
-    vote_count: Dict[str, int] = {}
-    for p in predictions:
-        vote_count[p] = vote_count.get(p, 0) + 1
-    logger.info("  Prediction distribution : %s", vote_count)
+    # Per-class report
+    target_names = [NODE_NAMES[i] for i in sorted(set(y_true))]
+    report = classification_report(y_true, y_pred, target_names=target_names, zero_division=0)
+    logger.info("\n%s", report)
+
+    # Prediction distribution
+    pred_names = [NODE_NAMES[p] for p in y_pred]
+    logger.info("Prediction distribution: %s", dict(Counter(pred_names)))
 
 
 if __name__ == "__main__":
@@ -136,19 +137,12 @@ if __name__ == "__main__":
         help="Path to the trained model checkpoint.",
     )
     parser.add_argument(
-        "--dataset", type=str, default="dataset_windows.pt",
+        "--dataset", type=str, default="../dataset_windows.pt",
         help="Path to the windowed dataset .pt file.",
     )
-    parser.add_argument(
-        "--ground-truth", type=str, required=True,
-        help="Name of the actual root cause node (frontend, auth, backend, cache, database).",
-    )
-    parser.add_argument("--hidden-dim", type=int, default=32)
     args = parser.parse_args()
 
     evaluate(
         checkpoint_path=args.checkpoint,
         dataset_path=args.dataset,
-        ground_truth=args.ground_truth,
-        hidden_dim=args.hidden_dim,
     )
