@@ -231,8 +231,8 @@ def visualize_dual(model_path: str, dataset_path: str, output_path: str = "graph
     with torch.no_grad():
         x = data.x.unsqueeze(0)
         edge_index = data.edge_index
-        z, probs = model(x, edge_index)
-        rc_logits = model.classify_root_cause(z)
+        z, probs, h_spatial = model(x, edge_index)
+        rc_logits = model.classify_root_cause(h_spatial)
         rc_probs = F.softmax(rc_logits, dim=-1).squeeze(0).numpy()
 
     predicted_rc = NODE_NAMES[rc_probs.argmax()]

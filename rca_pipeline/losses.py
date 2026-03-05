@@ -5,9 +5,11 @@ InfoNCE (Noise Contrastive Estimation):
     Pulls healthy (anchor, positive) graph embeddings together while
     pushing anomalous (negative) embeddings apart in representation space.
 
-GIB Sparsity:
-    Penalizes the Graph Information Bottleneck mask probabilities to
-    encourage sparse causal sub-graph selection.
+GIB Sparsity (Asymmetric):
+    For healthy windows: push mask M toward zero (no root cause).
+    For anomalous windows: push mask M toward sparse one-hot (single root cause).
+    This directly encodes the dynamical system assumption:
+        U=0 → M≈0, ||U||_0=1 → M is one-hot.
 """
 
 import torch
@@ -28,116 +30,72 @@ def info_nce_loss(
     """
     Asymmetric InfoNCE contrastive loss.
 
-    Healthy graph windows (anchor, positive) are pulled together, while
-    anomalous windows (negatives) are repelled. The loss is computed as
-    the negative log-likelihood of the positive pair among all candidates.
-
     Args:
         z_anchor   : shape [batch, embedding_dim]
-                     Graph-level embeddings of anchor (healthy baseline) windows.
         z_positive : shape [batch, embedding_dim]
-                     Graph-level embeddings of positive (healthy shifted) windows.
         z_negatives: shape [num_negatives, embedding_dim]
-                     Graph-level embeddings of negative (chaos-injected) windows.
-        temperature: Scalar temperature for the softmax. Lower values
-                     sharpen the distribution.
+        temperature: Scalar temperature for the softmax.
 
     Returns:
         Scalar InfoNCE loss.
     """
-    # L2-normalize all embeddings to the unit hypersphere
-    # shape: [batch, embedding_dim]
     z_anchor = F.normalize(z_anchor, dim=-1)
     z_positive = F.normalize(z_positive, dim=-1)
-    # shape: [num_negatives, embedding_dim]
     z_negatives = F.normalize(z_negatives, dim=-1)
 
-    # Positive similarity: dot product between anchor and positive
-    # shape: [batch, 1]
     pos_sim = torch.sum(z_anchor * z_positive, dim=-1, keepdim=True) / temperature
-
-    # Negative similarity: dot product between each anchor and all negatives
-    # shape: [batch, num_negatives]
     neg_sim = torch.mm(z_anchor, z_negatives.t()) / temperature
-
-    # Concatenate: the positive is always at index 0
-    # shape: [batch, 1 + num_negatives]
     logits = torch.cat([pos_sim, neg_sim], dim=-1)
-
-    # Target: the positive is always at position 0
-    # shape: [batch]
     labels = torch.zeros(logits.size(0), dtype=torch.long, device=logits.device)
-
-    # Standard cross-entropy over the softmax distribution
     loss = F.cross_entropy(logits, labels)
 
     return loss
 
 
-def gib_sparsity_loss(mask_probabilities: torch.Tensor) -> torch.Tensor:
-    """
-    Graph Information Bottleneck sparsity regularizer.
-
-    Encourages the node mask M to be as sparse as possible by penalizing
-    its mean activation. This is equivalent to a relaxed L1 norm on the
-    sigmoid probabilities and can also be interpreted as a KL divergence
-    between the predicted Bernoulli distribution and a sparse prior
-    Bernoulli(epsilon ~ 0).
-
-    Formally:
-        L_sparse = KL( Bernoulli(p) || Bernoulli(epsilon) )
-                 ~ p * log(p / eps) + (1-p) * log((1-p) / (1-eps))
-
-    For simplicity and numerical stability, we use the mean of the
-    probabilities as a differentiable L1 proxy.
-
-    Args:
-        mask_probabilities: shape [batch, num_nodes, 1]
-                            Sigmoid probabilities from the GIB module.
-
-    Returns:
-        Scalar sparsity loss.
-    """
-    # shape: scalar
-    # Mean activation across batch and nodes penalizes dense masks
-    loss = mask_probabilities.mean()
-
-    return loss
-
-
-def total_loss(
-    z_anchor: torch.Tensor,
-    z_positive: torch.Tensor,
-    z_negatives: torch.Tensor,
-    mask_probs: torch.Tensor,
-    beta: float = 0.0,
-    temperature: float = 0.07,
+def asymmetric_gib_loss(
+    probs_healthy: torch.Tensor,
+    probs_anomalous: torch.Tensor,
+    target_sparsity: float = 0.2,
 ) -> torch.Tensor:
     """
-    Combined objective: L_total = L_InfoNCE + beta * L_GIB.
+    Asymmetric GIB loss that encodes the dynamical system assumption:
+        - Healthy windows (U=0): mask should be near zero → no root cause
+        - Anomalous windows (||U||_0 = 1): mask should be concentrated → one node active
 
-    The beta coefficient controls the information bottleneck pressure.
-    During warm-up, beta=0 lets the contrastive loss structure the
-    latent space first. Then beta is annealed upward to activate
-    the causal sub-graph compression.
+    The anomalous term uses a KL divergence between the mask distribution
+    and a uniform prior of strength `target_sparsity`, combined with a
+    negative entropy term that pushes toward a peaked (one-hot) distribution.
 
     Args:
-        z_anchor        : shape [batch, embedding_dim]
-        z_positive      : shape [batch, embedding_dim]
-        z_negatives     : shape [num_negatives, embedding_dim]
-        mask_probs      : shape [batch, num_nodes, 1]
-        beta            : GIB coefficient (annealed during training)
-        temperature     : InfoNCE temperature
+        probs_healthy:   shape [batch_h, num_nodes, 1] — mask probs for healthy windows
+        probs_anomalous: shape [batch_a, num_nodes, 1] — mask probs for anomalous windows
+        target_sparsity: desired mean activation for anomalous masks (e.g. 0.2 = 1/5 nodes)
 
     Returns:
-        Scalar total loss.
+        Scalar asymmetric GIB loss.
     """
-    l_contrastive = info_nce_loss(z_anchor, z_positive, z_negatives, temperature)
-    l_sparsity = gib_sparsity_loss(mask_probs)
+    # --- Healthy: push all mask probabilities toward 0 ---
+    # Simple L2 penalty: encourages M → 0 for healthy windows
+    loss_healthy = (probs_healthy ** 2).mean()
 
-    l_total = l_contrastive + beta * l_sparsity
+    # --- Anomalous: push mask toward sparse, concentrated distribution ---
+    # Squeeze to [batch, num_nodes]
+    p_anom = probs_anomalous.squeeze(-1)
 
-    return l_total
+    # 1. Sparsity: mean activation should be close to target_sparsity
+    mean_activation = p_anom.mean(dim=-1)  # [batch]
+    loss_sparsity = ((mean_activation - target_sparsity) ** 2).mean()
+
+    # 2. Concentration: negative entropy pushes toward one-hot
+    #    Normalize mask probs to a distribution per sample, then minimize entropy
+    p_norm = p_anom / (p_anom.sum(dim=-1, keepdim=True) + 1e-8)  # [batch, num_nodes]
+    entropy = -(p_norm * torch.log(p_norm + 1e-8)).sum(dim=-1)   # [batch]
+    max_entropy = torch.log(torch.tensor(float(p_anom.size(-1))))
+    loss_concentration = (entropy / max_entropy).mean()  # normalized to [0, 1]
+
+    loss_anomalous = loss_sparsity + loss_concentration
+
+    return loss_healthy + loss_anomalous
 
 
 def root_cause_loss(
@@ -146,13 +104,6 @@ def root_cause_loss(
 ) -> torch.Tensor:
     """
     Cross-entropy loss for root cause classification.
-
-    Args:
-        logits: shape [batch, num_nodes] — predicted root cause logits.
-        targets: shape [batch] — ground truth root cause node indices.
-
-    Returns:
-        Scalar cross-entropy loss.
     """
     return F.cross_entropy(logits, targets)
 

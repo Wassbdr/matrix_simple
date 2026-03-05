@@ -1,22 +1,26 @@
 ##############################################
-# PodChaos -- Kill du pod Cache (Redis)
-# Cible : Pod Redis, tue immediatement.
-# Kubernetes le relancera automatiquement.
+# StressChaos -- Fuite de Memoire (Cache)
+# Cible : Pod Redis
+# Consomme 128MB de RAM avec 2 workers.
+# Provoquera des lags GC sans tuer le pod.
 ##############################################
 apiVersion: chaos-mesh.org/v1alpha1
-kind: PodChaos
+kind: StressChaos
 metadata:
-  name: kill-cache-pod
+  name: stress-mem-cache
   namespace: rca-sandbox
   labels:
-    experiment: pod-kill-cache
+    experiment: stress-mem-cache
     project: rca-research
 spec:
-  action: pod-kill
   mode: all
   selector:
     namespaces:
       - rca-sandbox
     labelSelectors:
       app: cache
-  gracePeriod: 0
+  stressors:
+    memory:
+      workers: 2
+      size: "128MB"
+  duration: "5m"

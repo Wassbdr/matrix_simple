@@ -25,7 +25,7 @@ from typing import List, Dict, Tuple
 from torch_geometric.data import Data
 
 from model import SpatioTemporalRCA
-from losses import info_nce_loss, gib_sparsity_loss
+from losses import info_nce_loss
 
 logging.basicConfig(
     level=logging.INFO,
@@ -278,9 +278,9 @@ def run_sanity_check(
         # -- Forward pass --
         # z shape: [batch, num_nodes, hidden_dim]
         # probs shape: [batch, num_nodes, 1]
-        z_a, probs_a = model(x_anchor, edge_index)
-        z_p, _ = model(x_positive, edge_index)
-        z_n, _ = model(x_negative, edge_index)
+        z_a, probs_a, _ = model(x_anchor, edge_index)
+        z_p, _, _ = model(x_positive, edge_index)
+        z_n, _, _ = model(x_negative, edge_index)
 
         # -- Graph-level aggregation (mean pooling) --
         # shape: [batch, hidden_dim]
@@ -291,7 +291,7 @@ def run_sanity_check(
         # -- Compute losses --
         # L_total = L_InfoNCE + beta * L_GIB
         l_nce = info_nce_loss(z_a_graph, z_p_graph, z_n_graph, temperature=0.07)
-        l_gib = gib_sparsity_loss(probs_a)
+        l_gib = probs_a.mean()  # L1 sparsity
         loss = l_nce + beta * l_gib
 
         # -- Backward pass --

@@ -93,38 +93,12 @@ def feature_masking(
     return x_aug
 
 
-def edge_dropout(
-    edge_index: torch.Tensor,
-    drop_ratio: float = 0.2,
-) -> torch.Tensor:
-    """
-    Randomly removes a fraction of edges from the graph.
-
-    This augments the spatial structure, forcing the GCN to be
-    robust to partial connectivity (e.g. simulating partial
-    network partitions).
-
-    Args:
-        edge_index: shape [2, num_edges]
-        drop_ratio: Fraction of edges to remove.
-
-    Returns:
-        Augmented edge_index with some edges removed.
-    """
-    num_edges = edge_index.size(1)
-    num_to_keep = max(1, int(num_edges * (1.0 - drop_ratio)))
-    keep_indices = torch.randperm(num_edges)[:num_to_keep]
-    keep_indices = keep_indices.sort().values
-    return edge_index[:, keep_indices]
-
-
 def augment_positive(
     x: torch.Tensor,
     edge_index: Optional[torch.Tensor] = None,
     noise_sigma: float = 0.1,
     jitter_shift: int = 1,
     feature_mask_ratio: float = 0.2,
-    edge_drop_ratio: float = 0.2,
 ) -> torch.Tensor:
     """
     Applies a composition of augmentations to generate a positive sample.
@@ -138,16 +112,12 @@ def augment_positive(
         2. Temporal jitter
         3. Feature masking
 
-    Note: Edge dropout is returned separately since it modifies the
-    graph structure, not the node features.
-
     Args:
         x: shape [batch, num_nodes, num_features, W]
-        edge_index: Optional, shape [2, num_edges] (augmented separately)
+        edge_index: Optional, shape [2, num_edges] (unused, kept for API compat)
         noise_sigma: Gaussian noise standard deviation.
         jitter_shift: Max temporal shift in timesteps.
         feature_mask_ratio: Fraction of features to mask.
-        edge_drop_ratio: Fraction of edges to drop.
 
     Returns:
         Augmented x tensor.

@@ -20,6 +20,6 @@ spec:
       app: database
   stressors:
     cpu:
-      workers: 4
-      load: 100
+      workers: 1
+      load: 25
   duration: "5m"

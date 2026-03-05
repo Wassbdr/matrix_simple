@@ -8,10 +8,14 @@ venv/
 # PyTorch artifacts
 *.pt
 checkpoints/
+rca_pipeline/checkpoints/
 
 # Dataset outputs
 dataset_*.csv
-synthetic_dataset.csv
+synthetic_*.csv
+dataset_merged.csv
+datasets/
+rca_pipeline/datasets/
 
 # Logs
 port_forward.log

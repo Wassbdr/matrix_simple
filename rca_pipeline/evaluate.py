@@ -99,8 +99,8 @@ def evaluate(
     with torch.no_grad():
         for data in test_anomalies:
             x = data.x.unsqueeze(0)  # [1, V, F, W]
-            z, _ = model(x, data.edge_index)
-            rc_logits = model.classify_root_cause(z)  # [1, num_nodes]
+            z, probs, h_spatial = model(x, data.edge_index)
+            rc_logits = model.classify_root_cause(h_spatial)  # [1, num_nodes]
             pred_idx = rc_logits.argmax(dim=1).item()
 
             y_true.append(NAME_TO_IDX[data.root_cause[0]])

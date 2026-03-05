@@ -91,7 +91,7 @@ def identify_root_cause(
 
         # Forward pass
         # z: [1, num_nodes, hidden_dim], probs: [1, num_nodes, 1]
-        _, probs = model(x, edge_index)
+        _, probs, _ = model(x, edge_index)
 
         # Remove batch dim: [num_nodes, 1] -> [num_nodes]
         node_probs = probs.squeeze(0).squeeze(-1)

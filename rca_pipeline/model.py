@@ -51,6 +51,12 @@ class TemporalConvBlock(nn.Module):
             padding=kernel_size // 2,
         )
         self.norm = nn.BatchNorm1d(hidden_dim)
+        # Learned temporal attention: preserves order information
+        self.temporal_attn = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.Tanh(),
+            nn.Linear(hidden_dim // 2, 1),
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -63,9 +69,11 @@ class TemporalConvBlock(nn.Module):
         h = F.relu(self.conv1(x))
         # shape: [batch*num_nodes, hidden_dim, W]
         h = F.relu(self.conv2(h))
-        # Global average pooling over the temporal dimension
-        # shape: [batch*num_nodes, hidden_dim]
-        h = h.mean(dim=-1)
+        # Temporal attention: learned weighting preserves temporal order
+        h_t = h.permute(0, 2, 1)  # [B*N, W, H]
+        attn_scores = self.temporal_attn(h_t).squeeze(-1)  # [B*N, W]
+        attn_weights = F.softmax(attn_scores, dim=-1)  # [B*N, W]
+        h = (h_t * attn_weights.unsqueeze(-1)).sum(dim=1)  # [B*N, H]
         h = self.norm(h)
         return h
 
@@ -92,11 +100,10 @@ class SpatialConvBlock(nn.Module):
         Returns:
             shape [num_nodes_total, hidden_dim]
         """
-        # shape: [num_nodes_total, hidden_dim]
         h = F.relu(self.gcn1(x, edge_index))
-        # shape: [num_nodes_total, hidden_dim]
-        h = self.gcn2(h, edge_index)
-        h = self.norm(h)
+        h = F.relu(self.gcn2(h, edge_index))
+        # Residual connection preserves node identity through message passing
+        h = self.norm(h + x)
         return h
 
 
@@ -110,14 +117,20 @@ class GraphInformationBottleneck(nn.Module):
     Output: (mask [num_nodes_total, 1], probabilities [num_nodes_total, 1])
     """
 
-    def __init__(self, hidden_dim: int, temperature: float = 0.5) -> None:
+    def __init__(self, hidden_dim: int, temperature: float = 0.5, mask_floor: float = 0.01) -> None:
         super().__init__()
+        self.temperature_init = temperature
         self.temperature = temperature
+        self.mask_floor = mask_floor
         self.mlp = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, 1),
         )
+
+    def set_temperature(self, temperature: float) -> None:
+        """Update the Concrete distribution temperature (for annealing)."""
+        self.temperature = temperature
 
     def forward(self, h: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -134,47 +147,43 @@ class GraphInformationBottleneck(nn.Module):
 
         if self.training:
             # Relaxed Bernoulli (Concrete distribution) reparameterization trick
-            # Sample u ~ Uniform(0, 1)
             u = torch.rand_like(logits).clamp(1e-6, 1.0 - 1e-6)
-            # Concrete / Gumbel-Sigmoid: sigma((log(u) - log(1-u) + logits) / tau)
             gumbel_noise = torch.log(u) - torch.log(1.0 - u)
             mask = torch.sigmoid((gumbel_noise + logits) / self.temperature)
+            mask = mask.clamp(min=self.mask_floor)
         else:
-            # Hard threshold at inference
-            mask = (probs > 0.5).float()
+            # Soft deterministic mask at inference (matches training distribution)
+            mask = probs
 
         return mask, probs
 
 
-class RootCauseClassifier(nn.Module):
+class NodeScorer(nn.Module):
     """
-    Supervised classification head that maps node-level hidden representations
-    to a root cause prediction. Uses the GIB-masked spatial embeddings
-    to predict which node is the root cause.
+    Per-node scoring head for the No-GIB ablation.
+    Applied independently to each node's spatial embedding.
 
-    Input : z [batch, num_nodes, hidden_dim] (GIB-masked embeddings)
-    Output: logits [batch, num_nodes] (one logit per node = per possible root cause)
+    Input : h_spatial [batch, num_nodes, hidden_dim]
+    Output: logits   [batch, num_nodes] (one score per candidate root cause)
     """
 
-    def __init__(self, hidden_dim: int, num_nodes: int) -> None:
+    def __init__(self, hidden_dim: int) -> None:
         super().__init__()
-        self.classifier = nn.Sequential(
-            nn.Linear(num_nodes * hidden_dim, hidden_dim),
+        self.scorer = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
             nn.Dropout(0.2),
-            nn.Linear(hidden_dim, num_nodes),
+            nn.Linear(hidden_dim, 1),
         )
 
-    def forward(self, z: torch.Tensor) -> torch.Tensor:
+    def forward(self, h: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            z: shape [batch, num_nodes, hidden_dim]
+            h: shape [batch, num_nodes, hidden_dim]
         Returns:
             logits: shape [batch, num_nodes]
         """
-        batch_size = z.size(0)
-        z_flat = z.view(batch_size, -1)  # [batch, num_nodes * hidden_dim]
-        return self.classifier(z_flat)
+        return self.scorer(h).squeeze(-1)
 
 
 class SpatioTemporalRCA(nn.Module):
@@ -185,8 +194,9 @@ class SpatioTemporalRCA(nn.Module):
         x     : [batch, num_nodes, num_features, W]
         edge_index : [2, num_edges] (static topology)
     Output:
-        z     : [batch, num_nodes, hidden_dim]  (compressed representation)
-        probs : [batch, num_nodes, 1]           (mask probabilities for GIB loss)
+        z_graph : [batch, hidden_dim]            (masked global pooled embedding)
+        probs   : [batch, num_nodes, 1]          (mask probabilities = root cause scores)
+        h_spatial_batched : [batch, num_nodes, hidden_dim] (raw spatial embeddings)
     """
 
     def __init__(
@@ -202,7 +212,7 @@ class SpatioTemporalRCA(nn.Module):
         self.temporal_block = TemporalConvBlock(num_features, hidden_dim, temporal_kernel)
         self.spatial_block = SpatialConvBlock(hidden_dim)
         self.gib = GraphInformationBottleneck(hidden_dim, gib_temperature)
-        self.root_cause_head = RootCauseClassifier(hidden_dim, num_nodes)
+        self.node_scorer = NodeScorer(hidden_dim)
 
         logger.info(
             "SpatioTemporalRCA initialized: features=%d, hidden=%d, nodes=%d",
@@ -212,61 +222,57 @@ class SpatioTemporalRCA(nn.Module):
         )
 
     def forward(
-        self, x: torch.Tensor, edge_index: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        self, x: torch.Tensor, edge_index: torch.Tensor, use_gib: bool = True
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Args:
             x: shape [batch, num_nodes, num_features, W]
             edge_index: shape [2, num_edges]
+            use_gib: whether to apply the Graph Information Bottleneck masking
         Returns:
-            z: shape [batch, num_nodes, hidden_dim]
-            mask_probs: shape [batch, num_nodes, 1]
+            z_graph: shape [batch, hidden_dim]  -- masked global pooled embedding
+            probs:   shape [batch, num_nodes, 1] -- per-node mask probabilities
+            h_spatial_batched: shape [batch, num_nodes, hidden_dim] -- raw embeddings
         """
         batch_size = x.size(0)
 
         # -- Temporal Convolution --
-        # Reshape to [batch * num_nodes, num_features, W] for Conv1d
         x_flat = x.view(batch_size * self.num_nodes, x.size(2), x.size(3))
-        # shape: [batch * num_nodes, hidden_dim]
         h_temporal = self.temporal_block(x_flat)
 
-        # -- Spatial Convolution --
-        # GCNConv expects a single flat node list with a matching edge_index.
-        # We replicate edge_index for each sample in the batch by offsetting
-        # node indices.
-        h_all = []
+        # -- Spatial Convolution (batched) --
         hidden_dim = h_temporal.size(1)
-        for i in range(batch_size):
-            # Extract per-sample node features: [num_nodes, hidden_dim]
-            h_i = h_temporal[i * self.num_nodes : (i + 1) * self.num_nodes]
-            # Apply GCN on the shared static topology
-            h_i = self.spatial_block(h_i, edge_index)
-            h_all.append(h_i)
+        if batch_size > 1:
+            offsets = torch.arange(batch_size, device=h_temporal.device) * self.num_nodes
+            batch_ei = edge_index.unsqueeze(0).expand(batch_size, -1, -1) + offsets.view(-1, 1, 1)
+            batch_ei = batch_ei.reshape(2, -1)
+        else:
+            batch_ei = edge_index
+        h_spatial = self.spatial_block(h_temporal, batch_ei)
 
-        # shape: [batch * num_nodes, hidden_dim]
-        h_spatial = torch.cat(h_all, dim=0)
+        # Reshape to [batch, num_nodes, hidden_dim]
+        h_spatial_batched = h_spatial.view(batch_size, self.num_nodes, hidden_dim)
 
         # -- Graph Information Bottleneck --
-        # shape: mask [batch*num_nodes, 1], probs [batch*num_nodes, 1]
-        mask, probs = self.gib(h_spatial)
+        if use_gib:
+            mask, probs = self.gib(h_spatial)
+            mask = mask.view(batch_size, self.num_nodes, 1)
+            probs = probs.view(batch_size, self.num_nodes, 1)
+            # Masked Global Pooling: z_graph = sum(mask * h_spatial, dim=nodes)
+            z_graph = (mask * h_spatial_batched).sum(dim=1)  # [batch, hidden_dim]
+        else:
+            probs = torch.ones(batch_size, self.num_nodes, 1, device=h_spatial.device) / self.num_nodes
+            # Without GIB: simple mean pool over nodes
+            z_graph = h_spatial_batched.mean(dim=1)  # [batch, hidden_dim]
 
-        # Compressed representation: Z = M (element-wise) H
-        # shape: [batch * num_nodes, hidden_dim]
-        z = mask * h_spatial
+        return z_graph, probs, h_spatial_batched
 
-        # Reshape back to [batch, num_nodes, ...]
-        z = z.view(batch_size, self.num_nodes, hidden_dim)
-        probs = probs.view(batch_size, self.num_nodes, 1)
-
-        return z, probs
-
-    def classify_root_cause(self, z: torch.Tensor) -> torch.Tensor:
+    def classify_root_cause(self, h_spatial_batched: torch.Tensor) -> torch.Tensor:
         """
-        Predicts root cause node from GIB-masked embeddings.
-
+        Per-node scoring for No-GIB ablation.
         Args:
-            z: shape [batch, num_nodes, hidden_dim]
+            h_spatial_batched: shape [batch, num_nodes, hidden_dim]
         Returns:
             logits: shape [batch, num_nodes]
         """
-        return self.root_cause_head(z)
+        return self.node_scorer(h_spatial_batched)
