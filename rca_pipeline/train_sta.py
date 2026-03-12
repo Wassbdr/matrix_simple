@@ -1,5 +1,5 @@
 """
-Training loop for SelectThenAnalyzeV3.
+Training loop for SelectThenAnalyze (STA).
 
 Two-phase training aligned with the paper's formulation:
 
@@ -22,7 +22,7 @@ Phase 2 -- Supervised fine-tuning:
     - Both paths also give gradient to the selector through the STE.
 
 Usage:
-    python train_v3.py --dataset scalable_dataset_N100.pt --num-nodes 100 --k 10
+    python train_sta.py --dataset scalable_dataset_N100.pt --num-nodes 100 --k 10
 """
 
 import torch
@@ -35,7 +35,7 @@ import argparse
 import os
 import time
 
-from model_v3 import SelectThenAnalyzeV3
+from model_sta import SelectThenAnalyze
 from losses import info_nce_loss
 from augment import augment_positive
 
@@ -113,7 +113,7 @@ def asymmetric_sparsity_loss(
 # Training
 # ---------------------------------------------------------------------------
 
-def train_v3(
+def train_sta(
     dataset_path: str,
     node_names: List[str],
     # Architecture
@@ -133,7 +133,7 @@ def train_v3(
     batch_size: int = 256,
     weight_decay: float = 1e-4,
     checkpoint_dir: str = "checkpoints",
-    out_checkpoint: str = "sta_v3.pt",
+    out_checkpoint: str = "sta.pt",
     skip_contrastive: bool = False,
 ) -> None:
 
@@ -160,7 +160,7 @@ def train_v3(
     edge_index = healthy[0].edge_index.to(device)
     num_features = x_anchor.size(2)
 
-    model = SelectThenAnalyzeV3(
+    model = SelectThenAnalyze(
         num_features=num_features,
         hidden_dim=hidden_dim,
         num_nodes=num_nodes,
@@ -345,7 +345,7 @@ def train_v3(
         "num_nodes": num_nodes,
         "k": k,
         "node_names": node_names,
-        "mode": "select_then_analyze_v3",
+        "mode": "select_then_analyze",
     }, ckpt_path)
     logger.info("Checkpoint saved to %s", ckpt_path)
 
@@ -355,7 +355,7 @@ def train_v3(
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train SelectThenAnalyzeV3")
+    parser = argparse.ArgumentParser(description="Train SelectThenAnalyze (STA)")
     parser.add_argument("--dataset", type=str, required=True)
     parser.add_argument("--node-names", type=str, default="auto",
                         help="'auto' reads from dataset, 'large' for 20-node, 'small' for 5-node")
@@ -370,7 +370,7 @@ if __name__ == "__main__":
     parser.add_argument("--beta-max", type=float, default=0.5)
     parser.add_argument("--gamma-sparsity", type=float, default=0.1)
     parser.add_argument("--skip-contrastive", action="store_true")
-    parser.add_argument("--out-checkpoint", type=str, default="sta_v3.pt")
+    parser.add_argument("--out-checkpoint", type=str, default="sta.pt")
     args = parser.parse_args()
 
     # Resolve node names
@@ -393,7 +393,7 @@ if __name__ == "__main__":
     if args.num_nodes is not None and args.num_nodes != len(node_names):
         raise ValueError(f"--num-nodes {args.num_nodes} != len(node_names) {len(node_names)}")
 
-    train_v3(
+    train_sta(
         dataset_path=args.dataset,
         node_names=node_names,
         hidden_dim=args.hidden_dim,

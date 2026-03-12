@@ -1,5 +1,5 @@
 """
-Select-then-Analyze v3: Correct STE + Vectorized Subgraph Extraction.
+Select-then-Analyze (STA): Correct STE + Vectorized Subgraph Extraction.
 
 Architecture (Early Bottleneck):
     1. LightEncoder: 1-layer GCN + temporal attention on full graph  -- O(N)
@@ -10,14 +10,13 @@ Architecture (Early Bottleneck):
 
     Total: O(N + k^2) vs O(N^2) in the Late Bottleneck baseline.
 
-Key innovations over v2:
+Key innovations:
     - Proper Straight-Through Estimator (STE) with Gumbel noise:
         M_hard = binarize(M_soft) - sg(M_soft) + M_soft
       Forward uses M_hard (discrete top-k), backward flows through M_soft.
     - Sigmoid mask (independent per-node) instead of softmax.
       Allows the sparsity loss ||M_soft||_1 to act as a direct L0 surrogate.
-    - Single vectorized pyg_subgraph call for the entire batch
-      (eliminates Python for-loops in _extract_subgraph).
+    - Single vectorized pyg_subgraph call for the entire batch.
     - Dual gradient path to the selector:
         (a) Direct: GIB sparsity loss + supervised CE on selector logits.
         (b) Indirect: task loss through STE mask -> Deep STGCN -> scorer.
@@ -255,7 +254,7 @@ def extract_subgraph_vectorized(
     Single-call vectorized subgraph extraction for an entire batch.
 
     Instead of looping over batch elements in Python (O(B*E) in Python,
-    the bottleneck in model_v2), this function:
+      the bottleneck in a naive loop), this function:
         1. Builds a batched super-graph (standard PyG batch convention).
         2. Computes a global subset of selected nodes (B*k indices).
         3. Calls torch_geometric.utils.subgraph ONCE with relabel_nodes=True.
@@ -317,10 +316,10 @@ def extract_subgraph_vectorized(
 
 
 # ---------------------------------------------------------------------------
-# Main Architecture: Select-then-Analyze v3
+# Main Architecture: Select-then-Analyze (STA)
 # ---------------------------------------------------------------------------
 
-class SelectThenAnalyzeV3(nn.Module):
+class SelectThenAnalyze(nn.Module):
     """
     Full pipeline:
         x [B, N, F, W]  -->  LightEncoder  -->  STESelector  -->  subgraph
@@ -356,7 +355,7 @@ class SelectThenAnalyzeV3(nn.Module):
         self._k_override = None  # for k-annealing during training
 
         logger.info(
-            "SelectThenAnalyzeV3: N=%d, k=%d, features=%d, hidden=%d",
+            "SelectThenAnalyze: N=%d, k=%d, features=%d, hidden=%d",
             num_nodes, k, num_features, hidden_dim,
         )
 
