@@ -39,12 +39,25 @@ class GraphBuilder:
         ]
 
     def _map_pod_to_node(self, pod_name: str) -> int:
-        """Heuristically assign a pod name to a graph node index."""
+        """Map a pod name to a graph node index.
+        
+        Uses segment-based matching: splits on '-' and checks if any segment
+        starts with the node key. Resolves ambiguity by preferring the longest
+        matching key (e.g. 'database' over 'data').
+        """
         pod_name_lower = str(pod_name).lower()
+        segments = pod_name_lower.replace('_', '-').split('-')
+        
+        best_match_idx = -1
+        best_match_len = 0
         for key, idx in self.node_mapping.items():
-            if key in pod_name_lower:
-                return idx
-        return -1
+            for seg in segments:
+                if seg == key or seg.startswith(key):
+                    if len(key) > best_match_len:
+                        best_match_len = len(key)
+                        best_match_idx = idx
+                    break
+        return best_match_idx
 
     def build_snapshots(self) -> List[Data]:
         """Reads the CSV and builds a list of graph snapshots (one per timestamp)."""
@@ -125,19 +138,9 @@ class GraphBuilder:
         
         logger.info(f"Split dataset into {len(chunks)} continuous chunks.")
 
-        # Extract all X matrices: [T, num_nodes, num_features] for global scaling
-        all_x = torch.stack([snap.x for snap in snapshots])
-        T, num_nodes, num_features = all_x.shape
-
-        # Apply StandardScaler across the time and node dimensions globally
-        scaler = StandardScaler()
-        reshaped_x = all_x.view(-1, num_features).numpy()
-        scaled_x = scaler.fit_transform(reshaped_x)
-        all_x_scaled = torch.tensor(scaled_x, dtype=torch.float).view(T, num_nodes, num_features)
-        
-        # Map scaled features back directly on snapshots to maintain chunk boundaries
-        for i, snap in enumerate(snapshots):
-            snap.x = all_x_scaled[i]
+        # NOTE: Normalization is NOT applied here to avoid data leakage.
+        # The caller must normalize after train/test split using fit_scaler()
+        # on training data only, then apply_scaler() on both splits.
 
         windows: List[Data] = []
         
@@ -167,8 +170,29 @@ class GraphBuilder:
                     
                 windows.append(window_data)
                 
-        logger.info(f"Generated {len(windows)} sliding windows (size {window_size}) with standard scaling applied.")
+        logger.info(f"Generated {len(windows)} sliding windows (size {window_size}).")
         return windows
+
+    @staticmethod
+    def fit_scaler(data_list: List[Data]) -> StandardScaler:
+        """Fit a StandardScaler on a list of Data objects (training set only).
+        x shape per sample: [num_nodes, num_features, window_size]."""
+        all_x = torch.cat([d.x for d in data_list], dim=0)  # [total_nodes, F, W]
+        # Flatten across nodes and timesteps to get per-feature statistics
+        flat = all_x.permute(1, 0, 2).reshape(all_x.size(1), -1).T.numpy()  # [total_nodes*W, F]
+        scaler = StandardScaler()
+        scaler.fit(flat)
+        logger.info(f"Scaler fit on {len(data_list)} samples (mean={scaler.mean_}, std={scaler.scale_})")
+        return scaler
+
+    @staticmethod
+    def apply_scaler(data_list: List[Data], scaler: StandardScaler) -> List[Data]:
+        """Apply a pre-fitted StandardScaler to a list of Data objects (in-place)."""
+        mean = torch.tensor(scaler.mean_, dtype=torch.float).view(1, -1, 1)  # [1, F, 1]
+        std = torch.tensor(scaler.scale_, dtype=torch.float).view(1, -1, 1)  # [1, F, 1]
+        for d in data_list:
+            d.x = (d.x - mean) / std
+        return data_list
 
     def save_windows(self, windows: List[Data], filepath: str) -> None:
         """Saves the list of Data objects to a PyTorch file."""

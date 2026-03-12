@@ -1,5 +1,5 @@
 """
-Scaled Synthetic RCA Dataset — 20-node microservice architecture.
+Scaled Simulated RCA Dataset — 20-node microservice architecture.
 
 Topology: realistic 3-tier K8S architecture with 20 services.
     Tier 1 (Gateways):    gateway-web, gateway-mobile, gateway-admin
@@ -115,7 +115,7 @@ def generate_large_dataset(
     seed: int = 42,
 ) -> List[Data]:
     """
-    Generates a 20-node synthetic RCA dataset.
+    Generates a 20-node simulated RCA dataset.
     
     Key differences from the 5-node version:
         - Stochastic propagation: edge weights jittered per sample
@@ -226,13 +226,13 @@ def generate_large_dataset(
 
 
 if __name__ == "__main__":
-    print("Generating 20-node synthetic RCA dataset (N=5000)...")
+    print("Generating 20-node simulated RCA dataset (N=5000)...")
     dataset = generate_large_dataset(
         num_samples=5000, window_size=12, num_features=5,
         anomaly_ratio=0.4, seed=42,
     )
     
-    torch.save(dataset, "synthetic_large_dataset_windows.pt")
+    torch.save(dataset, "simulated_large_dataset_windows.pt")
     
     anomalies = [d for d in dataset if d.y.item() == 1]
     healthy = [d for d in dataset if d.y.item() == 0]

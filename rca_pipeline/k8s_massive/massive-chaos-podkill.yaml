@@ -1,0 +1,14 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: pod-kill-massive
+  namespace: rca-sandbox
+spec:
+  action: pod-kill
+  mode: one
+  selector:
+    namespaces:
+      - rca-sandbox
+    labelSelectors:
+      app: core-010
+  duration: "5m"

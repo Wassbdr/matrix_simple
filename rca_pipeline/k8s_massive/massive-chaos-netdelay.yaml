@@ -1,0 +1,19 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: net-delay-massive
+  namespace: rca-sandbox
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces:
+      - rca-sandbox
+    labelSelectors:
+      app: svc-018
+  delay:
+    latency: "800ms"
+    correlation: "100"
+    jitter: "200ms"
+  direction: both
+  duration: "5m"

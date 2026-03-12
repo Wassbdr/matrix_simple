@@ -585,7 +585,7 @@ def run_benchmark(
     
     # ── Part B: SelectThenAnalyze 20-node evaluation ──
     if large_dataset_path:
-        from synthetic_data_large import NODE_NAMES_LARGE
+        from simulated_data_large import NODE_NAMES_LARGE
         print("\n" + "▓" * 60)
         print("  PART B: SelectThenAnalyze (20-node dataset)")
         print("▓" * 60)

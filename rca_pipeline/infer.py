@@ -21,13 +21,10 @@ from model import SpatioTemporalRCA
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-NODE_NAMES: Dict[int, str] = {
-    0: "frontend",
-    1: "auth",
-    2: "backend",
-    3: "cache",
-    4: "database",
-}
+from common import NODE_NAMES as _DEFAULT_NODE_NAMES, NAME_TO_IDX as _DEFAULT_NAME_TO_IDX
+
+# Legacy: int->str mapping for default 5-node topology
+NODE_NAMES: Dict[int, str] = {i: name for i, name in enumerate(_DEFAULT_NODE_NAMES)}
 
 
 def load_model(checkpoint_path: str, hidden_dim: int = 32) -> SpatioTemporalRCA:
@@ -38,7 +35,8 @@ def load_model(checkpoint_path: str, hidden_dim: int = 32) -> SpatioTemporalRCA:
         num_features = checkpoint.get('num_features',
             checkpoint['model_state_dict']['temporal_block.conv1.weight'].size(1))
         hd = checkpoint.get('hidden_dim', hidden_dim)
-        model = SpatioTemporalRCA(num_features=num_features, hidden_dim=hd, num_nodes=5)
+        num_nodes = checkpoint.get('num_nodes', 5)
+        model = SpatioTemporalRCA(num_features=num_features, hidden_dim=hd, num_nodes=num_nodes)
         model.load_state_dict(checkpoint["model_state_dict"])
         logger.info(
             "Loaded checkpoint from %s (epoch %d, features=%d, hidden=%d)",

@@ -372,7 +372,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     if args.node_names == "large":
-        from synthetic_data_large import NODE_NAMES_LARGE
+        from simulated_data_large import NODE_NAMES_LARGE
         node_names = NODE_NAMES_LARGE
     else:
         from common import NODE_NAMES

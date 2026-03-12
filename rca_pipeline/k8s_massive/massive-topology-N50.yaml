@@ -1,0 +1,2455 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rca-sandbox
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-000
+  namespace: rca-sandbox
+  labels:
+    app: core-000
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: core-000
+  template:
+    metadata:
+      labels:
+        app: core-000
+    spec:
+      containers:
+      - name: core-000
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: core-000
+        - name: UPSTREAMS
+          value: "http://core-001.rca-sandbox.svc.cluster.local:8000/api/data,http://core-002.rca-sandbox.svc.cluster.local:8000/api/data,http://core-004.rca-sandbox.svc.cluster.local:8000/api/data,http://core-007.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-000
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: core-000
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-001
+  namespace: rca-sandbox
+  labels:
+    app: core-001
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: core-001
+  template:
+    metadata:
+      labels:
+        app: core-001
+    spec:
+      containers:
+      - name: core-001
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: core-001
+        - name: UPSTREAMS
+          value: "http://core-004.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-001
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: core-001
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-002
+  namespace: rca-sandbox
+  labels:
+    app: core-002
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: core-002
+  template:
+    metadata:
+      labels:
+        app: core-002
+    spec:
+      containers:
+      - name: core-002
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: core-002
+        - name: UPSTREAMS
+          value: "http://core-004.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-002
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: core-002
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-003
+  namespace: rca-sandbox
+  labels:
+    app: svc-003
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-003
+  template:
+    metadata:
+      labels:
+        app: svc-003
+    spec:
+      containers:
+      - name: svc-003
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-003
+        - name: UPSTREAMS
+          value: "http://core-000.rca-sandbox.svc.cluster.local:8000/api/data,http://core-008.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-035.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-003
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-003
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-004
+  namespace: rca-sandbox
+  labels:
+    app: core-004
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: core-004
+  template:
+    metadata:
+      labels:
+        app: core-004
+    spec:
+      containers:
+      - name: core-004
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: core-004
+        - name: UPSTREAMS
+          value: ""
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-004
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: core-004
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-005
+  namespace: rca-sandbox
+  labels:
+    app: core-005
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: core-005
+  template:
+    metadata:
+      labels:
+        app: core-005
+    spec:
+      containers:
+      - name: core-005
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: core-005
+        - name: UPSTREAMS
+          value: "http://core-000.rca-sandbox.svc.cluster.local:8000/api/data,http://core-001.rca-sandbox.svc.cluster.local:8000/api/data,http://core-004.rca-sandbox.svc.cluster.local:8000/api/data,http://core-006.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-005
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: core-005
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-006
+  namespace: rca-sandbox
+  labels:
+    app: core-006
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: core-006
+  template:
+    metadata:
+      labels:
+        app: core-006
+    spec:
+      containers:
+      - name: core-006
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: core-006
+        - name: UPSTREAMS
+          value: "http://core-001.rca-sandbox.svc.cluster.local:8000/api/data,http://core-002.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-006
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: core-006
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-007
+  namespace: rca-sandbox
+  labels:
+    app: core-007
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: core-007
+  template:
+    metadata:
+      labels:
+        app: core-007
+    spec:
+      containers:
+      - name: core-007
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: core-007
+        - name: UPSTREAMS
+          value: "http://core-001.rca-sandbox.svc.cluster.local:8000/api/data,http://core-004.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-007
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: core-007
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-008
+  namespace: rca-sandbox
+  labels:
+    app: core-008
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: core-008
+  template:
+    metadata:
+      labels:
+        app: core-008
+    spec:
+      containers:
+      - name: core-008
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: core-008
+        - name: UPSTREAMS
+          value: "http://core-001.rca-sandbox.svc.cluster.local:8000/api/data,http://core-004.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-008
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: core-008
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-009
+  namespace: rca-sandbox
+  labels:
+    app: core-009
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: core-009
+  template:
+    metadata:
+      labels:
+        app: core-009
+    spec:
+      containers:
+      - name: core-009
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: core-009
+        - name: UPSTREAMS
+          value: "http://core-000.rca-sandbox.svc.cluster.local:8000/api/data,http://core-002.rca-sandbox.svc.cluster.local:8000/api/data,http://core-004.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-009
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: core-009
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-010
+  namespace: rca-sandbox
+  labels:
+    app: core-010
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: core-010
+  template:
+    metadata:
+      labels:
+        app: core-010
+    spec:
+      containers:
+      - name: core-010
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: core-010
+        - name: UPSTREAMS
+          value: "http://core-001.rca-sandbox.svc.cluster.local:8000/api/data,http://core-004.rca-sandbox.svc.cluster.local:8000/api/data,http://core-007.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-010
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: core-010
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-011
+  namespace: rca-sandbox
+  labels:
+    app: svc-011
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-011
+  template:
+    metadata:
+      labels:
+        app: svc-011
+    spec:
+      containers:
+      - name: svc-011
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-011
+        - name: UPSTREAMS
+          value: "http://core-006.rca-sandbox.svc.cluster.local:8000/api/data,http://core-007.rca-sandbox.svc.cluster.local:8000/api/data,http://core-010.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-011
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-011
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-012
+  namespace: rca-sandbox
+  labels:
+    app: svc-012
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-012
+  template:
+    metadata:
+      labels:
+        app: svc-012
+    spec:
+      containers:
+      - name: svc-012
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-012
+        - name: UPSTREAMS
+          value: "http://core-002.rca-sandbox.svc.cluster.local:8000/api/data,http://core-009.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-011.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-012
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-012
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-013
+  namespace: rca-sandbox
+  labels:
+    app: svc-013
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-013
+  template:
+    metadata:
+      labels:
+        app: svc-013
+    spec:
+      containers:
+      - name: svc-013
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-013
+        - name: UPSTREAMS
+          value: "http://core-004.rca-sandbox.svc.cluster.local:8000/api/data,http://core-008.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-012.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-013
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-013
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-014
+  namespace: rca-sandbox
+  labels:
+    app: core-014
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: core-014
+  template:
+    metadata:
+      labels:
+        app: core-014
+    spec:
+      containers:
+      - name: core-014
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: core-014
+        - name: UPSTREAMS
+          value: "http://core-001.rca-sandbox.svc.cluster.local:8000/api/data,http://core-002.rca-sandbox.svc.cluster.local:8000/api/data,http://core-008.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-014
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: core-014
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-015
+  namespace: rca-sandbox
+  labels:
+    app: svc-015
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-015
+  template:
+    metadata:
+      labels:
+        app: svc-015
+    spec:
+      containers:
+      - name: svc-015
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-015
+        - name: UPSTREAMS
+          value: "http://core-001.rca-sandbox.svc.cluster.local:8000/api/data,http://core-002.rca-sandbox.svc.cluster.local:8000/api/data,http://core-004.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-015
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-015
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-016
+  namespace: rca-sandbox
+  labels:
+    app: core-016
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: core-016
+  template:
+    metadata:
+      labels:
+        app: core-016
+    spec:
+      containers:
+      - name: core-016
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: core-016
+        - name: UPSTREAMS
+          value: "http://core-000.rca-sandbox.svc.cluster.local:8000/api/data,http://core-001.rca-sandbox.svc.cluster.local:8000/api/data,http://core-007.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-016
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: core-016
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-017
+  namespace: rca-sandbox
+  labels:
+    app: svc-017
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-017
+  template:
+    metadata:
+      labels:
+        app: svc-017
+    spec:
+      containers:
+      - name: svc-017
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-017
+        - name: UPSTREAMS
+          value: "http://core-001.rca-sandbox.svc.cluster.local:8000/api/data,http://core-005.rca-sandbox.svc.cluster.local:8000/api/data,http://core-009.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-017
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-017
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-018
+  namespace: rca-sandbox
+  labels:
+    app: svc-018
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-018
+  template:
+    metadata:
+      labels:
+        app: svc-018
+    spec:
+      containers:
+      - name: svc-018
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-018
+        - name: UPSTREAMS
+          value: "http://core-007.rca-sandbox.svc.cluster.local:8000/api/data,http://core-009.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-011.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-024.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-018
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-018
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-019
+  namespace: rca-sandbox
+  labels:
+    app: svc-019
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-019
+  template:
+    metadata:
+      labels:
+        app: svc-019
+    spec:
+      containers:
+      - name: svc-019
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-019
+        - name: UPSTREAMS
+          value: "http://core-001.rca-sandbox.svc.cluster.local:8000/api/data,http://core-004.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-013.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-019
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-019
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-020
+  namespace: rca-sandbox
+  labels:
+    app: svc-020
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-020
+  template:
+    metadata:
+      labels:
+        app: svc-020
+    spec:
+      containers:
+      - name: svc-020
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-020
+        - name: UPSTREAMS
+          value: "http://core-002.rca-sandbox.svc.cluster.local:8000/api/data,http://core-004.rca-sandbox.svc.cluster.local:8000/api/data,http://core-006.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-020
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-020
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-021
+  namespace: rca-sandbox
+  labels:
+    app: svc-021
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-021
+  template:
+    metadata:
+      labels:
+        app: svc-021
+    spec:
+      containers:
+      - name: svc-021
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-021
+        - name: UPSTREAMS
+          value: "http://core-004.rca-sandbox.svc.cluster.local:8000/api/data,http://core-007.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-020.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-021
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-021
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-022
+  namespace: rca-sandbox
+  labels:
+    app: svc-022
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-022
+  template:
+    metadata:
+      labels:
+        app: svc-022
+    spec:
+      containers:
+      - name: svc-022
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-022
+        - name: UPSTREAMS
+          value: "http://core-001.rca-sandbox.svc.cluster.local:8000/api/data,http://core-004.rca-sandbox.svc.cluster.local:8000/api/data,http://core-016.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-022
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-022
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-023
+  namespace: rca-sandbox
+  labels:
+    app: svc-023
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-023
+  template:
+    metadata:
+      labels:
+        app: svc-023
+    spec:
+      containers:
+      - name: svc-023
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-023
+        - name: UPSTREAMS
+          value: "http://core-006.rca-sandbox.svc.cluster.local:8000/api/data,http://core-014.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-015.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-024.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-023
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-023
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-024
+  namespace: rca-sandbox
+  labels:
+    app: svc-024
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-024
+  template:
+    metadata:
+      labels:
+        app: svc-024
+    spec:
+      containers:
+      - name: svc-024
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-024
+        - name: UPSTREAMS
+          value: "http://core-004.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-024
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-024
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-025
+  namespace: rca-sandbox
+  labels:
+    app: svc-025
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-025
+  template:
+    metadata:
+      labels:
+        app: svc-025
+    spec:
+      containers:
+      - name: svc-025
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-025
+        - name: UPSTREAMS
+          value: "http://core-005.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-012.rca-sandbox.svc.cluster.local:8000/api/data,http://core-016.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-025
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-025
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-026
+  namespace: rca-sandbox
+  labels:
+    app: svc-026
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-026
+  template:
+    metadata:
+      labels:
+        app: svc-026
+    spec:
+      containers:
+      - name: svc-026
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-026
+        - name: UPSTREAMS
+          value: "http://core-009.rca-sandbox.svc.cluster.local:8000/api/data,http://core-010.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-015.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-026
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-026
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-027
+  namespace: rca-sandbox
+  labels:
+    app: svc-027
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-027
+  template:
+    metadata:
+      labels:
+        app: svc-027
+    spec:
+      containers:
+      - name: svc-027
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-027
+        - name: UPSTREAMS
+          value: "http://core-004.rca-sandbox.svc.cluster.local:8000/api/data,http://core-005.rca-sandbox.svc.cluster.local:8000/api/data,http://core-016.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-027
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-027
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-028
+  namespace: rca-sandbox
+  labels:
+    app: svc-028
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-028
+  template:
+    metadata:
+      labels:
+        app: svc-028
+    spec:
+      containers:
+      - name: svc-028
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-028
+        - name: UPSTREAMS
+          value: "http://core-001.rca-sandbox.svc.cluster.local:8000/api/data,http://core-008.rca-sandbox.svc.cluster.local:8000/api/data,http://core-010.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-028
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-028
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-029
+  namespace: rca-sandbox
+  labels:
+    app: svc-029
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-029
+  template:
+    metadata:
+      labels:
+        app: svc-029
+    spec:
+      containers:
+      - name: svc-029
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-029
+        - name: UPSTREAMS
+          value: "http://core-007.rca-sandbox.svc.cluster.local:8000/api/data,http://core-016.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-018.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-029
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-029
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-030
+  namespace: rca-sandbox
+  labels:
+    app: svc-030
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-030
+  template:
+    metadata:
+      labels:
+        app: svc-030
+    spec:
+      containers:
+      - name: svc-030
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-030
+        - name: UPSTREAMS
+          value: "http://core-014.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-015.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-024.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-030
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-030
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-031
+  namespace: rca-sandbox
+  labels:
+    app: svc-031
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-031
+  template:
+    metadata:
+      labels:
+        app: svc-031
+    spec:
+      containers:
+      - name: svc-031
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-031
+        - name: UPSTREAMS
+          value: "http://core-000.rca-sandbox.svc.cluster.local:8000/api/data,http://core-004.rca-sandbox.svc.cluster.local:8000/api/data,http://core-006.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-031
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-031
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-032
+  namespace: rca-sandbox
+  labels:
+    app: svc-032
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-032
+  template:
+    metadata:
+      labels:
+        app: svc-032
+    spec:
+      containers:
+      - name: svc-032
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-032
+        - name: UPSTREAMS
+          value: "http://core-001.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-015.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-017.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-032
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-032
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-033
+  namespace: rca-sandbox
+  labels:
+    app: svc-033
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-033
+  template:
+    metadata:
+      labels:
+        app: svc-033
+    spec:
+      containers:
+      - name: svc-033
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-033
+        - name: UPSTREAMS
+          value: "http://core-001.rca-sandbox.svc.cluster.local:8000/api/data,http://core-002.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-022.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-033
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-033
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-034
+  namespace: rca-sandbox
+  labels:
+    app: svc-034
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-034
+  template:
+    metadata:
+      labels:
+        app: svc-034
+    spec:
+      containers:
+      - name: svc-034
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-034
+        - name: UPSTREAMS
+          value: "http://core-001.rca-sandbox.svc.cluster.local:8000/api/data,http://core-004.rca-sandbox.svc.cluster.local:8000/api/data,http://core-010.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-034
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-034
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-035
+  namespace: rca-sandbox
+  labels:
+    app: svc-035
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-035
+  template:
+    metadata:
+      labels:
+        app: svc-035
+    spec:
+      containers:
+      - name: svc-035
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-035
+        - name: UPSTREAMS
+          value: "http://core-014.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-024.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-035
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-035
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-036
+  namespace: rca-sandbox
+  labels:
+    app: svc-036
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-036
+  template:
+    metadata:
+      labels:
+        app: svc-036
+    spec:
+      containers:
+      - name: svc-036
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-036
+        - name: UPSTREAMS
+          value: "http://core-001.rca-sandbox.svc.cluster.local:8000/api/data,http://core-002.rca-sandbox.svc.cluster.local:8000/api/data,http://core-006.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-036
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-036
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-037
+  namespace: rca-sandbox
+  labels:
+    app: svc-037
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-037
+  template:
+    metadata:
+      labels:
+        app: svc-037
+    spec:
+      containers:
+      - name: svc-037
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-037
+        - name: UPSTREAMS
+          value: "http://core-004.rca-sandbox.svc.cluster.local:8000/api/data,http://core-009.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-024.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-037
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-037
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-038
+  namespace: rca-sandbox
+  labels:
+    app: svc-038
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-038
+  template:
+    metadata:
+      labels:
+        app: svc-038
+    spec:
+      containers:
+      - name: svc-038
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-038
+        - name: UPSTREAMS
+          value: "http://core-002.rca-sandbox.svc.cluster.local:8000/api/data,http://core-008.rca-sandbox.svc.cluster.local:8000/api/data,http://core-009.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-038
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-038
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-039
+  namespace: rca-sandbox
+  labels:
+    app: svc-039
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-039
+  template:
+    metadata:
+      labels:
+        app: svc-039
+    spec:
+      containers:
+      - name: svc-039
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-039
+        - name: UPSTREAMS
+          value: "http://core-004.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-013.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-026.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-039
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-039
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-040
+  namespace: rca-sandbox
+  labels:
+    app: svc-040
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-040
+  template:
+    metadata:
+      labels:
+        app: svc-040
+    spec:
+      containers:
+      - name: svc-040
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-040
+        - name: UPSTREAMS
+          value: "http://core-001.rca-sandbox.svc.cluster.local:8000/api/data,http://core-009.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-036.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-040
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-040
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-041
+  namespace: rca-sandbox
+  labels:
+    app: svc-041
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-041
+  template:
+    metadata:
+      labels:
+        app: svc-041
+    spec:
+      containers:
+      - name: svc-041
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-041
+        - name: UPSTREAMS
+          value: "http://core-002.rca-sandbox.svc.cluster.local:8000/api/data,http://core-006.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-035.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-041
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-041
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-042
+  namespace: rca-sandbox
+  labels:
+    app: svc-042
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-042
+  template:
+    metadata:
+      labels:
+        app: svc-042
+    spec:
+      containers:
+      - name: svc-042
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-042
+        - name: UPSTREAMS
+          value: "http://core-002.rca-sandbox.svc.cluster.local:8000/api/data,http://core-010.rca-sandbox.svc.cluster.local:8000/api/data,http://core-014.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-042
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-042
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-043
+  namespace: rca-sandbox
+  labels:
+    app: svc-043
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-043
+  template:
+    metadata:
+      labels:
+        app: svc-043
+    spec:
+      containers:
+      - name: svc-043
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-043
+        - name: UPSTREAMS
+          value: "http://core-004.rca-sandbox.svc.cluster.local:8000/api/data,http://core-014.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-033.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-043
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-043
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-044
+  namespace: rca-sandbox
+  labels:
+    app: svc-044
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-044
+  template:
+    metadata:
+      labels:
+        app: svc-044
+    spec:
+      containers:
+      - name: svc-044
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-044
+        - name: UPSTREAMS
+          value: "http://core-007.rca-sandbox.svc.cluster.local:8000/api/data,http://core-016.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-022.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-044
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-044
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-045
+  namespace: rca-sandbox
+  labels:
+    app: svc-045
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-045
+  template:
+    metadata:
+      labels:
+        app: svc-045
+    spec:
+      containers:
+      - name: svc-045
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-045
+        - name: UPSTREAMS
+          value: "http://core-005.rca-sandbox.svc.cluster.local:8000/api/data,http://core-007.rca-sandbox.svc.cluster.local:8000/api/data,http://core-016.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-045
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-045
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-046
+  namespace: rca-sandbox
+  labels:
+    app: svc-046
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-046
+  template:
+    metadata:
+      labels:
+        app: svc-046
+    spec:
+      containers:
+      - name: svc-046
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-046
+        - name: UPSTREAMS
+          value: "http://core-002.rca-sandbox.svc.cluster.local:8000/api/data,http://core-006.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-029.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-046
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-046
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-047
+  namespace: rca-sandbox
+  labels:
+    app: svc-047
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-047
+  template:
+    metadata:
+      labels:
+        app: svc-047
+    spec:
+      containers:
+      - name: svc-047
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-047
+        - name: UPSTREAMS
+          value: "http://core-002.rca-sandbox.svc.cluster.local:8000/api/data,http://core-007.rca-sandbox.svc.cluster.local:8000/api/data,http://core-008.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-047
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-047
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-048
+  namespace: rca-sandbox
+  labels:
+    app: svc-048
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-048
+  template:
+    metadata:
+      labels:
+        app: svc-048
+    spec:
+      containers:
+      - name: svc-048
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-048
+        - name: UPSTREAMS
+          value: "http://core-000.rca-sandbox.svc.cluster.local:8000/api/data,http://core-002.rca-sandbox.svc.cluster.local:8000/api/data,http://core-004.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-048
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-048
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-049
+  namespace: rca-sandbox
+  labels:
+    app: svc-049
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-049
+  template:
+    metadata:
+      labels:
+        app: svc-049
+    spec:
+      containers:
+      - name: svc-049
+        image: rca-dummy-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SERVICE_NAME
+          value: svc-049
+        - name: UPSTREAMS
+          value: "http://core-007.rca-sandbox.svc.cluster.local:8000/api/data,http://core-016.rca-sandbox.svc.cluster.local:8000/api/data,http://svc-024.rca-sandbox.svc.cluster.local:8000/api/data"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-049
+  namespace: rca-sandbox
+spec:
+  selector:
+    app: svc-049
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+---

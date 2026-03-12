@@ -62,36 +62,36 @@ def asymmetric_gib_loss(
         - Healthy windows (U=0): mask should be near zero → no root cause
         - Anomalous windows (||U||_0 = 1): mask should be concentrated → one node active
 
-    The anomalous term uses a KL divergence between the mask distribution
-    and a uniform prior of strength `target_sparsity`, combined with a
-    negative entropy term that pushes toward a peaked (one-hot) distribution.
+    Scales properly to any N:
+        - target_sparsity should be set to 1/N by the caller.
+        - Concentration weight is scaled by 1/log(N) to prevent it from
+          dominating at large N where max_entropy grows.
 
     Args:
         probs_healthy:   shape [batch_h, num_nodes, 1] — mask probs for healthy windows
         probs_anomalous: shape [batch_a, num_nodes, 1] — mask probs for anomalous windows
-        target_sparsity: desired mean activation for anomalous masks (e.g. 0.2 = 1/5 nodes)
+        target_sparsity: desired mean activation for anomalous masks (e.g. 1/N)
 
     Returns:
         Scalar asymmetric GIB loss.
     """
     # --- Healthy: push all mask probabilities toward 0 ---
-    # Simple L2 penalty: encourages M → 0 for healthy windows
     loss_healthy = (probs_healthy ** 2).mean()
 
     # --- Anomalous: push mask toward sparse, concentrated distribution ---
-    # Squeeze to [batch, num_nodes]
-    p_anom = probs_anomalous.squeeze(-1)
+    p_anom = probs_anomalous.squeeze(-1)  # [batch, num_nodes]
+    N = p_anom.size(-1)
 
     # 1. Sparsity: mean activation should be close to target_sparsity
     mean_activation = p_anom.mean(dim=-1)  # [batch]
     loss_sparsity = ((mean_activation - target_sparsity) ** 2).mean()
 
     # 2. Concentration: negative entropy pushes toward one-hot
-    #    Normalize mask probs to a distribution per sample, then minimize entropy
-    p_norm = p_anom / (p_anom.sum(dim=-1, keepdim=True) + 1e-8)  # [batch, num_nodes]
-    entropy = -(p_norm * torch.log(p_norm + 1e-8)).sum(dim=-1)   # [batch]
-    max_entropy = torch.log(torch.tensor(float(p_anom.size(-1))))
-    loss_concentration = (entropy / max_entropy).mean()  # normalized to [0, 1]
+    #    Scaled by 1/log(N) so it doesn't dominate at large N
+    p_norm = p_anom / (p_anom.sum(dim=-1, keepdim=True) + 1e-8)
+    entropy = -(p_norm * torch.log(p_norm + 1e-8)).sum(dim=-1)
+    max_entropy = torch.log(torch.tensor(float(N), device=p_anom.device))
+    loss_concentration = (entropy / max_entropy).mean() / max(1.0, torch.log(torch.tensor(float(N))).item())
 
     loss_anomalous = loss_sparsity + loss_concentration
 

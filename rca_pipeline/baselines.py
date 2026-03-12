@@ -4,11 +4,10 @@ import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 from sklearn.ensemble import RandomForestClassifier
 import numpy as np
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Optional
 from torch_geometric.data import Data
 
-NODE_NAMES = ['frontend', 'auth', 'backend', 'cache', 'database']
-NAME_TO_IDX = {name: i for i, name in enumerate(NODE_NAMES)}
+from common import NODE_NAMES, NAME_TO_IDX
 
 
 def get_ranking_metrics(y_true_list: List[int], y_pred_logits_list: np.ndarray) -> Tuple[float, float, float]:
@@ -33,12 +32,13 @@ def get_ranking_metrics(y_true_list: List[int], y_pred_logits_list: np.ndarray) 
     return top1 / n, top2 / n, mrr / n
 
 
-def _get_anomalies(data_list: List[Data]) -> List[Data]:
+def _get_anomalies(data_list: List[Data], name_to_idx: Optional[Dict[str, int]] = None) -> List[Data]:
     """Extract anomalous windows with valid root cause labels."""
+    idx_map = name_to_idx if name_to_idx is not None else NAME_TO_IDX
     return [d for d in data_list
             if d.y is not None and d.y.item() == 1
             and hasattr(d, 'root_cause') and len(d.root_cause) > 0
-            and d.root_cause[0] in NAME_TO_IDX]
+            and d.root_cause[0] in idx_map]
 
 
 # -------------------------------------------------------------

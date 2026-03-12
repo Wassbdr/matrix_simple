@@ -24,11 +24,10 @@ from torch_geometric.data import Data
 from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
 from model import SpatioTemporalRCA
 
+from common import NODE_NAMES, NAME_TO_IDX, stratified_split
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
-
-NODE_NAMES = ['frontend', 'auth', 'backend', 'cache', 'database']
-NAME_TO_IDX = {name: i for i, name in enumerate(NODE_NAMES)}
 
 
 def load_model(checkpoint_path: str) -> SpatioTemporalRCA:
@@ -38,11 +37,13 @@ def load_model(checkpoint_path: str) -> SpatioTemporalRCA:
         checkpoint['model_state_dict']['temporal_block.conv1.weight'].size(1))
     hidden_dim = checkpoint.get('hidden_dim',
         checkpoint['model_state_dict']['temporal_block.conv1.weight'].size(0))
+    num_nodes = checkpoint.get('num_nodes', 5)
 
-    model = SpatioTemporalRCA(num_features=num_features, hidden_dim=hidden_dim, num_nodes=5)
+    model = SpatioTemporalRCA(num_features=num_features, hidden_dim=hidden_dim, num_nodes=num_nodes)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
-    logger.info("Loaded checkpoint from %s (features=%d, hidden=%d)", checkpoint_path, num_features, hidden_dim)
+    logger.info("Loaded checkpoint from %s (features=%d, hidden=%d, nodes=%d)",
+                checkpoint_path, num_features, hidden_dim, num_nodes)
     return model
 
 

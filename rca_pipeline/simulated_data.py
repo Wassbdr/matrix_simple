@@ -6,7 +6,7 @@ import numpy as np
 NODE_NAMES = ['frontend', 'auth', 'backend', 'cache', 'database']
 NAME_TO_IDX = {name: i for i, name in enumerate(NODE_NAMES)}
 
-def generate_synthetic_dataset(
+def generate_simulated_dataset(
     num_samples: int = 1500,
     window_size: int = 6,
     num_features: int = 5,
@@ -15,7 +15,7 @@ def generate_synthetic_dataset(
     propagation_strength: float = 0.6
 ):
     """
-    Generates a synthetic dataset rigorously following the mathematical formalization:
+    Generates a simulated dataset rigorously following the mathematical formalization:
        X(t+1) = f(A, X(t)) + B*U(t) + noise
        
     The anomaly U(t) is a sparse exogenous injection. Over time, it propagates 
@@ -139,11 +139,11 @@ def generate_synthetic_dataset(
     return dataset
 
 if __name__ == "__main__":
-    print("Generating strictly formalized synthetic RCA dataset (N=5000)...")
-    dataset = generate_synthetic_dataset(num_samples=5000, window_size=12, num_features=5, anomaly_ratio=0.4, noise_level=0.1, propagation_strength=0.8)
+    print("Generating strictly formalized simulated RCA dataset (N=5000)...")
+    dataset = generate_simulated_dataset(num_samples=5000, window_size=12, num_features=5, anomaly_ratio=0.4, noise_level=0.1, propagation_strength=0.8)
     
     import torch
-    torch.save(dataset, "synthetic_dataset_windows.pt")
+    torch.save(dataset, "simulated_dataset_windows.pt")
     
     anomalies = [d for d in dataset if d.y.item() == 1]
     print(f"Dataset generated: 5000 total samples, {len(anomalies)} anomalies")

@@ -3,27 +3,38 @@ Shared constants and utilities for the RCA pipeline.
 Single source of truth for node names, indices, and dataset splitting.
 """
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from torch_geometric.data import Data
 
+# Default 5-node K8S topology (used by legacy scripts: train.py, benchmark.py)
 NODE_NAMES = ['frontend', 'auth', 'backend', 'cache', 'database']
 NAME_TO_IDX = {name: i for i, name in enumerate(NODE_NAMES)}
 NUM_NODES = len(NODE_NAMES)
 
 
-def stratified_split(dataset: List[Data], train_ratio: float = 0.8) -> Tuple[List[Data], List[Data]]:
+def stratified_split(
+    dataset: List[Data],
+    train_ratio: float = 0.8,
+    name_to_idx: Optional[Dict[str, int]] = None,
+) -> Tuple[List[Data], List[Data]]:
     """
     Deterministic train/test split.
     - Healthy windows: split chronologically.
     - Anomalous windows: split per root-cause type by ratio.
 
-    Used by both train.py and benchmark.py to guarantee identical splits.
+    Args:
+        dataset: list of PyG Data objects.
+        train_ratio: fraction for training.
+        name_to_idx: optional mapping for dynamic topologies (N>5).
+                     Falls back to the default 5-node NAME_TO_IDX.
     """
+    idx_map = name_to_idx if name_to_idx is not None else NAME_TO_IDX
+
     healthy = [d for d in dataset if d.y is None or d.y.item() == 0]
     anomalous = [d for d in dataset
                  if d.y is not None and d.y.item() == 1
                  and hasattr(d, 'root_cause') and len(d.root_cause) > 0
-                 and d.root_cause[0] in NAME_TO_IDX]
+                 and d.root_cause[0] in idx_map]
 
     h_split = int(len(healthy) * train_ratio)
     train_data = healthy[:h_split]
