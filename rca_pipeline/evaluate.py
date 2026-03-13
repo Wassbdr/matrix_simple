@@ -14,7 +14,6 @@ Usage:
 """
 
 import torch
-import torch.nn.functional as F
 import argparse
 import logging
 from typing import List, Dict, Tuple
@@ -24,7 +23,7 @@ from torch_geometric.data import Data
 from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
 from model import SpatioTemporalRCA
 
-from common import NODE_NAMES, NAME_TO_IDX, stratified_split, load_dataset_payload
+from common import load_dataset_payload
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -61,12 +60,15 @@ def evaluate(
     checkpoint_path: str,
     dataset_path: str,
     train_ratio: float = 0.8,
+    batch_size: int = 256,
 ) -> None:
     """
     Evaluates the model on anomalous windows using stratified split.
     Reports per-class and weighted metrics.
     """
     model, use_gib = load_model(checkpoint_path)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
 
     logger.info("Loading dataset from %s", dataset_path)
     dataset, node_names = load_dataset_payload(dataset_path)
@@ -99,20 +101,34 @@ def evaluate(
 
     # Predict root cause for each test window
     y_true, y_pred = [], []
-    edge_index = test_anomalies[0].edge_index
+    same_topology = all(torch.equal(d.edge_index, test_anomalies[0].edge_index) for d in test_anomalies)
 
     with torch.no_grad():
-        for data in test_anomalies:
-            x = data.x.unsqueeze(0)  # [1, V, F, W]
-            z, probs, h_spatial = model(x, data.edge_index)
-            if use_gib:
-                logits = model.gib_logits(h_spatial)  # [1, num_nodes]
-            else:
-                logits = model.classify_root_cause(h_spatial)  # [1, num_nodes]
-            pred_idx = logits.argmax(dim=1).item()
+        if same_topology:
+            X_test = torch.stack([d.x for d in test_anomalies]).to(device)
+            y_true = [name_to_idx[d.root_cause[0]] for d in test_anomalies]
+            edge_index = test_anomalies[0].edge_index.to(device)
 
-            y_true.append(name_to_idx[data.root_cause[0]])
-            y_pred.append(pred_idx)
+            for start in range(0, len(test_anomalies), batch_size):
+                xb = X_test[start:start + batch_size]
+                _, _, h_spatial = model(xb, edge_index)
+                if use_gib:
+                    logits = model.gib_logits(h_spatial)
+                else:
+                    logits = model.classify_root_cause(h_spatial)
+                y_pred.extend(logits.argmax(dim=1).detach().cpu().tolist())
+        else:
+            logger.warning("Mixed edge_index detected; falling back to per-window inference.")
+            for data in test_anomalies:
+                x = data.x.unsqueeze(0).to(device)
+                edge_index = data.edge_index.to(device)
+                _, _, h_spatial = model(x, edge_index)
+                if use_gib:
+                    logits = model.gib_logits(h_spatial)
+                else:
+                    logits = model.classify_root_cause(h_spatial)
+                y_true.append(name_to_idx[data.root_cause[0]])
+                y_pred.append(int(logits.argmax(dim=1).item()))
 
     # Compute metrics
     p = precision_score(y_true, y_pred, average='weighted', zero_division=0)
@@ -148,9 +164,11 @@ if __name__ == "__main__":
         "--dataset", type=str, default="../dataset_windows.pt",
         help="Path to the windowed dataset .pt file.",
     )
+    parser.add_argument("--batch-size", type=int, default=256)
     args = parser.parse_args()
 
     evaluate(
         checkpoint_path=args.checkpoint,
         dataset_path=args.dataset,
+        batch_size=args.batch_size,
     )

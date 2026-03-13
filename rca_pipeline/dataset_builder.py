@@ -4,6 +4,8 @@ import requests
 import csv
 import logging
 import argparse
+import os
+import math
 from typing import List, Dict, Any
 import uuid
 
@@ -145,7 +147,6 @@ class ExperimentRunner:
                         "value": value
                     })
 
-        import os
         csv_file = os.path.join(self.output_dir, f"dataset_{self.run_id}.csv")
         self._save_csv(dataset_records, csv_file, chaos_start_ts, chaos_end_ts)
 
@@ -177,7 +178,6 @@ class ExperimentRunner:
             
             # For latency, avoid NaN if requests are 0
             val = float(row["value"])
-            import math
             if math.isnan(val) or math.isinf(val):
                 val = 0.0
             pivoted[key][row["metric"]] = val

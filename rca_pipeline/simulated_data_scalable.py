@@ -175,6 +175,8 @@ def generate_scalable_dataset(
         A_raw[d, s] = w * 0.3
     for i in range(N):
         A_raw[i, i] = 1.0
+    neighbor_mask = A_raw > 0
+    neighbor_mask.fill_diagonal_(False)
 
     dataset: List[Data] = []
 
@@ -193,9 +195,9 @@ def generate_scalable_dataset(
             strength = 0.5 + rng.rand() * 1.5
             X[t, node, feats] += strength
             # 1-hop propagation (weak)
-            for dst in range(N):
-                if A_raw[node, dst].item() > 0 and dst != node and t + 1 < window_size:
-                    X[t + 1, dst, feats] += strength * 0.15
+            if t + 1 < window_size:
+                dst_mask = neighbor_mask[node]
+                X[t + 1, dst_mask, feats] += strength * 0.15
 
         root_cause_idx = -1
 
@@ -241,15 +243,17 @@ def generate_scalable_dataset(
                 drop = torch.from_numpy(rng.binomial(1, 0.8, size=N)).float()
                 next_active = next_active * drop
 
-                for nid in range(N):
-                    if next_active[nid] > 0.1:
-                        X[t, nid, affected_feats] += (
-                            next_active[nid] + torch.randn(len(affected_feats)) * 0.2
-                        )
-                        # Feature bleed
-                        other = [f for f in range(num_features) if f not in affected_feats]
-                        if other:
-                            X[t, nid, other] += next_active[nid] * 0.15
+                active_idx = torch.nonzero(next_active > 0.1, as_tuple=False).squeeze(-1)
+                if active_idx.numel() > 0:
+                    base = next_active[active_idx]
+                    for feat in affected_feats:
+                        X[t, active_idx, feat] += base + torch.randn(active_idx.numel()) * 0.2
+
+                    # Feature bleed
+                    other = [f for f in range(num_features) if f not in affected_feats]
+                    if other:
+                        for feat in other:
+                            X[t, active_idx, feat] += base * 0.15
 
                 active = next_active
 

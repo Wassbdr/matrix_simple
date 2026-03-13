@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import torch
 from torch_geometric.data import Data
 from sklearn.preprocessing import StandardScaler
@@ -90,9 +91,10 @@ class GraphBuilder:
         for ts in timestamps:
             ts_data = grouped[grouped['timestamp'] == ts]
             x = torch.zeros((5, len(self.features)), dtype=torch.float)
-            for _, row in ts_data.iterrows():
-                idx = int(row['node_idx'])
-                x[idx] = torch.tensor([row[feat] for feat in self.features], dtype=torch.float)
+            idxs = ts_data['node_idx'].to_numpy(dtype=np.int64)
+            feats = ts_data[self.features].to_numpy(dtype=np.float32)
+            if len(idxs) > 0:
+                x[idxs] = torch.from_numpy(feats)
             snapshot = Data(x=x, edge_index=self.edge_index)
             snapshot.time_step = ts  # type: ignore
             

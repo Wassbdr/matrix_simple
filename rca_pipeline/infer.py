@@ -124,6 +124,7 @@ def run_inference(
     dataset_path: str,
     hidden_dim: int = 32,
     num_windows: int = 5,
+    batch_size: int = 256,
 ) -> None:
     """
     Loads model and dataset, then runs inference on the last N windows
@@ -136,6 +137,8 @@ def run_inference(
         num_windows: Number of anomalous windows to analyze.
     """
     model, use_gib = load_model(checkpoint_path, hidden_dim)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
     windows, node_idx_names = load_windows(dataset_path)
 
     # Select anomalous windows explicitly by label (y==1)
@@ -148,21 +151,41 @@ def run_inference(
     logger.info("Analyzing %d anomalous windows...", len(anomaly_windows))
 
     logger.info("=" * 60)
-    for i, window in enumerate(anomaly_windows):
-        root_name, root_score, score_map = identify_root_cause(model, window, use_gib, node_idx_names)
-        logger.info("Window %d/%d:", i + 1, len(anomaly_windows))
-        logger.info("  Scores: %s", score_map)
-        logger.info(
-            "  --> Root cause: %s (score: %.4f)",
-            root_name,
-            root_score,
-        )
+    predicted_roots: List[str] = []
+    names = node_idx_names if node_idx_names is not None else _DEFAULT_NODE_IDX_NAMES
+    edge_index = anomaly_windows[0].edge_index.to(device)
+    X = torch.stack([w.x for w in anomaly_windows]).to(device)
+
+    with torch.no_grad():
+        global_idx = 0
+        for start in range(0, len(anomaly_windows), batch_size):
+            xb = X[start:start + batch_size]
+            _, _, h_spatial = model(xb, edge_index)
+            if use_gib:
+                logits = model.gib_logits(h_spatial)
+            else:
+                logits = model.classify_root_cause(h_spatial)
+
+            for row in logits.detach().cpu():
+                score_map = {name: round(float(row[idx]), 4) for idx, name in names.items()}
+                root_idx = int(torch.argmax(row).item())
+                root_name = names[root_idx]
+                root_score = float(row[root_idx])
+                predicted_roots.append(root_name)
+
+                logger.info("Window %d/%d:", global_idx + 1, len(anomaly_windows))
+                logger.info("  Scores: %s", score_map)
+                logger.info(
+                    "  --> Root cause: %s (score: %.4f)",
+                    root_name,
+                    root_score,
+                )
+                global_idx += 1
     logger.info("=" * 60)
 
     # Majority vote across all analyzed windows
     vote_count: Dict[str, int] = {}
-    for window in anomaly_windows:
-        name, _, _ = identify_root_cause(model, window, use_gib, node_idx_names)
+    for name in predicted_roots:
         vote_count[name] = vote_count.get(name, 0) + 1
 
     final_root_cause = max(vote_count, key=lambda k: vote_count[k])
@@ -189,6 +212,7 @@ if __name__ == "__main__":
         "--num-windows", type=int, default=5,
         help="Number of anomalous windows to analyze.",
     )
+    parser.add_argument("--batch-size", type=int, default=256)
     args = parser.parse_args()
 
     run_inference(
@@ -196,4 +220,5 @@ if __name__ == "__main__":
         dataset_path=args.dataset,
         hidden_dim=args.hidden_dim,
         num_windows=args.num_windows,
+        batch_size=args.batch_size,
     )

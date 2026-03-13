@@ -7,7 +7,7 @@ import numpy as np
 from typing import List, Tuple, Dict, Optional
 from torch_geometric.data import Data
 
-from common import NODE_NAMES, NAME_TO_IDX
+from common import NAME_TO_IDX
 
 
 def get_ranking_metrics(y_true_list: List[int], y_pred_logits_list: np.ndarray) -> Tuple[float, float, float]:
@@ -39,6 +39,43 @@ def _get_anomalies(data_list: List[Data], name_to_idx: Optional[Dict[str, int]] 
             if d.y is not None and d.y.item() == 1
             and hasattr(d, 'root_cause') and len(d.root_cause) > 0
             and d.root_cause[0] in idx_map]
+
+
+def _resolve_name_to_idx(
+    train_data: List[Data],
+    test_data: List[Data],
+    name_to_idx: Optional[Dict[str, int]] = None,
+) -> Dict[str, int]:
+    """Resolve label mapping for fixed (5-node) and scalable datasets."""
+    if name_to_idx is not None:
+        return name_to_idx
+
+    data_all = train_data + test_data
+
+    # Fast path for legacy 5-node topology.
+    root_causes = [
+        d.root_cause[0]
+        for d in data_all
+        if hasattr(d, 'root_cause') and len(d.root_cause) > 0 and d.root_cause[0]
+    ]
+    if root_causes and all(rc in NAME_TO_IDX for rc in root_causes):
+        return NAME_TO_IDX
+
+    # If samples embed node names, use them to preserve true node indexing.
+    for d in data_all:
+        node_names = getattr(d, 'node_names', None)
+        if node_names is not None and len(node_names) == d.x.size(0):
+            return {name: i for i, name in enumerate(node_names)}
+
+    # Fallback: deterministic order of first appearance among anomaly labels.
+    ordered: List[str] = []
+    for rc in root_causes:
+        if rc not in ordered:
+            ordered.append(rc)
+    if ordered:
+        return {name: i for i, name in enumerate(ordered)}
+
+    return NAME_TO_IDX
 
 
 # -------------------------------------------------------------
@@ -115,10 +152,13 @@ class PureGCNBaseline(nn.Module):
 
 def train_pure_gcn(train_data: List[Data], test_data: List[Data],
                    epochs: int = 150, hidden_dim: int = 32, batch_size: int = 256,
-                   seed: int = 42) -> Tuple[float, float, float]:
+                   seed: int = 42,
+                   name_to_idx: Optional[Dict[str, int]] = None) -> Tuple[float, float, float]:
     torch.manual_seed(seed)
-    train_anomalies = _get_anomalies(train_data)
-    test_anomalies = _get_anomalies(test_data)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    idx_map = _resolve_name_to_idx(train_data, test_data, name_to_idx)
+    train_anomalies = _get_anomalies(train_data, idx_map)
+    test_anomalies = _get_anomalies(test_data, idx_map)
 
     if not train_anomalies or not test_anomalies:
         print(f"PureGCN: Not enough data (train={len(train_anomalies)}, test={len(test_anomalies)}).")
@@ -129,10 +169,11 @@ def train_pure_gcn(train_data: List[Data], test_data: List[Data],
     edge_index = sample.edge_index
 
     # Stack into tensors
-    X_train = torch.stack([d.x for d in train_anomalies])  # [N, V, F, W]
-    y_train = torch.tensor([NAME_TO_IDX[d.root_cause[0]] for d in train_anomalies], dtype=torch.long)
+    X_train = torch.stack([d.x for d in train_anomalies]).to(device)  # [N, V, F, W]
+    y_train = torch.tensor([idx_map[d.root_cause[0]] for d in train_anomalies], dtype=torch.long, device=device)
+    edge_index = edge_index.to(device)
 
-    model = PureGCNBaseline(num_nodes, num_features, hidden_dim, num_classes=num_nodes)
+    model = PureGCNBaseline(num_nodes, num_features, hidden_dim, num_classes=num_nodes).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-5)
     criterion = nn.CrossEntropyLoss()
@@ -154,8 +195,8 @@ def train_pure_gcn(train_data: List[Data], test_data: List[Data],
 
     model.eval()
     y_true, y_logits = [], []
-    X_test = torch.stack([d.x for d in test_anomalies])
-    y_test_labels = [NAME_TO_IDX[d.root_cause[0]] for d in test_anomalies]
+    X_test = torch.stack([d.x for d in test_anomalies]).to(device)
+    y_test_labels = [idx_map[d.root_cause[0]] for d in test_anomalies]
     with torch.no_grad():
         # Batched inference
         for start in range(0, len(test_anomalies), batch_size):
@@ -172,24 +213,27 @@ def train_pure_gcn(train_data: List[Data], test_data: List[Data],
 # Baseline 2: Random Forest (Flattened Spatial-Temporal Features)
 # -------------------------------------------------------------
 def train_random_forest(train_data: List[Data], test_data: List[Data],
-                        seed: int = 42) -> Tuple[float, float, float]:
-    train_anomalies = _get_anomalies(train_data)
-    test_anomalies = _get_anomalies(test_data)
+                        seed: int = 42,
+                        name_to_idx: Optional[Dict[str, int]] = None) -> Tuple[float, float, float]:
+    idx_map = _resolve_name_to_idx(train_data, test_data, name_to_idx)
+    train_anomalies = _get_anomalies(train_data, idx_map)
+    test_anomalies = _get_anomalies(test_data, idx_map)
 
     if not train_anomalies or not test_anomalies:
         return 0, 0, 0
 
     X_train = np.array([d.x.numpy().flatten() for d in train_anomalies])
-    y_train = np.array([NAME_TO_IDX[d.root_cause[0]] for d in train_anomalies])
+    y_train = np.array([idx_map[d.root_cause[0]] for d in train_anomalies])
     X_test = np.array([d.x.numpy().flatten() for d in test_anomalies])
-    y_test = np.array([NAME_TO_IDX[d.root_cause[0]] for d in test_anomalies])
+    y_test = np.array([idx_map[d.root_cause[0]] for d in test_anomalies])
 
     clf = RandomForestClassifier(n_estimators=200, random_state=seed, class_weight="balanced",
                                  max_depth=20, min_samples_leaf=5)
     clf.fit(X_train, y_train)
 
     y_pred_probs = clf.predict_proba(X_test)
-    logits = np.zeros((len(X_test), len(NODE_NAMES)))
+    num_nodes = train_anomalies[0].x.size(0)
+    logits = np.zeros((len(X_test), num_nodes))
     for i, c in enumerate(clf.classes_):
         logits[:, c] = y_pred_probs[:, i]
 
@@ -218,19 +262,23 @@ class MLPBaseline(nn.Module):
 
 def train_mlp_baseline(train_data: List[Data], test_data: List[Data],
                         epochs: int = 150, hidden_dim: int = 128, batch_size: int = 256,
-                        seed: int = 42) -> Tuple[float, float, float]:
+                        seed: int = 42,
+                        name_to_idx: Optional[Dict[str, int]] = None) -> Tuple[float, float, float]:
     torch.manual_seed(seed)
-    train_anomalies = _get_anomalies(train_data)
-    test_anomalies = _get_anomalies(test_data)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    idx_map = _resolve_name_to_idx(train_data, test_data, name_to_idx)
+    train_anomalies = _get_anomalies(train_data, idx_map)
+    test_anomalies = _get_anomalies(test_data, idx_map)
 
     if not train_anomalies or not test_anomalies:
         return 0, 0, 0
 
-    X_train = torch.stack([d.x.flatten() for d in train_anomalies])  # [N, V*F*W]
-    y_train = torch.tensor([NAME_TO_IDX[d.root_cause[0]] for d in train_anomalies], dtype=torch.long)
+    X_train = torch.stack([d.x.flatten() for d in train_anomalies]).to(device)  # [N, V*F*W]
+    y_train = torch.tensor([idx_map[d.root_cause[0]] for d in train_anomalies], dtype=torch.long, device=device)
 
+    num_nodes = train_anomalies[0].x.size(0)
     input_dim = X_train.size(1)
-    model = MLPBaseline(input_dim, hidden_dim, num_classes=len(NODE_NAMES))
+    model = MLPBaseline(input_dim, hidden_dim, num_classes=num_nodes).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-5)
     criterion = nn.CrossEntropyLoss()
@@ -251,8 +299,8 @@ def train_mlp_baseline(train_data: List[Data], test_data: List[Data],
         scheduler.step()
 
     model.eval()
-    X_test = torch.stack([d.x.flatten() for d in test_anomalies])
-    y_test_labels = [NAME_TO_IDX[d.root_cause[0]] for d in test_anomalies]
+    X_test = torch.stack([d.x.flatten() for d in test_anomalies]).to(device)
+    y_test_labels = [idx_map[d.root_cause[0]] for d in test_anomalies]
     y_true, y_logits = [], []
     with torch.no_grad():
         for start in range(0, len(test_anomalies), batch_size):
