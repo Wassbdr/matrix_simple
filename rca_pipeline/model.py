@@ -276,3 +276,16 @@ class SpatioTemporalRCA(nn.Module):
             logits: shape [batch, num_nodes]
         """
         return self.node_scorer(h_spatial_batched)
+
+    def gib_logits(self, h_spatial_batched: torch.Tensor) -> torch.Tensor:
+        """
+        Raw GIB MLP logits (before sigmoid) for N-way root cause classification.
+        Use with F.cross_entropy for training and argmax for inference.
+
+        Args:
+            h_spatial_batched: shape [batch, num_nodes, hidden_dim]
+        Returns:
+            logits: shape [batch, num_nodes]
+        """
+        B, N, H = h_spatial_batched.shape
+        return self.gib.mlp(h_spatial_batched.view(B * N, H)).squeeze(-1).view(B, N)

@@ -24,35 +24,37 @@ from torch_geometric.data import Data
 from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
 from model import SpatioTemporalRCA
 
-from common import NODE_NAMES, NAME_TO_IDX, stratified_split
+from common import NODE_NAMES, NAME_TO_IDX, stratified_split, load_dataset_payload
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
-def load_model(checkpoint_path: str) -> SpatioTemporalRCA:
-    """Loads a trained model from a checkpoint file."""
+def load_model(checkpoint_path: str) -> Tuple[SpatioTemporalRCA, bool]:
+    """Loads a trained model from a checkpoint file.
+    Returns the model and the use_gib flag stored at training time."""
     checkpoint = torch.load(checkpoint_path, weights_only=False, map_location="cpu")
     num_features = checkpoint.get('num_features',
         checkpoint['model_state_dict']['temporal_block.conv1.weight'].size(1))
     hidden_dim = checkpoint.get('hidden_dim',
         checkpoint['model_state_dict']['temporal_block.conv1.weight'].size(0))
     num_nodes = checkpoint.get('num_nodes', 5)
+    use_gib = checkpoint.get('use_gib', True)
 
     model = SpatioTemporalRCA(num_features=num_features, hidden_dim=hidden_dim, num_nodes=num_nodes)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
-    logger.info("Loaded checkpoint from %s (features=%d, hidden=%d, nodes=%d)",
-                checkpoint_path, num_features, hidden_dim, num_nodes)
-    return model
+    logger.info("Loaded checkpoint from %s (features=%d, hidden=%d, nodes=%d, use_gib=%s)",
+                checkpoint_path, num_features, hidden_dim, num_nodes, use_gib)
+    return model, use_gib
 
 
-def get_anomalies(dataset: List[Data]) -> List[Data]:
+def get_anomalies(dataset, name_to_idx):
     """Extract anomalous windows with valid root cause labels."""
     return [d for d in dataset
             if d.y is not None and d.y.item() == 1
             and hasattr(d, 'root_cause') and len(d.root_cause) > 0
-            and d.root_cause[0] in NAME_TO_IDX]
+            and d.root_cause[0] in name_to_idx]
 
 
 def evaluate(
@@ -64,12 +66,14 @@ def evaluate(
     Evaluates the model on anomalous windows using stratified split.
     Reports per-class and weighted metrics.
     """
-    model = load_model(checkpoint_path)
+    model, use_gib = load_model(checkpoint_path)
 
     logger.info("Loading dataset from %s", dataset_path)
-    dataset = torch.load(dataset_path, weights_only=False)
+    dataset, node_names = load_dataset_payload(dataset_path)
+    name_to_idx = {name: i for i, name in enumerate(node_names)}
+    node_idx_to_name = {i: name for i, name in enumerate(node_names)}
 
-    anomalies = get_anomalies(dataset)
+    anomalies = get_anomalies(dataset, name_to_idx)
     logger.info("Total anomalous windows with valid labels: %d", len(anomalies))
 
     if not anomalies:
@@ -101,10 +105,13 @@ def evaluate(
         for data in test_anomalies:
             x = data.x.unsqueeze(0)  # [1, V, F, W]
             z, probs, h_spatial = model(x, data.edge_index)
-            rc_logits = model.classify_root_cause(h_spatial)  # [1, num_nodes]
-            pred_idx = rc_logits.argmax(dim=1).item()
+            if use_gib:
+                logits = model.gib_logits(h_spatial)  # [1, num_nodes]
+            else:
+                logits = model.classify_root_cause(h_spatial)  # [1, num_nodes]
+            pred_idx = logits.argmax(dim=1).item()
 
-            y_true.append(NAME_TO_IDX[data.root_cause[0]])
+            y_true.append(name_to_idx[data.root_cause[0]])
             y_pred.append(pred_idx)
 
     # Compute metrics
@@ -122,12 +129,12 @@ def evaluate(
     logger.info("=" * 60)
 
     # Per-class report
-    target_names = [NODE_NAMES[i] for i in sorted(set(y_true))]
+    target_names = [node_idx_to_name[i] for i in sorted(set(y_true) | set(y_pred))]
     report = classification_report(y_true, y_pred, target_names=target_names, zero_division=0)
     logger.info("\n%s", report)
 
     # Prediction distribution
-    pred_names = [NODE_NAMES[p] for p in y_pred]
+    pred_names = [node_idx_to_name[p] for p in y_pred]
     logger.info("Prediction distribution: %s", dict(Counter(pred_names)))
 
 

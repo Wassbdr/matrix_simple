@@ -27,7 +27,7 @@ import os
 from model import SpatioTemporalRCA
 from losses import info_nce_loss, asymmetric_gib_loss, root_cause_loss
 from augment import augment_positive
-from common import NODE_NAMES, NAME_TO_IDX, stratified_split
+from common import NODE_NAMES, NAME_TO_IDX, stratified_split, load_windows_dataset
 import torch.nn.functional as F
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 def load_dataset(filepath: str) -> List[Data]:
     logger.info("Loading dataset from %s", filepath)
-    dataset: List[Data] = torch.load(filepath, weights_only=False)
+    dataset: List[Data] = load_windows_dataset(filepath)
     logger.info("Loaded %d windowed graph samples.", len(dataset))
     return dataset
 
@@ -115,10 +115,11 @@ def train(
                 x_anchor.shape, x_positive.shape, x_negative.shape)
 
     num_features = x_anchor.size(2)
+    num_nodes = x_anchor.size(1)
 
     # -- Initialize model --
     model = SpatioTemporalRCA(
-        num_features=num_features, hidden_dim=hidden_dim, num_nodes=5,
+        num_features=num_features, hidden_dim=hidden_dim, num_nodes=num_nodes,
     ).to(device)
 
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -221,7 +222,6 @@ def train(
     optimizer_sup = optim.AdamW(param_groups, weight_decay=weight_decay)
     scheduler_sup = optim.lr_scheduler.CosineAnnealingLR(optimizer_sup, T_max=supervised_epochs, eta_min=1e-5)
 
-    bce_loss_fn = torch.nn.BCELoss()
     batch_size_sup = 256
     n_sup = x_sup.size(0)
 
@@ -242,11 +242,10 @@ def train(
             z_graph, probs, h_spatial = model(x_batch, edge_index, use_gib=use_gib)
 
             if use_gib:
-                # GIB is the sole predictor: BCE on mask probs vs one-hot root cause
-                mask_pred = probs.squeeze(-1)  # [batch, num_nodes]
-                mask_target = F.one_hot(y_batch, num_classes=5).float()  # [batch, num_nodes]
-                loss = bce_loss_fn(mask_pred.clamp(1e-6, 1.0 - 1e-6), mask_target)
-                preds = mask_pred.argmax(dim=1)
+                # GIB is the sole predictor: CE on raw GIB logits (principled N-way classification)
+                gib_logits = model.gib_logits(h_spatial)  # [batch, num_nodes]
+                loss = F.cross_entropy(gib_logits, y_batch)
+                preds = gib_logits.argmax(dim=1)
             else:
                 # No GIB: per-node scorer on spatial embeddings
                 rc_logits = model.node_scorer(h_spatial)  # [batch, num_nodes]
@@ -280,6 +279,7 @@ def train(
         "epoch": contrastive_epochs + supervised_epochs,
         "beta_max": beta_max,
         "num_features": num_features,
+        "num_nodes": num_nodes,
         "hidden_dim": hidden_dim,
         "mode": "semi_supervised",
         "use_gib": use_gib,

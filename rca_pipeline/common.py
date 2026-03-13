@@ -3,6 +3,7 @@ Shared constants and utilities for the RCA pipeline.
 Single source of truth for node names, indices, and dataset splitting.
 """
 
+import torch
 from typing import Dict, List, Tuple, Optional
 from torch_geometric.data import Data
 
@@ -10,6 +11,33 @@ from torch_geometric.data import Data
 NODE_NAMES = ['frontend', 'auth', 'backend', 'cache', 'database']
 NAME_TO_IDX = {name: i for i, name in enumerate(NODE_NAMES)}
 NUM_NODES = len(NODE_NAMES)
+
+
+def load_windows_dataset(filepath: str) -> List[Data]:
+    """Load a windowed dataset .pt file.
+
+    Supports both:
+    - New format: dict {'train': [...], 'test': [...], 'scaler': ...} — returns train+test combined.
+    - Legacy format: plain List[Data].
+    """
+    payload = torch.load(filepath, weights_only=False)
+    if isinstance(payload, dict) and 'train' in payload and 'test' in payload:
+        return payload['train'] + payload['test']
+    return payload
+
+
+def load_dataset_payload(filepath: str):
+    """Load a windowed dataset .pt file, returning (windows, node_names).
+
+    node_names is a list of strings (e.g. ['frontend', 'auth', ...]).
+    Falls back to the default 5-node NODE_NAMES for legacy list-format files.
+    """
+    payload = torch.load(filepath, weights_only=False)
+    if isinstance(payload, dict) and 'train' in payload and 'test' in payload:
+        windows = payload['train'] + payload['test']
+        names = payload.get('node_names', NODE_NAMES)
+        return windows, names
+    return payload, NODE_NAMES
 
 
 def stratified_split(

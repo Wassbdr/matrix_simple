@@ -1,0 +1,325 @@
+{
+  "summary": {
+    "evaluate_delta": {
+      "precision_weighted": 0.0,
+      "recall_weighted": 0.0,
+      "f1_weighted": 0.0
+    },
+    "old_checkpoint": "checkpoints/stgcn_rca_final_v2.pt",
+    "new_checkpoint": "checkpoints/stgcn_rca_final_v2.pt"
+  },
+  "per_size": {
+    "N100": {
+      "Full-Graph GCN (N=100)": {
+        "old": {
+          "top1": 0.9408,
+          "mrr": 0.9594,
+          "latency_ms": 1.38
+        },
+        "new": {
+          "top1": 0.9408,
+          "mrr": 0.9594,
+          "latency_ms": 1.38
+        },
+        "delta": {
+          "top1": 0.0,
+          "mrr": 0.0,
+          "latency_ms": 0.0
+        }
+      },
+      "Late Bottleneck STGCN+GIB (N=100)": {
+        "old": {
+          "top1": 0.9022,
+          "mrr": 0.9248,
+          "latency_ms": 2.05
+        },
+        "new": {
+          "top1": 0.9022,
+          "mrr": 0.9248,
+          "latency_ms": 2.05
+        },
+        "delta": {
+          "top1": 0.0,
+          "mrr": 0.0,
+          "latency_ms": 0.0
+        }
+      },
+      "MLP Baseline": {
+        "old": {
+          "top1": 0.0169,
+          "mrr": 0.0722,
+          "latency_ms": 0.0
+        },
+        "new": {
+          "top1": 0.0169,
+          "mrr": 0.0722,
+          "latency_ms": 0.0
+        },
+        "delta": {
+          "top1": 0.0,
+          "mrr": 0.0,
+          "latency_ms": 0.0
+        }
+      },
+      "Random Forest": {
+        "old": {
+          "top1": 0.07,
+          "mrr": 0.1485,
+          "latency_ms": 0.0
+        },
+        "new": {
+          "top1": 0.07,
+          "mrr": 0.1485,
+          "latency_ms": 0.0
+        },
+        "delta": {
+          "top1": 0.0,
+          "mrr": 0.0,
+          "latency_ms": 0.0
+        }
+      },
+      "STA Select-then-Analyze (k=10)": {
+        "old": {
+          "top1": 0.9022,
+          "mrr": 0.9264,
+          "latency_ms": 4.61
+        },
+        "new": {
+          "top1": 0.9022,
+          "mrr": 0.9264,
+          "latency_ms": 4.61
+        },
+        "delta": {
+          "top1": 0.0,
+          "mrr": 0.0,
+          "latency_ms": 0.0
+        }
+      },
+      "STA Selector-only (k=10)": {
+        "old": {
+          "top1": 0.8889,
+          "mrr": 0.9176,
+          "latency_ms": 0.0
+        },
+        "new": {
+          "top1": 0.8889,
+          "mrr": 0.9176,
+          "latency_ms": 0.0
+        },
+        "delta": {
+          "top1": 0.0,
+          "mrr": 0.0,
+          "latency_ms": 0.0
+        }
+      }
+    },
+    "N20": {
+      "Full-Graph GCN (N=20)": {
+        "old": {
+          "top1": 0.9727,
+          "mrr": 0.9808,
+          "latency_ms": 2.56
+        },
+        "new": {
+          "top1": 0.9727,
+          "mrr": 0.9808,
+          "latency_ms": 2.56
+        },
+        "delta": {
+          "top1": 0.0,
+          "mrr": 0.0,
+          "latency_ms": 0.0
+        }
+      },
+      "Late Bottleneck STGCN+GIB (N=20)": {
+        "old": {
+          "top1": 0.9658,
+          "mrr": 0.9754,
+          "latency_ms": 2.45
+        },
+        "new": {
+          "top1": 0.9658,
+          "mrr": 0.9754,
+          "latency_ms": 2.45
+        },
+        "delta": {
+          "top1": 0.0,
+          "mrr": 0.0,
+          "latency_ms": 0.0
+        }
+      },
+      "MLP Baseline": {
+        "old": {
+          "top1": 0.0669,
+          "mrr": 0.2174,
+          "latency_ms": 0.0
+        },
+        "new": {
+          "top1": 0.0669,
+          "mrr": 0.2174,
+          "latency_ms": 0.0
+        },
+        "delta": {
+          "top1": 0.0,
+          "mrr": 0.0,
+          "latency_ms": 0.0
+        }
+      },
+      "Random Forest": {
+        "old": {
+          "top1": 0.5929,
+          "mrr": 0.7211,
+          "latency_ms": 0.0
+        },
+        "new": {
+          "top1": 0.5929,
+          "mrr": 0.7211,
+          "latency_ms": 0.0
+        },
+        "delta": {
+          "top1": 0.0,
+          "mrr": 0.0,
+          "latency_ms": 0.0
+        }
+      },
+      "STA Select-then-Analyze (k=5)": {
+        "old": {
+          "top1": 0.9795,
+          "mrr": 0.9833,
+          "latency_ms": 6.66
+        },
+        "new": {
+          "top1": 0.9795,
+          "mrr": 0.9833,
+          "latency_ms": 6.66
+        },
+        "delta": {
+          "top1": 0.0,
+          "mrr": 0.0,
+          "latency_ms": 0.0
+        }
+      },
+      "STA Selector-only (k=5)": {
+        "old": {
+          "top1": 0.9727,
+          "mrr": 0.9793,
+          "latency_ms": 0.0
+        },
+        "new": {
+          "top1": 0.9727,
+          "mrr": 0.9793,
+          "latency_ms": 0.0
+        },
+        "delta": {
+          "top1": 0.0,
+          "mrr": 0.0,
+          "latency_ms": 0.0
+        }
+      }
+    },
+    "N50": {
+      "Full-Graph GCN (N=50)": {
+        "old": {
+          "top1": 0.9442,
+          "mrr": 0.9614,
+          "latency_ms": 2.58
+        },
+        "new": {
+          "top1": 0.9442,
+          "mrr": 0.9614,
+          "latency_ms": 2.58
+        },
+        "delta": {
+          "top1": 0.0,
+          "mrr": 0.0,
+          "latency_ms": 0.0
+        }
+      },
+      "Late Bottleneck STGCN+GIB (N=50)": {
+        "old": {
+          "top1": 0.9544,
+          "mrr": 0.9707,
+          "latency_ms": 2.24
+        },
+        "new": {
+          "top1": 0.9544,
+          "mrr": 0.9707,
+          "latency_ms": 2.24
+        },
+        "delta": {
+          "top1": 0.0,
+          "mrr": 0.0,
+          "latency_ms": 0.0
+        }
+      },
+      "MLP Baseline": {
+        "old": {
+          "top1": 0.019,
+          "mrr": 0.0959,
+          "latency_ms": 0.0
+        },
+        "new": {
+          "top1": 0.019,
+          "mrr": 0.0959,
+          "latency_ms": 0.0
+        },
+        "delta": {
+          "top1": 0.0,
+          "mrr": 0.0,
+          "latency_ms": 0.0
+        }
+      },
+      "Random Forest": {
+        "old": {
+          "top1": 0.1774,
+          "mrr": 0.2763,
+          "latency_ms": 0.0
+        },
+        "new": {
+          "top1": 0.1774,
+          "mrr": 0.2763,
+          "latency_ms": 0.0
+        },
+        "delta": {
+          "top1": 0.0,
+          "mrr": 0.0,
+          "latency_ms": 0.0
+        }
+      },
+      "STA Select-then-Analyze (k=8)": {
+        "old": {
+          "top1": 0.9366,
+          "mrr": 0.9573,
+          "latency_ms": 8.64
+        },
+        "new": {
+          "top1": 0.9366,
+          "mrr": 0.9573,
+          "latency_ms": 8.64
+        },
+        "delta": {
+          "top1": 0.0,
+          "mrr": 0.0,
+          "latency_ms": 0.0
+        }
+      },
+      "STA Selector-only (k=8)": {
+        "old": {
+          "top1": 0.9214,
+          "mrr": 0.9477,
+          "latency_ms": 0.0
+        },
+        "new": {
+          "top1": 0.9214,
+          "mrr": 0.9477,
+          "latency_ms": 0.0
+        },
+        "delta": {
+          "top1": 0.0,
+          "mrr": 0.0,
+          "latency_ms": 0.0
+        }
+      }
+    }
+  }
+}

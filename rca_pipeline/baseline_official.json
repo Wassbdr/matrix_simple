@@ -1,0 +1,186 @@
+{
+  "generated_at": "2026-03-13T13:44:47.475102+00:00",
+  "checkpoint": "checkpoints/stgcn_rca_final_v2.pt",
+  "dataset": "../dataset_windows.pt",
+  "evaluate_metrics": {
+    "total_test_windows": 12,
+    "precision_weighted": 0.5,
+    "recall_weighted": 0.6667,
+    "f1_weighted": 0.5556
+  },
+  "infer_summary": {
+    "num_windows": 5,
+    "final_root_cause": "cache",
+    "votes": "{'cache': 5}"
+  },
+  "benchmark_official": {
+    "N20": {
+      "STA Select-then-Analyze (k=5)": {
+        "top1": "0.9795\u00b10.007",
+        "top2": "0.9809\u00b10.007",
+        "top5": "0.9863\u00b10.008",
+        "mrr": "0.9833\u00b10.006",
+        "sel_percent": "0.9877",
+        "latency_ms": "6.66",
+        "params": "16,549"
+      },
+      "STA Selector-only (k=5)": {
+        "top1": "0.9727\u00b10.007",
+        "top2": "0.9781\u00b10.008",
+        "top5": "0.9877\u00b10.006",
+        "mrr": "0.9793\u00b10.006",
+        "sel_percent": "0.0000",
+        "latency_ms": "0.00",
+        "params": "0"
+      },
+      "Late Bottleneck STGCN+GIB (N=20)": {
+        "top1": "0.9658\u00b10.014",
+        "top2": "0.9768\u00b10.007",
+        "top5": "0.9863\u00b10.002",
+        "mrr": "0.9754\u00b10.009",
+        "sel_percent": "0.0000",
+        "latency_ms": "2.45",
+        "params": "8,579"
+      },
+      "Full-Graph GCN (N=20)": {
+        "top1": "0.9727\u00b10.005",
+        "top2": "0.9822\u00b10.004",
+        "top5": "0.9891\u00b10.004",
+        "mrr": "0.9808\u00b10.003",
+        "sel_percent": "0.0000",
+        "latency_ms": "2.56",
+        "params": "7,490"
+      },
+      "MLP Baseline": {
+        "top1": "0.0669\u00b10.007",
+        "top2": "0.1380\u00b10.011",
+        "top5": "0.3333\u00b10.026",
+        "mrr": "0.2174\u00b10.006",
+        "sel_percent": "0.0000",
+        "latency_ms": "0.00",
+        "params": "22,132"
+      },
+      "Random Forest": {
+        "top1": "0.5929\u00b10.016",
+        "top2": "0.7527\u00b10.013",
+        "top5": "0.8866\u00b10.002",
+        "mrr": "0.7211\u00b10.008",
+        "sel_percent": "0.0000",
+        "latency_ms": "0.00",
+        "params": "0"
+      }
+    },
+    "N50": {
+      "STA Select-then-Analyze (k=8)": {
+        "top1": "0.9366\u00b10.018",
+        "top2": "0.9632\u00b10.011",
+        "top5": "0.9823\u00b10.007",
+        "mrr": "0.9573\u00b10.013",
+        "sel_percent": "0.9848",
+        "latency_ms": "8.64",
+        "params": "16,549"
+      },
+      "STA Selector-only (k=8)": {
+        "top1": "0.9214\u00b10.037",
+        "top2": "0.9556\u00b10.019",
+        "top5": "0.9810\u00b10.008",
+        "mrr": "0.9477\u00b10.024",
+        "sel_percent": "0.0000",
+        "latency_ms": "0.00",
+        "params": "0"
+      },
+      "Late Bottleneck STGCN+GIB (N=50)": {
+        "top1": "0.9544\u00b10.008",
+        "top2": "0.9797\u00b10.006",
+        "top5": "0.9873\u00b10.005",
+        "mrr": "0.9707\u00b10.006",
+        "sel_percent": "0.0000",
+        "latency_ms": "2.24",
+        "params": "8,579"
+      },
+      "Full-Graph GCN (N=50)": {
+        "top1": "0.9442\u00b10.032",
+        "top2": "0.9696\u00b10.014",
+        "top5": "0.9810\u00b10.008",
+        "mrr": "0.9614\u00b10.021",
+        "sel_percent": "0.0000",
+        "latency_ms": "2.58",
+        "params": "7,490"
+      },
+      "MLP Baseline": {
+        "top1": "0.0190\u00b10.005",
+        "top2": "0.0406\u00b10.010",
+        "top5": "0.1179\u00b10.003",
+        "mrr": "0.0959\u00b10.007",
+        "sel_percent": "0.0000",
+        "latency_ms": "0.00",
+        "params": "51,922"
+      },
+      "Random Forest": {
+        "top1": "0.1774\u00b10.017",
+        "top2": "0.2497\u00b10.006",
+        "top5": "0.3498\u00b10.019",
+        "mrr": "0.2763\u00b10.011",
+        "sel_percent": "0.0000",
+        "latency_ms": "0.00",
+        "params": "0"
+      }
+    },
+    "N100": {
+      "STA Select-then-Analyze (k=10)": {
+        "top1": "0.9022\u00b10.021",
+        "top2": "0.9372\u00b10.025",
+        "top5": "0.9505\u00b10.022",
+        "mrr": "0.9264\u00b10.021",
+        "sel_percent": "0.9614",
+        "latency_ms": "4.61",
+        "params": "16,549"
+      },
+      "STA Selector-only (k=10)": {
+        "top1": "0.8889\u00b10.040",
+        "top2": "0.9251\u00b10.039",
+        "top5": "0.9517\u00b10.021",
+        "mrr": "0.9176\u00b10.033",
+        "sel_percent": "0.0000",
+        "latency_ms": "0.00",
+        "params": "0"
+      },
+      "Late Bottleneck STGCN+GIB (N=100)": {
+        "top1": "0.9022\u00b10.090",
+        "top2": "0.9300\u00b10.058",
+        "top5": "0.9505\u00b10.045",
+        "mrr": "0.9248\u00b10.069",
+        "sel_percent": "0.0000",
+        "latency_ms": "2.05",
+        "params": "8,579"
+      },
+      "Full-Graph GCN (N=100)": {
+        "top1": "0.9408\u00b10.011",
+        "top2": "0.9686\u00b10.006",
+        "top5": "0.9807\u00b10.007",
+        "mrr": "0.9594\u00b10.008",
+        "sel_percent": "0.0000",
+        "latency_ms": "1.38",
+        "params": "7,490"
+      },
+      "MLP Baseline": {
+        "top1": "0.0169\u00b10.007",
+        "top2": "0.0314\u00b10.005",
+        "top5": "0.0797\u00b10.008",
+        "mrr": "0.0722\u00b10.006",
+        "sel_percent": "0.0000",
+        "latency_ms": "0.00",
+        "params": "101,572"
+      },
+      "Random Forest": {
+        "top1": "0.0700\u00b10.009",
+        "top2": "0.1353\u00b10.012",
+        "top5": "0.1957\u00b10.005",
+        "mrr": "0.1485\u00b10.007",
+        "sel_percent": "0.0000",
+        "latency_ms": "0.00",
+        "params": "0"
+      }
+    }
+  }
+}

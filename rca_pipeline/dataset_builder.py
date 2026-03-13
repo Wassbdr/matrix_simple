@@ -55,6 +55,7 @@ class ExperimentRunner:
         self.root_cause = root_cause
         self.run_id = str(uuid.uuid4())[:8]
         self.chaos_start_ts: float = 0.0
+        self.chaos_end_ts: float = 0.0
 
     def _run_cmd(self, cmd: List[str]) -> None:
         """Helper to run a shell command."""
@@ -96,6 +97,7 @@ class ExperimentRunner:
             # 5. Delete Chaos
             logger.info("Deleting Chaos Mesh experiment...")
             self._run_cmd(["kubectl", "delete", "-f", self.chaos_file, "--ignore-not-found=true"])
+            self.chaos_end_ts = time.time()
             
             # Wait to ensure Prometheus has scraped the final data points
             logger.info("Waiting 30 seconds for final metrics to be scraped...")
@@ -114,9 +116,9 @@ class ExperimentRunner:
 
         # 6. Extract data and export to CSV
         if end_time > 0:
-            self.extract_metrics(start_time, end_time, self.chaos_start_ts)
+            self.extract_metrics(start_time, end_time, self.chaos_start_ts, self.chaos_end_ts)
 
-    def extract_metrics(self, start_ts: float, end_ts: float, chaos_start_ts: float) -> None:
+    def extract_metrics(self, start_ts: float, end_ts: float, chaos_start_ts: float, chaos_end_ts: float) -> None:
         """Fetches metrics from Prometheus and saves them to a CSV file."""
         logger.info("Extracting metrics from Prometheus (10s step)...")
         namespace = "rca-sandbox"
@@ -145,9 +147,9 @@ class ExperimentRunner:
 
         import os
         csv_file = os.path.join(self.output_dir, f"dataset_{self.run_id}.csv")
-        self._save_csv(dataset_records, csv_file, chaos_start_ts)
+        self._save_csv(dataset_records, csv_file, chaos_start_ts, chaos_end_ts)
 
-    def _save_csv(self, data: List[Dict[str, Any]], filename: str, chaos_start_ts: float = 0.0) -> None:
+    def _save_csv(self, data: List[Dict[str, Any]], filename: str, chaos_start_ts: float = 0.0, chaos_end_ts: float = 0.0) -> None:
         """Pivots the metrics and exports to CSV with label and root_cause columns."""
         if not data:
             logger.warning("No data extracted to save.")
@@ -159,7 +161,8 @@ class ExperimentRunner:
             key = f'{row["timestamp"]}_{row["pod"]}'
             if key not in pivoted:
                 ts = float(row["timestamp"])
-                is_anomaly = 1 if (chaos_start_ts > 0 and ts >= chaos_start_ts) else 0
+                # Label as anomalous only within the chaos injection window
+                is_anomaly = 1 if (chaos_start_ts > 0 and chaos_start_ts <= ts <= chaos_end_ts) else 0
                 pivoted[key] = {
                     "timestamp": row["timestamp"],
                     "pod": row["pod"],
