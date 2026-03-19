@@ -40,6 +40,34 @@ def load_dataset_payload(filepath: str):
     return payload, NODE_NAMES
 
 
+def compute_target_sparsity(
+    num_nodes: int,
+    target_k: int = 1,
+    min_sparsity: float = 0.01,
+) -> float:
+    """
+    Compute the target sparsity level for GIB loss, scaled with graph size.
+    
+    The GIB loss should select approximately target_k root cause nodes,
+    regardless of the graph size N. This function computes the appropriate
+    sparsity target to maintain that invariant.
+    
+    Args:
+        num_nodes: Total number of nodes in the graph
+        target_k: Expected number of root cause nodes (default: 1)
+        min_sparsity: Minimum sparsity floor to avoid numerical issues
+    
+    Returns:
+        target_sparsity: Scalar in [min_sparsity, 1.0]
+    
+    Example:
+        N=5:   compute_target_sparsity(5) = 0.2    (1/5)
+        N=100: compute_target_sparsity(100) = 0.01 (1/100)
+    """
+    target = target_k / max(num_nodes, 1)
+    return max(target, min_sparsity)
+
+
 def stratified_split(
     dataset: List[Data],
     train_ratio: float = 0.8,

@@ -34,6 +34,25 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
+class CausalConv1d(nn.Module):
+    """1D convolution with left padding only to preserve strict temporal causality."""
+
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int = 3) -> None:
+        super().__init__()
+        self.left_padding = kernel_size - 1
+        self.conv = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            padding=0,
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.left_padding > 0:
+            x = F.pad(x, (self.left_padding, 0))
+        return self.conv(x)
+
+
 # ---------------------------------------------------------------------------
 # Stage 1: Lightweight Encoder (full graph, O(N))
 # ---------------------------------------------------------------------------
@@ -46,8 +65,8 @@ class LightEncoder(nn.Module):
 
     def __init__(self, num_features: int, hidden_dim: int) -> None:
         super().__init__()
-        self.temporal1 = nn.Conv1d(num_features, hidden_dim, kernel_size=3, padding=1)
-        self.temporal2 = nn.Conv1d(hidden_dim, hidden_dim, kernel_size=3, padding=1)
+        self.temporal1 = CausalConv1d(num_features, hidden_dim, kernel_size=3)
+        self.temporal2 = CausalConv1d(hidden_dim, hidden_dim, kernel_size=3)
         self.temp_attn = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.Tanh(),
@@ -133,6 +152,8 @@ class STESelector(nn.Module):
             logits:         [B, N]  -- raw logits before sigmoid (for CE loss)
         """
         logits = self.mlp(h).squeeze(-1)                                    # [B, N]
+        n_nodes = logits.size(-1)
+        k_eff = max(1, min(k, n_nodes))
 
         if self.training:
             # Gumbel noise for stochastic exploration
@@ -145,7 +166,7 @@ class STESelector(nn.Module):
         M_soft = torch.sigmoid(logits_noisy / self.temperature)             # [B, N]
 
         # Discrete top-k selection
-        _, top_k_indices = torch.topk(M_soft, k, dim=-1)                   # [B, k]
+        _, top_k_indices = torch.topk(M_soft, k_eff, dim=-1)               # [B, k_eff]
         top_k_indices, _ = top_k_indices.sort(dim=-1)                       # sort for pyg_subgraph
 
         M_hard = torch.zeros_like(M_soft)
@@ -168,10 +189,8 @@ class DeepTemporalBlock(nn.Module):
 
     def __init__(self, in_channels: int, hidden_dim: int, kernel_size: int = 3) -> None:
         super().__init__()
-        self.conv1 = nn.Conv1d(in_channels, hidden_dim, kernel_size=kernel_size,
-                               padding=kernel_size // 2)
-        self.conv2 = nn.Conv1d(hidden_dim, hidden_dim, kernel_size=kernel_size,
-                               padding=kernel_size // 2)
+        self.conv1 = CausalConv1d(in_channels, hidden_dim, kernel_size=kernel_size)
+        self.conv2 = CausalConv1d(hidden_dim, hidden_dim, kernel_size=kernel_size)
         self.norm = nn.BatchNorm1d(hidden_dim)
         self.temporal_attn = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim // 2),
@@ -285,21 +304,43 @@ def extract_subgraph_vectorized(
 
     # Flatten: [B*N, F, W]
     x_flat = x_masked.reshape(B * N, x_masked.size(2), x_masked.size(3))
+    node_offsets = torch.arange(B, device=device) * N
 
-    # Batch offsets
-    offsets = torch.arange(B, device=device) * N                            # [B]
-
-    # Batched edge_index (standard PyG convention)
-    if B > 1:
-        batched_ei = (
-            edge_index.unsqueeze(0).expand(B, -1, -1)
-            + offsets.view(-1, 1, 1)
-        ).reshape(2, -1)                                                    # [2, B*E]
+    # Batched edge_index supports both:
+    #   - static topology: edge_index [2, E]
+    #   - dynamic per-sample topology: edge_index [B, 2, E]
+    if edge_index.dim() == 2:
+        if B > 1:
+            batched_ei = (
+                edge_index.unsqueeze(0).expand(B, -1, -1)
+                + node_offsets.view(-1, 1, 1)
+                ).permute(1, 0, 2).reshape(2, -1)
+        else:
+            batched_ei = edge_index
+    elif edge_index.dim() == 3:
+        if edge_index.size(0) != B or edge_index.size(1) != 2:
+            raise ValueError(
+                "Dynamic edge_index must have shape [B, 2, E] aligned with x batch size"
+            )
+        if (edge_index < 0).any():
+            parts = []
+            for b in range(B):
+                valid = (edge_index[b, 0] >= 0) & (edge_index[b, 1] >= 0)
+                ei_b = edge_index[b, :, valid]
+                if ei_b.numel() > 0:
+                    parts.append(ei_b + b * N)
+            if parts:
+                batched_ei = torch.cat(parts, dim=1)
+            else:
+                batched_ei = edge_index.new_zeros((2, 0))
+        else:
+            offsets = node_offsets.view(B, 1, 1)
+            batched_ei = (edge_index + offsets).permute(1, 0, 2).reshape(2, -1)
     else:
-        batched_ei = edge_index
+        raise ValueError("edge_index must have shape [2, E] or [B, 2, E]")
 
     # Global indices of selected nodes
-    batched_subset = (top_k_indices + offsets.unsqueeze(1)).reshape(-1)      # [B*k]
+    batched_subset = (top_k_indices + node_offsets.unsqueeze(1)).reshape(-1)  # [B*k]
 
     # Single vectorized subgraph extraction
     sub_ei, _ = pyg_subgraph(
@@ -361,14 +402,38 @@ class SelectThenAnalyze(nn.Module):
 
     # -- helpers --
 
-    def _batch_edge_index(self, edge_index: torch.Tensor, B: int) -> torch.Tensor:
-        if B <= 1:
-            return edge_index
-        device = edge_index.device
-        offsets = torch.arange(B, device=device) * self.num_nodes
-        return (
-            edge_index.unsqueeze(0).expand(B, -1, -1) + offsets.view(-1, 1, 1)
-        ).reshape(2, -1)
+    def _batch_edge_index(self, edge_index: torch.Tensor, B: int, N: int = None) -> torch.Tensor:
+        if N is None:
+            N = self.num_nodes
+        if edge_index.dim() == 2:
+            if B <= 1:
+                return edge_index
+            device = edge_index.device
+            offsets = torch.arange(B, device=device) * N
+            return (
+                edge_index.unsqueeze(0).expand(B, -1, -1) + offsets.view(-1, 1, 1)
+            ).permute(1, 0, 2).reshape(2, -1)
+
+        if edge_index.dim() == 3:
+            if edge_index.size(0) != B or edge_index.size(1) != 2:
+                raise ValueError(
+                    "Dynamic edge_index must have shape [B, 2, E] aligned with x batch size"
+                )
+            if (edge_index < 0).any():
+                parts = []
+                for b in range(B):
+                    valid = (edge_index[b, 0] >= 0) & (edge_index[b, 1] >= 0)
+                    ei_b = edge_index[b, :, valid]
+                    if ei_b.numel() > 0:
+                        parts.append(ei_b + b * N)
+                if parts:
+                    return torch.cat(parts, dim=1)
+                return edge_index.new_zeros((2, 0))
+
+            offsets = (torch.arange(B, device=edge_index.device) * N).view(B, 1, 1)
+            return (edge_index + offsets).permute(1, 0, 2).reshape(2, -1)
+
+        raise ValueError("edge_index must have shape [2, E] or [B, 2, E]")
 
     # -- forward --
 
@@ -383,7 +448,7 @@ class SelectThenAnalyze(nn.Module):
 
         # ---- Stage 1: Light encoder (full graph) ----
         x_flat = x.view(B * N, F_, W)
-        batch_ei = self._batch_edge_index(edge_index, B)
+        batch_ei = self._batch_edge_index(edge_index, B, N)
         h_light = self.light_encoder(x_flat, batch_ei)                      # [B*N, H]
         h_light_batched = h_light.view(B, N, -1)                            # [B, N, H]
 
@@ -391,19 +456,20 @@ class SelectThenAnalyze(nn.Module):
         M_ste, M_soft, top_k_indices, selector_logits = self.selector(
             h_light_batched, k
         )
+        k_eff = top_k_indices.size(1)
 
         # ---- Stage 3: Mask features and extract subgraph ----
         # Gate features by STE mask: creates gradient path selector <- task loss
         x_masked = x * M_ste.unsqueeze(-1).unsqueeze(-1)                    # [B, N, F, W]
 
         x_sub, sub_ei = extract_subgraph_vectorized(
-            x_masked, edge_index, top_k_indices, self.num_nodes,
+            x_masked, edge_index, top_k_indices, N,
         )                                                                    # [B*k, F, W], [2, E_sub]
 
         # ---- Stage 4: Deep STGCN on subgraph (O(k^2)) ----
         h_deep = self.deep_temporal(x_sub)                                   # [B*k, H]
         h_deep = self.deep_spatial(h_deep, sub_ei)                           # [B*k, H]
-        h_deep_batched = h_deep.view(B, k, -1)                              # [B, k, H]
+        h_deep_batched = h_deep.view(B, k_eff, -1)                          # [B, k_eff, H]
 
         # ---- Stage 5: Score and scatter back ----
         scores_sub = self.scorer(h_deep_batched)                             # [B, k]

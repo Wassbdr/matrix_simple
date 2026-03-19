@@ -58,10 +58,17 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters())
 
 
-def get_ranking_metrics(y_true_list, y_pred_logits_list, top_ns=(1, 2, 5)):
+def get_ranking_metrics(y_true_list, y_pred_logits_list, severity_list=None, top_ns=(1, 2, 5)):
     tops = {n: 0.0 for n in top_ns}
     mrr = 0.0
-    for y_true, logits in zip(y_true_list, y_pred_logits_list):
+    sw_mrr_sum = 0.0
+    total_sev = 0.0
+    count = len(y_true_list)
+    
+    if count == 0:
+        return {n: 0.0 for n in top_ns}, 0.0, 0.0
+
+    for i, (y_true, logits) in enumerate(zip(y_true_list, y_pred_logits_list)):
         if isinstance(logits, torch.Tensor):
             logits = logits.cpu().detach().numpy()
         ranked = np.argsort(logits)[::-1]
@@ -69,11 +76,16 @@ def get_ranking_metrics(y_true_list, y_pred_logits_list, top_ns=(1, 2, 5)):
         for n in top_ns:
             if rank <= n:
                 tops[n] += 1
-        mrr += 1.0 / rank
-    count = len(y_true_list)
-    if count == 0:
-        return {n: 0.0 for n in top_ns}, 0.0
-    return {n: tops[n] / count for n in top_ns}, mrr / count
+        rr = 1.0 / rank
+        mrr += rr
+        
+        if severity_list is not None and i < len(severity_list):
+            sev = severity_list[i]
+            sw_mrr_sum += rr * sev
+            total_sev += sev
+            
+    sw_mrr = sw_mrr_sum / total_sev if total_sev > 0 else 0.0
+    return {n: tops[n] / count for n in top_ns}, mrr / count, sw_mrr
 
 
 def stratified_split(dataset, name_to_idx, train_ratio=0.8):
@@ -455,12 +467,21 @@ def eval_v1(model, test_anom, edge_index, name_to_idx, device):
             y_true.append(true_idx)
             y_logits.append(gib_logits.cpu().numpy())
 
-    tops, mrr = get_ranking_metrics(y_true, y_logits, top_ns=(1, 2, 5))
+    severity_list = [getattr(d, 'severity', 1.0) for d in test_anom]
+    tops, mrr, sw_mrr = get_ranking_metrics(y_true, y_logits, severity_list, top_ns=(1, 2, 5))
+    
+    crit_idx = [i for i, s in enumerate(severity_list) if s >= 0.7]
+    y_true_crit = [y_true[i] for i in crit_idx]
+    y_logits_crit = [y_logits[i] for i in crit_idx]
+    tops_crit, mrr_crit, _ = get_ranking_metrics(y_true_crit, y_logits_crit, None, top_ns=(1, 2, 5))
+    
     return {
-        "top1": tops[1], "top2": tops[2], "top5": tops[5], "mrr": mrr,
+        "top1": tops[1], "top2": tops[2], "top5": tops[5], "mrr": mrr, "sw_mrr": sw_mrr,
+        "crit_top1": tops_crit[1], "crit_mrr": mrr_crit,
         "mean_latency_ms": np.mean(latencies) * 1000,
         "std_latency_ms": np.std(latencies) * 1000,
         "params": count_parameters(model), "k": N, "N": N,
+        "n_test": len(y_true), "n_crit": len(crit_idx)
     }
 
 
@@ -475,6 +496,8 @@ def train_sta_compact(
     lr=1e-3, batch_size=256,
     nce_temperature=0.07,
     k_anneal_epochs=60,
+    use_severity_weights=False,
+    curriculum=False,
 ):
     """
     Train STA with k-annealing curriculum.
@@ -545,6 +568,15 @@ def train_sta_compact(
     y_sup = torch.tensor([name_to_idx[d.root_cause[0]] for d in anomalous], dtype=torch.long, device=device)
     n_sup = x_sup.size(0)
 
+    if use_severity_weights or curriculum:
+        severity_weights = torch.tensor(
+            [getattr(d, 'severity', 1.0) for d in anomalous],
+            dtype=torch.float, device=device,
+        )
+        severity_weights = severity_weights / severity_weights.mean().clamp(min=1e-6)
+    else:
+        severity_weights = torch.ones(n_sup, dtype=torch.float, device=device)
+
     # Hold out 5% for early stopping validation
     n_val = max(1, int(n_sup * 0.05))
     perm_split = torch.randperm(n_sup, device=device)
@@ -552,6 +584,7 @@ def train_sta_compact(
     train_idx_sta = perm_split[n_val:]
     x_val_sta, y_val_sta = x_sup[val_idx], y_sup[val_idx]
     x_train_sta, y_train_sta = x_sup[train_idx_sta], y_sup[train_idx_sta]
+    sev_train_sta = severity_weights[train_idx_sta]
     n_train_sta = x_train_sta.size(0)
 
     # Full LR for all parameters (encoder needs to adapt fully for node selection)
@@ -576,6 +609,12 @@ def train_sta_compact(
         t_frac = epoch / max(supervised_epochs - 1, 1)
         model.set_temperature(1.0 + t_frac * (0.3 - 1.0))
 
+        # Soft Curriculum: dynamic exponent scaling of severity
+        if curriculum:
+            epoch_power = 3.0 - (2.0 * t_frac)
+        else:
+            epoch_power = 1.0
+
         perm = torch.randperm(n_train_sta, device=device)
         ep_loss = ep_correct = ep_selected = 0
         nb = 0
@@ -584,16 +623,31 @@ def train_sta_compact(
             idx = perm[start:start + batch_size]
             x_b, y_b = x_train_sta[idx], y_train_sta[idx]
             opt_sup.zero_grad()
+            
+            # Apply exponent to severity and normalize per batch
+            if use_severity_weights or curriculum:
+                sev_b = sev_train_sta[idx] ** epoch_power
+                sev_b = sev_b / sev_b.mean().clamp(min=1e-6)
+            else:
+                sev_b = torch.ones_like(y_b, dtype=torch.float)
 
             logits_full, M_soft, top_k, sel_logits = model(x_b, ei)
 
             # Primary: CE on selector logits (covers all N — main learning signal)
-            loss_sel = F.cross_entropy(sel_logits, y_b)
+            if use_severity_weights or curriculum:
+                loss_sel_unreduced = F.cross_entropy(sel_logits, y_b, reduction='none')
+                loss_sel = (loss_sel_unreduced * sev_b).mean()
+            else:
+                loss_sel = F.cross_entropy(sel_logits, y_b)
 
             # Secondary: CE on scorer output (only when RC in top-k)
             in_topk = (top_k == y_b.unsqueeze(1)).any(dim=1)
             if in_topk.any():
-                loss_scorer = F.cross_entropy(logits_full[in_topk], y_b[in_topk])
+                if use_severity_weights or curriculum:
+                    loss_scorer_unreduced = F.cross_entropy(logits_full[in_topk], y_b[in_topk], reduction='none')
+                    loss_scorer = (loss_scorer_unreduced * sev_b[in_topk]).mean()
+                else:
+                    loss_scorer = F.cross_entropy(logits_full[in_topk], y_b[in_topk])
             else:
                 loss_scorer = torch.tensor(0.0, device=device)
 
@@ -610,8 +664,8 @@ def train_sta_compact(
 
         sch_sup.step()
         if epoch % 30 == 0 or epoch == supervised_epochs - 1:
-            print(f"    [Phase2] Ep {epoch:03d}/{supervised_epochs} | loss={ep_loss/nb:.4f} | "
-                  f"acc={ep_correct/n_train_sta:.4f} | RC-in-top-{k_cur}={ep_selected/n_train_sta:.4f} | k={k_cur}")
+            print(f"    [Phase2] Ep {epoch:03d}/{supervised_epochs} | loss={ep_loss/max(1,nb):.4f} | "
+                  f"acc={ep_correct/max(1,n_train_sta):.4f} | RC-in-top-{k_cur}={ep_selected/max(1,n_train_sta):.4f} | k={k_cur}")
 
         # Early stopping on validation set (only after k-annealing completes)
         if epoch >= k_anneal_epochs:
@@ -677,14 +731,27 @@ def eval_sta(model, test_anom, edge_index, name_to_idx, device):
             if true_idx in top_k[0].tolist():
                 selection_hits += 1
 
-    tops, mrr = get_ranking_metrics(y_true, y_logits_combined, top_ns=(1, 2, 5))
-    tops_sel, mrr_sel = get_ranking_metrics(y_true, y_logits_selector, top_ns=(1, 2, 5))
+    severity_list = [getattr(d, 'severity', 1.0) for d in test_anom]
+    tops, mrr, sw_mrr = get_ranking_metrics(y_true, y_logits_combined, severity_list, top_ns=(1, 2, 5))
+    tops_sel, mrr_sel, sw_mrr_sel = get_ranking_metrics(y_true, y_logits_selector, severity_list, top_ns=(1, 2, 5))
+    
+    crit_idx = [i for i, s in enumerate(severity_list) if s >= 0.7]
+    y_true_crit = [y_true[i] for i in crit_idx]
+    
+    y_logits_crit = [y_logits_combined[i] for i in crit_idx]
+    tops_crit, mrr_crit, _ = get_ranking_metrics(y_true_crit, y_logits_crit, None, top_ns=(1, 2, 5))
+    
+    y_logits_sel_crit = [y_logits_selector[i] for i in crit_idx]
+    tops_sel_crit, mrr_sel_crit, _ = get_ranking_metrics(y_true_crit, y_logits_sel_crit, None, top_ns=(1, 2, 5))
+
     return {
-        "top1": tops[1], "top2": tops[2], "top5": tops[5], "mrr": mrr,
+        "top1": tops[1], "top2": tops[2], "top5": tops[5], "mrr": mrr, "sw_mrr": sw_mrr,
+        "crit_top1": tops_crit[1], "crit_mrr": mrr_crit,
         "sel_top1": tops_sel[1], "sel_top2": tops_sel[2], "sel_top5": tops_sel[5],
-        "sel_mrr": mrr_sel,
+        "sel_mrr": mrr_sel, "sel_sw_mrr": sw_mrr_sel,
+        "sel_crit_top1": tops_sel_crit[1], "sel_crit_mrr": mrr_sel_crit,
         "selection_rate": selection_hits / len(y_true),
-        "n_test": len(y_true),
+        "n_test": len(y_true), "n_crit": len(crit_idx),
         "mean_latency_ms": np.mean(latencies) * 1000,
         "std_latency_ms": np.std(latencies) * 1000,
         "params": count_parameters(model),
@@ -711,9 +778,17 @@ def eval_gcn_baseline(model, test_anom, edge_index, name_to_idx, N):
                 lo = lo.unsqueeze(0)
             y_true.append(name_to_idx[data.root_cause[0]])
             y_logits.append(lo[0].cpu().numpy())
-    tops, mrr = get_ranking_metrics(y_true, y_logits, top_ns=(1, 2, 5))
+    severity_list = [getattr(d, 'severity', 1.0) for d in test_anom]
+    tops, mrr, sw_mrr = get_ranking_metrics(y_true, y_logits, severity_list, top_ns=(1, 2, 5))
+    
+    crit_idx = [i for i, s in enumerate(severity_list) if s >= 0.7]
+    y_true_crit = [y_true[i] for i in crit_idx]
+    y_logits_crit = [y_logits[i] for i in crit_idx]
+    tops_crit, mrr_crit, _ = get_ranking_metrics(y_true_crit, y_logits_crit, None, top_ns=(1, 2, 5))
+    
     return {
-        "top1": tops[1], "top2": tops[2], "top5": tops[5], "mrr": mrr,
+        "top1": tops[1], "top2": tops[2], "top5": tops[5], "mrr": mrr, "sw_mrr": sw_mrr,
+        "crit_top1": tops_crit[1], "crit_mrr": mrr_crit,
         "mean_latency_ms": np.mean(latencies) * 1000,
         "std_latency_ms": np.std(latencies) * 1000,
         "params": count_parameters(model), "k": N, "N": N,
@@ -738,8 +813,16 @@ def eval_mlp_baseline(model, test_anom, name_to_idx, N):
             lo = model(stats.flatten().unsqueeze(0))
             y_true.append(name_to_idx[data.root_cause[0]])
             y_logits.append(lo[0].cpu().numpy())
-    tops, mrr = get_ranking_metrics(y_true, y_logits, top_ns=(1, 2, 5))
-    return {"top1": tops[1], "top2": tops[2], "top5": tops[5], "mrr": mrr, "params": count_parameters(model)}
+    severity_list = [getattr(d, 'severity', 1.0) for d in test_anom]
+    tops, mrr, sw_mrr = get_ranking_metrics(y_true, y_logits, severity_list, top_ns=(1, 2, 5))
+    
+    crit_idx = [i for i, s in enumerate(severity_list) if s >= 0.7]
+    y_true_crit = [y_true[i] for i in crit_idx]
+    y_logits_crit = [y_logits[i] for i in crit_idx]
+    tops_crit, mrr_crit, _ = get_ranking_metrics(y_true_crit, y_logits_crit, None, top_ns=(1, 2, 5))
+    
+    return {"top1": tops[1], "top2": tops[2], "top5": tops[5], "mrr": mrr, "sw_mrr": sw_mrr,
+            "crit_top1": tops_crit[1], "crit_mrr": mrr_crit, "params": count_parameters(model)}
 
 
 def eval_rf_baseline(clf, test_anom, name_to_idx, N):
@@ -749,8 +832,16 @@ def eval_rf_baseline(clf, test_anom, name_to_idx, N):
     logits = np.zeros((len(X_test), N))
     for i, c in enumerate(clf.classes_):
         logits[:, c] = probs[:, i]
-    tops, mrr = get_ranking_metrics(y_test, logits, top_ns=(1, 2, 5))
-    return {"top1": tops[1], "top2": tops[2], "top5": tops[5], "mrr": mrr}
+    severity_list = [getattr(d, 'severity', 1.0) for d in test_anom]
+    tops, mrr, sw_mrr = get_ranking_metrics(y_test, logits, severity_list, top_ns=(1, 2, 5))
+    
+    crit_idx = [i for i, s in enumerate(severity_list) if s >= 0.7]
+    y_true_crit = [y_test[i] for i in crit_idx]
+    y_logits_crit = [logits[i] for i in crit_idx]
+    tops_crit, mrr_crit, _ = get_ranking_metrics(y_true_crit, y_logits_crit, None, top_ns=(1, 2, 5))
+    
+    return {"top1": tops[1], "top2": tops[2], "top5": tops[5], "mrr": mrr, "sw_mrr": sw_mrr,
+            "crit_top1": tops_crit[1], "crit_mrr": mrr_crit}
 
 
 # =====================================================================
@@ -769,8 +860,8 @@ def print_results_table(results: Dict[str, dict], title: str):
     has_sel = any("selection_rate" in v for v in results.values() if v)
     has_std = any("top1_std" in v for v in results.values() if v)
 
-    hdr = f"  {'MODEL':<38} | {'TOP-1':>7} | {'TOP-2':>7} | {'TOP-5':>7} | {'MRR':>7}"
-    sep = f"  {'-'*38}-+-{'-'*7}-+-{'-'*7}-+-{'-'*7}-+-{'-'*7}"
+    hdr = f"  {'MODEL':<38} | {'TOP-1':>7} | {'TOP-2':>7} | {'TOP-5':>7} | {'MRR':>7} | {'SW-MRR':>7} | {'C.TOP-1':>7} | {'C.MRR':>7}"
+    sep = f"  {'-'*38}-+-{'-'*7}-+-{'-'*7}-+-{'-'*7}-+-{'-'*7}-+-{'-'*7}-+-{'-'*7}-+-{'-'*7}"
     if has_sel:
         hdr += f" | {'SEL%':>7}"
         sep += f"-+-{'-'*7}"
@@ -784,13 +875,20 @@ def print_results_table(results: Dict[str, dict], title: str):
         if m is None:
             print(f"  {name:<38} | {'N/A':>7}")
             continue
+            
+        mrr_val = m.get('mrr', 0)
+        sw_mrr_val = m.get('sw_mrr', m.get('sel_sw_mrr', 0))
+        crit_top1 = m.get('crit_top1', 0)
+        crit_mrr = m.get('crit_mrr', 0)
+        
         if has_std and "top1_std" in m:
             row = (f"  {name:<38} | {m['top1']:.4f}" + (f"\u00b1{m['top1_std']:.3f}" if m.get('top1_std') else "") +
                    f" | {m['top2']:.4f}" + (f"\u00b1{m['top2_std']:.3f}" if m.get('top2_std') else "") +
                    f" | {m['top5']:.4f}" + (f"\u00b1{m['top5_std']:.3f}" if m.get('top5_std') else "") +
-                   f" | {m['mrr']:.4f}" + (f"\u00b1{m['mrr_std']:.3f}" if m.get('mrr_std') else ""))
+                   f" | {mrr_val:.4f}" + (f"\u00b1{m['mrr_std']:.3f}" if m.get('mrr_std') else "") +
+                   f" | {sw_mrr_val:>7.4f} | {crit_top1:>7.4f} | {crit_mrr:>7.4f}")
         else:
-            row = f"  {name:<38} | {m['top1']:>7.4f} | {m['top2']:>7.4f} | {m['top5']:>7.4f} | {m['mrr']:>7.4f}"
+            row = f"  {name:<38} | {m['top1']:>7.4f} | {m['top2']:>7.4f} | {m['top5']:>7.4f} | {mrr_val:>7.4f} | {sw_mrr_val:>7.4f} | {crit_top1:>7.4f} | {crit_mrr:>7.4f}"
         if has_sel:
             sel = m.get("selection_rate", 0)
             row += f" | {sel:>7.4f}"
@@ -799,7 +897,7 @@ def print_results_table(results: Dict[str, dict], title: str):
             par = m.get("params", 0)
             row += f" | {lat:>9.2f} | {par:>9,}"
         print(row)
-    print(f"  {'-'*38}-+-{'-'*7}-+-{'-'*7}-+-{'-'*7}-+-{'-'*7}")
+    print(f"  {'-'*38}-+-{'-'*7}-+-{'-'*7}-+-{'-'*7}-+-{'-'*7}-+-{'-'*7}-+-{'-'*7}-+-{'-'*7}")
 
 
 def print_latency_scaling(scaling_results):
@@ -821,7 +919,7 @@ def aggregate_seeds(runs: List[dict]) -> dict:
     """Aggregate metrics over multiple seed runs into mean ± std."""
     if len(runs) == 1:
         return runs[0]
-    keys = ["top1", "top2", "top5", "mrr", "selection_rate", "mean_latency_ms"]
+    keys = ["top1", "top2", "top5", "mrr", "sw_mrr", "crit_top1", "crit_mrr", "sel_sw_mrr", "selection_rate", "mean_latency_ms", "sel_crit_top1", "sel_crit_mrr"]
     agg = {}
     for k in keys:
         vals = [r[k] for r in runs if k in r]
@@ -884,11 +982,13 @@ def build_configs(
 # =====================================================================
 
 def main(args):
-    from simulated_data_scalable import generate_scalable_dataset
+    from simulated_data_scalable import generate_scalable_dataset, generate_scalable_dataset_v2
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
     print(f"PyTorch: {torch.__version__}")
+    if args.v2:
+        print("Using SOTA V2 dataset generation (power-law, 80% recurrence, 8 patterns)")
 
     SEEDS = parse_int_list(args.seeds)
     NUM_SEEDS = len(SEEDS)
@@ -911,15 +1011,36 @@ def main(args):
         print_header(f"GRAPH SIZE N={N}, k={k}, samples={cfg['num_samples']}, seeds={NUM_SEEDS}", char="#")
 
         # ---- 1. Generate dataset (fixed seed for fair comparison) ----
-        print(f"\n  Generating BA({N}, m={cfg['ba_m']}) dataset...")
-        t0 = time.time()
-        dataset, node_names, edge_index = generate_scalable_dataset(
-            num_nodes=N, ba_m=cfg["ba_m"], num_samples=cfg["num_samples"],
-            window_size=args.window_size,
-            num_features=args.num_features,
-            anomaly_ratio=args.anomaly_ratio,
-            seed=args.dataset_seed,
-        )
+        if args.v2:
+            print(f"\n  Generating BA({N}, m={cfg['ba_m']}) dataset [V2 SOTA]...")
+            t0 = time.time()
+            dataset, node_names, edge_index, metadata = generate_scalable_dataset_v2(
+                num_nodes=N, ba_m=cfg["ba_m"], num_samples=cfg["num_samples"],
+                window_size=args.window_size,
+                num_features=args.num_features,
+                anomaly_ratio=args.anomaly_ratio,
+                recurrence_ratio=0.8,
+                use_realistic_pattern_weights=True,
+                seed=args.dataset_seed,
+            )
+            # Print V2 statistics
+            anomalies_meta = [m for m in metadata if m["is_anomaly"]]
+            if anomalies_meta:
+                from collections import Counter
+                pattern_dist = Counter(m["pattern_type"] for m in anomalies_meta)
+                recurrent_count = sum(1 for m in anomalies_meta if m["is_recurrent"])
+                print(f"  V2 Stats: {len(anomalies_meta)} anomalies, {recurrent_count} recurrent ({recurrent_count/len(anomalies_meta)*100:.1f}%)")
+                print(f"  Pattern distribution: {dict(pattern_dist)}")
+        else:
+            print(f"\n  Generating BA({N}, m={cfg['ba_m']}) dataset...")
+            t0 = time.time()
+            dataset, node_names, edge_index = generate_scalable_dataset(
+                num_nodes=N, ba_m=cfg["ba_m"], num_samples=cfg["num_samples"],
+                window_size=args.window_size,
+                num_features=args.num_features,
+                anomaly_ratio=args.anomaly_ratio,
+                seed=args.dataset_seed,
+            )
         print(f"  Generated {len(dataset)} samples in {time.time()-t0:.1f}s")
 
         name_to_idx = {n: i for i, n in enumerate(node_names)}
@@ -936,12 +1057,14 @@ def main(args):
         print(f"  Test:  {len(test_data)} ({len(test_anom)} anomalies)")
 
         # Collect multi-seed results
-        sta_runs, late_runs, gcn_runs, mlp_runs, rf_runs = [], [], [], [], []
+        sta_runs, sta_dc_runs, late_runs, gcn_runs, mlp_runs, rf_runs = [], [], [], [], [], []
 
         for seed_idx, seed in enumerate(SEEDS):
             print(f"\n  === Seed {seed_idx+1}/{NUM_SEEDS} (seed={seed}) ===")
             torch.manual_seed(seed)
             np.random.seed(seed)
+
+            dynamic_k_anneal = int(args.supervised_epochs * 0.75) if N >= 50 else args.sta_k_anneal_epochs
 
             # ---- STA ----
             print(f"\n  -- Training SelectThenAnalyze (k={k}) --")
@@ -952,10 +1075,26 @@ def main(args):
                 warmup_epochs=args.sta_warmup_epochs,
                 supervised_epochs=args.supervised_epochs,
                 batch_size=args.batch_size,
-                k_anneal_epochs=args.sta_k_anneal_epochs,
+                k_anneal_epochs=dynamic_k_anneal,
             )
             print(f"  STA training completed in {time.time()-t0:.1f}s")
             sta_runs.append(eval_sta(sta_model, test_anom, edge_index, name_to_idx, device))
+
+            # ---- STA Data-Centric ----
+            print(f"\n  -- Training STA Data-Centric (k={k}) --")
+            t0 = time.time()
+            sta_dc_model = train_sta_compact(
+                train_data, node_names, edge_index, device,
+                hidden_dim=hidden, k=k,
+                warmup_epochs=args.sta_warmup_epochs,
+                supervised_epochs=args.supervised_epochs,
+                batch_size=args.batch_size,
+                k_anneal_epochs=dynamic_k_anneal,
+                use_severity_weights=True,
+                curriculum=True,
+            )
+            print(f"  STA Data-Centric training completed in {time.time()-t0:.1f}s")
+            sta_dc_runs.append(eval_sta(sta_dc_model, test_anom, edge_index, name_to_idx, device))
 
             # ---- Late Bottleneck (parallel approach) ----
             print(f"\n  -- Training STGCN+GIB (Late Bottleneck) --")
@@ -996,9 +1135,14 @@ def main(args):
         r_sta = aggregate_seeds(sta_runs)
         results[f"STA Select-then-Analyze (k={k})"] = r_sta
 
+        r_sta_dc = aggregate_seeds(sta_dc_runs)
+        results[f"STA Data-Centric (k={k})"] = r_sta_dc
+
         r_sta_sel = aggregate_seeds([{
             "top1": r.get("sel_top1", 0), "top2": r.get("sel_top2", 0),
             "top5": r.get("sel_top5", 0), "mrr": r.get("sel_mrr", 0),
+            "sw_mrr": r.get("sel_sw_mrr", 0), "crit_top1": r.get("sel_crit_top1", 0),
+            "crit_mrr": r.get("sel_crit_mrr", 0)
         } for r in sta_runs])
         results[f"STA Selector-only (k={k})"] = r_sta_sel
 
@@ -1050,6 +1194,8 @@ if __name__ == "__main__":
                         help="Anomaly ratio in generated dataset")
     parser.add_argument("--dataset-seed", type=int, default=42,
                         help="Seed used for dataset generation")
+    parser.add_argument("--v2", action="store_true",
+                        help="Use SOTA V2 dataset (power-law, 80%% recurrence, 8 patterns)")
 
     # Training/eval settings
     parser.add_argument("--seeds", type=str, default="42,123,7",

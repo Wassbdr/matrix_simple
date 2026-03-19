@@ -48,23 +48,30 @@ def temporal_jitter(
     max_shift: int = 1,
 ) -> torch.Tensor:
     """
-    Applies a random circular shift along the temporal dimension.
+    Applies a random temporal shift along the last dimension with zero-padding.
 
-    This simulates slight temporal misalignment, which should not
-    change the semantic meaning of the window (healthy vs anomalous).
+    Unlike torch.roll (circular), this implementation pads shifted positions
+    with zeros to preserve temporal causality — future timesteps never wrap
+    to the beginning of the window.
 
     Args:
         x: shape [batch, num_nodes, num_features, W] or [num_nodes, num_features, W]
         max_shift: Maximum number of timesteps to shift.
 
     Returns:
-        Temporally shifted copy of x.
+        Temporally shifted copy of x (zero-padded, not circular).
     """
     shift = torch.randint(-max_shift, max_shift + 1, (1,)).item()
     if shift == 0:
         return x.clone()
-    # torch.roll along the last dimension (temporal)
-    return torch.roll(x, shifts=int(shift), dims=-1)
+    out = torch.zeros_like(x)
+    if shift > 0:
+        # Shift right: early timesteps become zero
+        out[..., shift:] = x[..., :-shift]
+    else:
+        # Shift left: late timesteps become zero
+        out[..., :shift] = x[..., -shift:]
+    return out
 
 
 def feature_masking(

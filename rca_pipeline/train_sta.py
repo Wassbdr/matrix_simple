@@ -90,23 +90,29 @@ def sparsity_loss_l1(M_soft: torch.Tensor) -> torch.Tensor:
 def asymmetric_sparsity_loss(
     M_soft_healthy: torch.Tensor,
     M_soft_anomalous: torch.Tensor,
+    min_active_nodes: int = 1,
+    dispersion_weight: float = 0.25,
 ) -> torch.Tensor:
     """
     Asymmetric variant matching the dynamical system assumption:
         healthy  (U=0):     push M -> 0          (L2)
-        anomalous (|U|_0=1): push M -> sparse     (L1 + neg-entropy)
+        anomalous:          push M -> sparse and optionally distributed
+                            across multiple nodes when min_active_nodes > 1
     """
     loss_h = (M_soft_healthy ** 2).sum(dim=-1).mean()
 
-    # Anomalous: L1 + negative entropy
+    # Anomalous: L1 + anti-collapse entropy floor
     loss_l1 = M_soft_anomalous.abs().sum(dim=-1).mean()
     p = M_soft_anomalous / (M_soft_anomalous.sum(dim=-1, keepdim=True) + 1e-8)
     entropy = -(p * (p + 1e-8).log()).sum(dim=-1)
     N = M_soft_anomalous.size(-1)
-    max_ent = torch.log(torch.tensor(float(N), device=entropy.device))
-    loss_conc = (entropy / max_ent).mean()
+    max_ent = torch.log(torch.tensor(float(max(N, 2)), device=entropy.device))
+    target_nodes = max(1, min(min_active_nodes, N))
+    target_ent = torch.log(torch.tensor(float(target_nodes), device=entropy.device)) / max_ent
+    ent_norm = entropy / max_ent
+    loss_dispersion = F.relu(target_ent - ent_norm).mean()
 
-    return loss_h + loss_l1 + loss_conc
+    return loss_h + loss_l1 + dispersion_weight * loss_dispersion
 
 
 # ---------------------------------------------------------------------------
@@ -125,10 +131,14 @@ def train_sta(
     beta_max: float = 0.5,
     warmup_epochs: int = 30,
     nce_temperature: float = 0.07,
+    min_active_nodes: int = 1,
+    dispersion_weight: float = 0.25,
     # Phase 2
     supervised_epochs: int = 100,
     supervised_lr: float = 1e-3,
     gamma_sparsity: float = 0.1,
+    use_severity_weights: bool = False,
+    curriculum: bool = False,
     # General
     batch_size: int = 256,
     weight_decay: float = 1e-4,
@@ -154,8 +164,11 @@ def train_sta(
     logger.info("Healthy: %d, Anomalous: %d", len(healthy), len(anomalous))
 
     # Build tensors
-    x_anchor = torch.stack([healthy[i].x for i in range(len(healthy) - 1)]).to(device)
-    x_positive = torch.stack([healthy[i + 1].x for i in range(len(healthy) - 1)]).to(device)
+    # NOTE: We use the SAME windows for anchors and positives (with augmentation)
+    # to avoid data leakage from consecutive windows that may overlap healthy->anomaly
+    # transitions. Positives are generated via augment_positive() during training.
+    x_anchor = torch.stack([d.x for d in healthy]).to(device)
+    # x_positive will be generated on-the-fly via augmentation (same window, different view)
     x_negative = torch.stack([d.x for d in anomalous]).to(device)
     edge_index = healthy[0].edge_index.to(device)
     num_features = x_anchor.size(2)
@@ -208,9 +221,10 @@ def train_sta(
 
                 # Forward through model (we need M_soft for sparsity)
                 _, M_soft_a, _, _ = model(x_anchor[idx_h], edge_index)
+                # Generate positive pairs via augmentation of the SAME anchor (no leakage)
                 x_pos_aug = augment_positive(
-                    x_positive[idx_h], noise_sigma=0.05,
-                    jitter_shift=1, feature_mask_ratio=0.1,
+                    x_anchor[idx_h], noise_sigma=0.1,
+                    jitter_shift=2, feature_mask_ratio=0.15,
                 )
                 _, M_soft_p, _, _ = model(x_pos_aug, edge_index)
                 _, M_soft_n, _, _ = model(x_negative[idx_n], edge_index)
@@ -231,7 +245,12 @@ def train_sta(
 
                 # Asymmetric sparsity loss
                 M_healthy = torch.cat([M_soft_a, M_soft_p], dim=0)
-                l_sparse = asymmetric_sparsity_loss(M_healthy, M_soft_n)
+                l_sparse = asymmetric_sparsity_loss(
+                    M_healthy,
+                    M_soft_n,
+                    min_active_nodes=min_active_nodes,
+                    dispersion_weight=dispersion_weight,
+                )
 
                 loss = l_nce + beta * l_sparse
                 loss.backward()
@@ -266,6 +285,15 @@ def train_sta(
         dtype=torch.long, device=device,
     )
 
+    if use_severity_weights or curriculum:
+        severity_weights = torch.tensor(
+            [getattr(d, 'severity', 1.0) for d in anomalous],
+            dtype=torch.float, device=device,
+        )
+        severity_weights = severity_weights / severity_weights.mean().clamp(min=1e-6)
+    else:
+        severity_weights = torch.ones(len(x_sup), dtype=torch.float, device=device)
+
     param_groups = [
         {"params": model.selector.parameters(), "lr": supervised_lr},
         {"params": model.scorer.parameters(), "lr": supervised_lr},
@@ -278,11 +306,31 @@ def train_sta(
         optimizer_sup, T_max=supervised_epochs, eta_min=1e-5
     )
 
-    n_sup = x_sup.size(0)
     model.set_temperature(0.5)
 
     for epoch in range(supervised_epochs):
         model.train()
+
+        # k-annealing (using parameters for standalone running)
+        k_warm = min(num_nodes // 2, num_nodes - 1)
+        k_target = k
+        k_anneal_epochs_cur = int(supervised_epochs * 0.75) if num_nodes >= 50 else 60
+        if epoch < k_anneal_epochs_cur:
+            k_cur = k_warm - int((k_warm - k_target) * epoch / k_anneal_epochs_cur)
+        else:
+            k_cur = k_target
+        model.set_k(k_cur)
+
+        # Temperature annealing: 1.0 -> 0.3
+        t_frac = epoch / max(supervised_epochs - 1, 1)
+        model.set_temperature(1.0 + t_frac * (0.3 - 1.0))
+
+        # Soft Curriculum: dynamic exponent scaling of severity
+        if curriculum:
+            epoch_power = 3.0 - (2.0 * t_frac)
+        else:
+            epoch_power = 1.0
+
         perm = torch.randperm(n_sup, device=device)
         ep_loss = ep_correct = ep_selected = 0
         n_batches = 0
@@ -291,18 +339,33 @@ def train_sta(
             idx = perm[start:start + batch_size]
             x_b = x_sup[idx]
             y_b = y_sup[idx]
-
+            
             optimizer_sup.zero_grad()
+
+            # Apply exponent to severity and normalize per batch
+            if use_severity_weights or curriculum:
+                sev_b = severity_weights[idx] ** epoch_power
+                sev_b = sev_b / sev_b.mean().clamp(min=1e-6)
+            else:
+                sev_b = torch.ones_like(y_b, dtype=torch.float)
 
             logits_full, M_soft, top_k, sel_logits = model(x_b, edge_index)
 
             # Primary: CE on selector logits (all N, numerically stable)
-            loss_sel = F.cross_entropy(sel_logits, y_b)
+            if use_severity_weights or curriculum:
+                loss_sel_unreduced = F.cross_entropy(sel_logits, y_b, reduction='none')
+                loss_sel = (loss_sel_unreduced * sev_b).mean()
+            else:
+                loss_sel = F.cross_entropy(sel_logits, y_b)
 
             # Secondary: CE on scorer (only when RC in top-k)
             in_topk = (top_k == y_b.unsqueeze(1)).any(dim=1)
             if in_topk.any():
-                loss_scorer = F.cross_entropy(logits_full[in_topk], y_b[in_topk])
+                if use_severity_weights or curriculum:
+                    loss_scorer_unreduced = F.cross_entropy(logits_full[in_topk], y_b[in_topk], reduction='none')
+                    loss_scorer = (loss_scorer_unreduced * sev_b[in_topk]).mean()
+                else:
+                    loss_scorer = F.cross_entropy(logits_full[in_topk], y_b[in_topk])
             else:
                 loss_scorer = torch.tensor(0.0, device=device)
 
@@ -328,9 +391,9 @@ def train_sta(
                 "RC-in-top-%d %.4f | M_mean %.3f",
                 epoch, supervised_epochs,
                 ep_loss / max(n_batches, 1),
-                ep_correct / n_sup,
-                k,
-                ep_selected / n_sup,
+                ep_correct / n_sup if n_sup > 0 else 0,
+                k_cur,
+                ep_selected / n_sup if n_sup > 0 else 0,
                 M_soft.mean().item(),
             )
 
@@ -369,7 +432,21 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--beta-max", type=float, default=0.5)
     parser.add_argument("--gamma-sparsity", type=float, default=0.1)
+    parser.add_argument(
+        "--min-active-nodes",
+        type=int,
+        default=1,
+        help="Minimum active nodes encouraged in anomalous masks (set >1 for multi-root).",
+    )
+    parser.add_argument(
+        "--dispersion-weight",
+        type=float,
+        default=0.25,
+        help="Weight of anti-collapse entropy-floor regularization.",
+    )
     parser.add_argument("--skip-contrastive", action="store_true")
+    parser.add_argument("--use-severity-weights", action="store_true", help="Pondérer la CE par la sévérité (Data-Centric)")
+    parser.add_argument("--curriculum", action="store_true", help="Activer le curriculum learning 3-phases")
     parser.add_argument("--out-checkpoint", type=str, default="sta.pt")
     args = parser.parse_args()
 
@@ -403,7 +480,11 @@ if __name__ == "__main__":
         lr=args.lr,
         batch_size=args.batch_size,
         beta_max=args.beta_max,
+        min_active_nodes=args.min_active_nodes,
+        dispersion_weight=args.dispersion_weight,
         gamma_sparsity=args.gamma_sparsity,
+        use_severity_weights=args.use_severity_weights,
+        curriculum=args.curriculum,
         skip_contrastive=args.skip_contrastive,
         out_checkpoint=args.out_checkpoint,
     )

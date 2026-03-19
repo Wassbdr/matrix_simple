@@ -27,7 +27,7 @@ import os
 from model import SpatioTemporalRCA
 from losses import info_nce_loss, asymmetric_gib_loss, root_cause_loss
 from augment import augment_positive
-from common import NODE_NAMES, NAME_TO_IDX, stratified_split, load_windows_dataset
+from common import NODE_NAMES, NAME_TO_IDX, stratified_split, load_windows_dataset, compute_target_sparsity
 import torch.nn.functional as F
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -69,7 +69,11 @@ def train(
     beta_max: float = 0.5,
     warmup_epochs: int = 50,
     temperature: float = 0.07,
-    target_sparsity: float = 0.2,
+    target_sparsity: float = None,  # ← NOW OPTIONAL (computed from num_nodes)
+    target_k: int = 1,              # ← NEW: Expected number of root causes
+    min_sparsity: float = 0.01,     # ← NEW: Minimum sparsity floor
+    min_active_nodes: int = 1,
+    dispersion_weight: float = 0.25,
     # Phase 2 params
     supervised_epochs: int = 100,
     supervised_lr: float = 1e-3,
@@ -102,20 +106,32 @@ def train(
     logger.info("Root cause distribution: %s", rc_dist)
 
     # -- Build tensors --
-    anchors_x = [healthy[i].x for i in range(len(healthy) - 1)]
-    positives_x = [healthy[i + 1].x for i in range(len(healthy) - 1)]
+    # NOTE: We use the SAME windows for anchors and positives (with augmentation)
+    # to avoid data leakage from consecutive windows that may overlap healthy->anomaly
+    # transitions. Positives are generated via augment_positive() during training.
+    anchors_x = [d.x for d in healthy]
     negatives_x = [d.x for d in anomalous]
 
     x_anchor = torch.stack(anchors_x).to(device)
-    x_positive = torch.stack(positives_x).to(device)
+    # x_positive will be generated on-the-fly via augmentation (same window, different view)
     x_negative = torch.stack(negatives_x).to(device)
     edge_index = healthy[0].edge_index.to(device)
 
-    logger.info("Anchor: %s, Positive: %s, Negative: %s",
-                x_anchor.shape, x_positive.shape, x_negative.shape)
+    logger.info("Anchor: %s, Negative: %s (positives generated via augmentation)",
+                x_anchor.shape, x_negative.shape)
 
     num_features = x_anchor.size(2)
     num_nodes = x_anchor.size(1)
+
+    # BUG FIX #1: Compute target_sparsity dynamically based on num_nodes
+    # If not provided, compute it to select ~target_k nodes regardless of N
+    if target_sparsity is None:
+        target_sparsity = compute_target_sparsity(num_nodes, target_k=target_k, min_sparsity=min_sparsity)
+        logger.info("Computed target_sparsity=%.4f for N=%d nodes (target_k=%d)", 
+                    target_sparsity, num_nodes, target_k)
+    else:
+        logger.warning("Using provided target_sparsity=%.4f (not adaptive to N=%d). "
+                      "For production, use compute_target_sparsity().", target_sparsity, num_nodes)
 
     # -- Initialize model --
     model = SpatioTemporalRCA(
@@ -160,7 +176,8 @@ def train(
                 optimizer.zero_grad()
 
                 z_a, probs_a, _ = model(x_anchor[idx_h], edge_index, use_gib=use_gib)
-                x_pos_aug = augment_positive(x_positive[idx_h], noise_sigma=0.05, jitter_shift=1, feature_mask_ratio=0.1)
+                # Generate positive pairs via augmentation of the SAME anchor (no leakage)
+                x_pos_aug = augment_positive(x_anchor[idx_h], noise_sigma=0.1, jitter_shift=2, feature_mask_ratio=0.15)
                 z_p, probs_p, _ = model(x_pos_aug, edge_index, use_gib=use_gib)
                 z_n, probs_n, _ = model(x_negative[idx_n], edge_index, use_gib=use_gib)
 
@@ -168,7 +185,13 @@ def train(
 
                 if use_gib:
                     probs_healthy = torch.cat([probs_a, probs_p], dim=0)
-                    l_gib = asymmetric_gib_loss(probs_healthy, probs_n, target_sparsity)
+                    l_gib = asymmetric_gib_loss(
+                        probs_healthy,
+                        probs_n,
+                        target_sparsity=target_sparsity,
+                        min_active_nodes=min_active_nodes,
+                        dispersion_weight=dispersion_weight,
+                    )
                 else:
                     l_gib = torch.tensor(0.0, device=device)
 
@@ -297,7 +320,23 @@ if __name__ == "__main__":
     parser.add_argument("--beta-max", type=float, default=0.5)
     parser.add_argument("--warmup-epochs", type=int, default=50)
     parser.add_argument("--temperature", type=float, default=0.07)
-    parser.add_argument("--target-sparsity", type=float, default=0.2)
+    parser.add_argument("--target-sparsity", type=float, default=None,
+                        help="Target sparsity for GIB loss. If None, computed as 1/N.")
+    parser.add_argument("--target-k", type=int, default=1,
+                        help="Expected number of root causes per sample (used if target-sparsity=None).")
+    parser.add_argument("--min-sparsity", type=float, default=0.01,
+                        help="Minimum sparsity floor (used if target-sparsity=None).")
+    parser.add_argument("--min-active-nodes",
+        type=int,
+        default=1,
+        help="Minimum active nodes encouraged for anomalous masks (set >1 for multi-root).",
+    )
+    parser.add_argument(
+        "--dispersion-weight",
+        type=float,
+        default=0.25,
+        help="Weight for anti-collapse dispersion penalty in asymmetric GIB loss.",
+    )
     parser.add_argument("--no-gib", action="store_true", help="Disable GIB for ablation study")
     parser.add_argument("--out-checkpoint", type=str, default="stgcn_rca_final.pt", help="Output checkpoint filename")
     args = parser.parse_args()
@@ -312,6 +351,10 @@ if __name__ == "__main__":
         warmup_epochs=args.warmup_epochs,
         temperature=args.temperature,
         target_sparsity=args.target_sparsity,
+        target_k=args.target_k,
+        min_sparsity=args.min_sparsity,
+        min_active_nodes=args.min_active_nodes,
+        dispersion_weight=args.dispersion_weight,
         use_gib=not args.no_gib,
         out_checkpoint=args.out_checkpoint,
     )
