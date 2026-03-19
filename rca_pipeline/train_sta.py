@@ -36,8 +36,15 @@ import os
 import time
 
 from model_sta import SelectThenAnalyze
-from losses import info_nce_loss
+from losses import (
+    info_nce_loss,
+    recurrence_classification_loss,
+    memory_regularization_loss,
+    temporal_causality_regularizer,
+)
 from augment import augment_positive
+from common import stratified_split
+from memory_module import MemoryAugmentedRCA
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -54,28 +61,6 @@ def load_scalable_dataset(filepath: str):
         return payload["dataset"], payload["node_names"]
     # Fallback: legacy format (plain list)
     return payload, None
-
-
-def stratified_split(dataset: List[Data], name_to_idx: Dict[str, int],
-                     train_ratio: float = 0.8):
-    healthy = [d for d in dataset if d.y is None or d.y.item() == 0]
-    anomalous = [d for d in dataset
-                 if d.y is not None and d.y.item() == 1
-                 and hasattr(d, 'root_cause') and d.root_cause[0] in name_to_idx]
-
-    h_split = int(len(healthy) * train_ratio)
-    train = healthy[:h_split]
-    test = healthy[h_split:]
-
-    by_rc: Dict[str, list] = {}
-    for d in anomalous:
-        by_rc.setdefault(d.root_cause[0], []).append(d)
-    for rc, items in by_rc.items():
-        s = max(1, int(len(items) * train_ratio))
-        train.extend(items[:s])
-        test.extend(items[s:])
-
-    return train, test
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +115,7 @@ def train_sta(
     lr: float = 1e-3,
     beta_max: float = 0.5,
     warmup_epochs: int = 30,
-    nce_temperature: float = 0.07,
+    nce_temperature: float = 0.5,  # FIX: Increased from 0.07 to 0.5 for stable contrastive learning
     min_active_nodes: int = 1,
     dispersion_weight: float = 0.25,
     # Phase 2
@@ -139,6 +124,13 @@ def train_sta(
     gamma_sparsity: float = 0.1,
     use_severity_weights: bool = False,
     curriculum: bool = False,
+    # Memory Module (SOTA)
+    use_memory: bool = False,
+    memory_slots: int = 128,
+    memory_dim: int = 64,
+    lambda_recurrence: float = 0.1,
+    lambda_memory: float = 0.01,
+    lambda_causality: float = 0.05,
     # General
     batch_size: int = 256,
     weight_decay: float = 1e-4,
@@ -154,7 +146,7 @@ def train_sta(
     num_nodes = len(node_names)
 
     dataset, _ = load_scalable_dataset(dataset_path)
-    train_data, _ = stratified_split(dataset, name_to_idx)
+    train_data, _ = stratified_split(dataset, name_to_idx=name_to_idx)
     logger.info("Train: %d / %d total", len(train_data), len(dataset))
 
     healthy = [d for d in train_data if d.y is not None and d.y.item() == 0]
@@ -181,6 +173,26 @@ def train_sta(
         gib_temperature=2.0,
     ).to(device)
 
+    # SOTA: Wrap with Memory Module for recurrence pattern recognition
+    if use_memory:
+        model = MemoryAugmentedRCA(
+            base_model=model,
+            memory_slots=memory_slots,
+            memory_dim=memory_dim,
+            use_memory_for_scoring=True,
+        ).to(device)
+        logger.info("Memory Module enabled: %d slots, dim=%d", memory_slots, memory_dim)
+
+    # Extract recurrence metadata for memory training (SOTA)
+    is_recurrent_train = torch.tensor(
+        [getattr(d, 'is_recurrent', False) for d in anomalous],
+        dtype=torch.bool, device=device,
+    )
+    has_recurrence_labels = is_recurrent_train.any()
+    if has_recurrence_labels:
+        recurrence_ratio = is_recurrent_train.float().mean().item()
+        logger.info("Recurrence labels found: %.1f%% recurrent", recurrence_ratio * 100)
+
     total_params = sum(p.numel() for p in model.parameters())
     logger.info("Model parameters: %d", total_params)
 
@@ -205,7 +217,11 @@ def train_sta(
             model.train()
             beta = min(1.0, epoch / max(warmup_epochs, 1)) * beta_max
             t_frac = epoch / max(contrastive_epochs - 1, 1)
-            model.set_temperature(temp_start + t_frac * (temp_end - temp_start))
+            temp_value = temp_start + t_frac * (temp_end - temp_start)
+            if use_memory:
+                model.base_model.set_temperature(temp_value)
+            else:
+                model.set_temperature(temp_value)
 
             perm_h = torch.randperm(n_h, device=device)
             perm_n = torch.randperm(n_n, device=device)
@@ -219,27 +235,31 @@ def train_sta(
 
                 optimizer.zero_grad()
 
-                # Forward through model (we need M_soft for sparsity)
-                _, M_soft_a, _, _ = model(x_anchor[idx_h], edge_index)
+                out_a = model(x_anchor[idx_h], edge_index)
+                M_soft_a = out_a["M_soft"] if isinstance(out_a, dict) else out_a[1]
                 # Generate positive pairs via augmentation of the SAME anchor (no leakage)
                 x_pos_aug = augment_positive(
                     x_anchor[idx_h], noise_sigma=0.1,
                     jitter_shift=2, feature_mask_ratio=0.15,
                 )
-                _, M_soft_p, _, _ = model(x_pos_aug, edge_index)
-                _, M_soft_n, _, _ = model(x_negative[idx_n], edge_index)
+                out_p = model(x_pos_aug, edge_index)
+                M_soft_p = out_p["M_soft"] if isinstance(out_p, dict) else out_p[1]
+                out_n = model(x_negative[idx_n], edge_index)
+                M_soft_n = out_n["M_soft"] if isinstance(out_n, dict) else out_n[1]
 
                 # Graph-level embeddings via mean-pooled light encoder
                 x_a_flat = x_anchor[idx_h].view(B_h * num_nodes, num_features, -1)
                 x_p_flat = x_pos_aug.view(B_h * num_nodes, num_features, -1)
                 x_n_flat = x_negative[idx_n].view(B_n * num_nodes, num_features, -1)
 
-                batch_ei_h = model._batch_edge_index(edge_index, B_h)
-                batch_ei_n = model._batch_edge_index(edge_index, B_n)
+                # Access methods through base model if using memory
+                base_model = model.base_model if use_memory else model
+                batch_ei_h = base_model._batch_edge_index(edge_index, B_h)
+                batch_ei_n = base_model._batch_edge_index(edge_index, B_n)
 
-                h_a = model.light_encoder(x_a_flat, batch_ei_h).view(B_h, num_nodes, -1).mean(1)
-                h_p = model.light_encoder(x_p_flat, batch_ei_h).view(B_h, num_nodes, -1).mean(1)
-                h_n = model.light_encoder(x_n_flat, batch_ei_n).view(B_n, num_nodes, -1).mean(1)
+                h_a = base_model.light_encoder(x_a_flat, batch_ei_h).view(B_h, num_nodes, -1).mean(1)
+                h_p = base_model.light_encoder(x_p_flat, batch_ei_h).view(B_h, num_nodes, -1).mean(1)
+                h_n = base_model.light_encoder(x_n_flat, batch_ei_n).view(B_n, num_nodes, -1).mean(1)
 
                 l_nce = info_nce_loss(h_a, h_p, h_n, nce_temperature)
 
@@ -264,8 +284,10 @@ def train_sta(
 
             if epoch % 20 == 0 or epoch == contrastive_epochs - 1:
                 with torch.no_grad():
-                    _, ma, _, _ = model(x_anchor[:64], edge_index)
-                    _, mn, _, _ = model(x_negative[:64], edge_index)
+                    out_ma = model(x_anchor[:64], edge_index)
+                    ma = out_ma["M_soft"] if isinstance(out_ma, dict) else out_ma[1]
+                    out_mn = model(x_negative[:64], edge_index)
+                    mn = out_mn["M_soft"] if isinstance(out_mn, dict) else out_mn[1]
                 logger.info(
                     "[Phase1] Ep %03d/%03d | Loss %.4f | beta %.2f | "
                     "M_h_mean %.3f | M_a_mean %.3f",
@@ -280,6 +302,7 @@ def train_sta(
     logger.info("=== PHASE 2: Supervised (%d epochs) ===", supervised_epochs)
 
     x_sup = x_negative
+    n_sup = len(x_sup)  # FIX: Define n_sup here
     y_sup = torch.tensor(
         [name_to_idx[d.root_cause[0]] for d in anomalous],
         dtype=torch.long, device=device,
@@ -294,19 +317,40 @@ def train_sta(
     else:
         severity_weights = torch.ones(len(x_sup), dtype=torch.float, device=device)
 
-    param_groups = [
-        {"params": model.selector.parameters(), "lr": supervised_lr},
-        {"params": model.scorer.parameters(), "lr": supervised_lr},
-        {"params": model.deep_temporal.parameters(), "lr": supervised_lr},
-        {"params": model.deep_spatial.parameters(), "lr": supervised_lr},
-        {"params": model.light_encoder.parameters(), "lr": supervised_lr * 0.1},
-    ]
+    # Build parameter groups (handle memory-augmented model)
+    if use_memory:
+        # Access base model components through wrapper
+        base = model.base_model
+        param_groups = [
+            {"params": base.selector.parameters(), "lr": supervised_lr},
+            {"params": base.scorer.parameters(), "lr": supervised_lr},
+            {"params": base.deep_temporal.parameters(), "lr": supervised_lr},
+            {"params": base.deep_spatial.parameters(), "lr": supervised_lr},
+            {"params": base.light_encoder.parameters(), "lr": supervised_lr * 0.1},
+            {"params": model.incident_encoder.parameters(), "lr": supervised_lr},
+            {"params": model.memory.parameters(), "lr": supervised_lr * 0.5},
+            {"params": model.memory_scorer.parameters(), "lr": supervised_lr},
+            {"params": model.recurrence_head.parameters(), "lr": supervised_lr},
+        ]
+    else:
+        param_groups = [
+            {"params": model.selector.parameters(), "lr": supervised_lr},
+            {"params": model.scorer.parameters(), "lr": supervised_lr},
+            {"params": model.deep_temporal.parameters(), "lr": supervised_lr},
+            {"params": model.deep_spatial.parameters(), "lr": supervised_lr},
+            {"params": model.light_encoder.parameters(), "lr": supervised_lr * 0.1},
+        ]
     optimizer_sup = optim.AdamW(param_groups, weight_decay=weight_decay)
     scheduler_sup = optim.lr_scheduler.CosineAnnealingLR(
         optimizer_sup, T_max=supervised_epochs, eta_min=1e-5
     )
 
-    model.set_temperature(0.5)
+    # Helper to set model parameters (handles memory wrapper)
+    def set_model_param(name, value):
+        target = model.base_model if use_memory else model
+        getattr(target, f'set_{name}')(value)
+
+    set_model_param('temperature', 0.5)
 
     for epoch in range(supervised_epochs):
         model.train()
@@ -319,11 +363,11 @@ def train_sta(
             k_cur = k_warm - int((k_warm - k_target) * epoch / k_anneal_epochs_cur)
         else:
             k_cur = k_target
-        model.set_k(k_cur)
+        set_model_param('k', k_cur)
 
         # Temperature annealing: 1.0 -> 0.3
         t_frac = epoch / max(supervised_epochs - 1, 1)
-        model.set_temperature(1.0 + t_frac * (0.3 - 1.0))
+        set_model_param('temperature', 1.0 + t_frac * (0.3 - 1.0))
 
         # Soft Curriculum: dynamic exponent scaling of severity
         if curriculum:
@@ -344,12 +388,24 @@ def train_sta(
 
             # Apply exponent to severity and normalize per batch
             if use_severity_weights or curriculum:
-                sev_b = severity_weights[idx] ** epoch_power
+                # Invert severity to focus on subtle/gray failures (SOTA approach)
+                sev_b = 1.0 / (severity_weights[idx] + 0.1)
+                sev_b = sev_b ** epoch_power
                 sev_b = sev_b / sev_b.mean().clamp(min=1e-6)
             else:
                 sev_b = torch.ones_like(y_b, dtype=torch.float)
 
-            logits_full, M_soft, top_k, sel_logits = model(x_b, edge_index)
+            # Forward pass (handles both base model and memory-augmented model)
+            if use_memory:
+                # Memory-augmented forward
+                is_novel_b = ~is_recurrent_train[idx] if has_recurrence_labels else None
+                outputs = model(x_b, edge_index, is_novel=is_novel_b)
+                logits_full = outputs["logits_full"]
+                M_soft = outputs["M_soft"]
+                top_k = outputs["top_k"]
+                sel_logits = outputs["sel_logits"]
+            else:
+                logits_full, M_soft, top_k, sel_logits = model(x_b, edge_index)
 
             # Primary: CE on selector logits (all N, numerically stable)
             if use_severity_weights or curriculum:
@@ -372,7 +428,34 @@ def train_sta(
             # Continued sparsity regularization
             l_sparse = sparsity_loss_l1(M_soft)
 
-            loss = loss_sel + loss_scorer + gamma_sparsity * l_sparse
+            # SOTA: Temporal causality regularizer
+            l_causality = temporal_causality_regularizer(M_soft, x_b, edge_index, lag=2)
+
+            # SOTA: Memory and recurrence losses
+            l_recurrence = torch.tensor(0.0, device=device)
+            l_memory = torch.tensor(0.0, device=device)
+
+            if use_memory and has_recurrence_labels:
+                # Recurrence classification loss
+                rec_logits = outputs.get("recurrence_logits")
+                if rec_logits is not None:
+                    is_rec_b = is_recurrent_train[idx]
+                    l_recurrence = recurrence_classification_loss(rec_logits, is_rec_b)
+
+                # Memory regularization (encourage diverse usage)
+                mem_attn = outputs.get("memory_attn")
+                mem_gate = outputs.get("memory_gate")
+                if mem_attn is not None and mem_gate is not None:
+                    l_memory = memory_regularization_loss(mem_attn, mem_gate)
+
+            loss = (
+                loss_sel
+                + loss_scorer
+                + gamma_sparsity * l_sparse
+                + lambda_causality * l_causality
+                + lambda_recurrence * l_recurrence
+                + lambda_memory * l_memory
+            )
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer_sup.step()
@@ -386,22 +469,28 @@ def train_sta(
         scheduler_sup.step()
 
         if epoch % 20 == 0 or epoch == supervised_epochs - 1:
-            logger.info(
+            log_msg = (
                 "[Phase2] Ep %03d/%03d | Loss %.4f | Acc %.4f | "
-                "RC-in-top-%d %.4f | M_mean %.3f",
+                "RC-in-top-%d %.4f | M_mean %.3f"
+            )
+            log_args = [
                 epoch, supervised_epochs,
                 ep_loss / max(n_batches, 1),
                 ep_correct / n_sup if n_sup > 0 else 0,
                 k_cur,
                 ep_selected / n_sup if n_sup > 0 else 0,
                 M_soft.mean().item(),
-            )
+            ]
+            if use_memory and has_recurrence_labels:
+                log_msg += " | L_rec %.4f"
+                log_args.append(l_recurrence.item())
+            logger.info(log_msg, *log_args)
 
     # ===================================================================
     # Save
     # ===================================================================
     ckpt_path = os.path.join(checkpoint_dir, out_checkpoint)
-    torch.save({
+    checkpoint_data = {
         "model_state_dict": model.state_dict(),
         "num_features": num_features,
         "hidden_dim": hidden_dim,
@@ -409,7 +498,16 @@ def train_sta(
         "k": k,
         "node_names": node_names,
         "mode": "select_then_analyze",
-    }, ckpt_path)
+        "use_memory": use_memory,
+    }
+    if use_memory:
+        checkpoint_data["memory_slots"] = memory_slots
+        checkpoint_data["memory_dim"] = memory_dim
+        # Save memory stats for analysis
+        if hasattr(model, 'get_memory_stats'):
+            checkpoint_data["memory_stats"] = model.get_memory_stats()
+
+    torch.save(checkpoint_data, ckpt_path)
     logger.info("Checkpoint saved to %s", ckpt_path)
 
 
@@ -447,6 +545,13 @@ if __name__ == "__main__":
     parser.add_argument("--skip-contrastive", action="store_true")
     parser.add_argument("--use-severity-weights", action="store_true", help="Pondérer la CE par la sévérité (Data-Centric)")
     parser.add_argument("--curriculum", action="store_true", help="Activer le curriculum learning 3-phases")
+    # SOTA: Memory Module arguments
+    parser.add_argument("--use-memory", action="store_true", help="Enable Memory Module for recurrence recognition (SOTA)")
+    parser.add_argument("--memory-slots", type=int, default=128, help="Number of memory slots")
+    parser.add_argument("--memory-dim", type=int, default=64, help="Memory embedding dimension")
+    parser.add_argument("--lambda-recurrence", type=float, default=0.1, help="Weight for recurrence classification loss")
+    parser.add_argument("--lambda-memory", type=float, default=0.01, help="Weight for memory regularization loss")
+    parser.add_argument("--lambda-causality", type=float, default=0.05, help="Weight for temporal causality loss")
     parser.add_argument("--out-checkpoint", type=str, default="sta.pt")
     args = parser.parse_args()
 
@@ -459,7 +564,14 @@ if __name__ == "__main__":
             raise ValueError("Dataset does not contain node_names. "
                              "Specify --node-names large|small or regenerate.")
     elif args.node_names == "large":
-        from simulated_data_large import NODE_NAMES_LARGE
+        # Legacy 20-node topology (from simulated_data_large.py)
+        NODE_NAMES_LARGE = [
+            'gateway-web', 'gateway-mobile', 'gateway-admin',
+            'auth', 'user-svc', 'order-svc', 'payment-svc', 'notification-svc',
+            'search-svc', 'recommendation-svc', 'inventory-svc',
+            'postgres-primary', 'postgres-replica', 'redis-cache', 'redis-session',
+            'rabbitmq', 'elasticsearch', 'minio', 'monitoring', 'config-svc'
+        ]
         node_names = NODE_NAMES_LARGE
     elif args.node_names == "small":
         from common import NODE_NAMES
@@ -485,6 +597,13 @@ if __name__ == "__main__":
         gamma_sparsity=args.gamma_sparsity,
         use_severity_weights=args.use_severity_weights,
         curriculum=args.curriculum,
+        # SOTA: Memory Module
+        use_memory=args.use_memory,
+        memory_slots=args.memory_slots,
+        memory_dim=args.memory_dim,
+        lambda_recurrence=args.lambda_recurrence,
+        lambda_memory=args.lambda_memory,
+        lambda_causality=args.lambda_causality,
         skip_contrastive=args.skip_contrastive,
         out_checkpoint=args.out_checkpoint,
     )

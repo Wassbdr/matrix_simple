@@ -116,11 +116,11 @@ def generate_ba_topology(
             directed_edges.append((u, v))       # u depends on v
     G_directed.add_edges_from(directed_edges)
 
-    # Step 4: bidirectional edge_index for GCN (message passing both ways)
+    # Step 4: causal edge_index for GCN (message passing from effect to cause)
     src, dst = [], []
     for s, d in directed_edges:
-        src.extend([s, d])
-        dst.extend([d, s])
+        src.append(s)
+        dst.append(d)
     edge_index = torch.tensor([src, dst], dtype=torch.long)
 
     # Step 5: propagation matrix P
@@ -140,6 +140,95 @@ def generate_ba_topology(
         N, len(directed_edges), m, 2 * len(directed_edges) / N,
     )
 
+    return node_names, edge_index, P, G_directed
+
+
+def generate_microservice_topology(
+    num_nodes: int,
+    seed: int = 42,
+) -> Tuple[List[str], torch.Tensor, torch.Tensor, nx.DiGraph]:
+    """
+    Generate a hierarchical microservice topology (Front-end -> API Gateway -> Services -> Databases).
+    """
+    rng = np.random.RandomState(seed)
+    N = num_nodes
+    
+    # Tier sizes
+    n_gw = max(1, N // 20)
+    n_db = max(2, N // 10)
+    n_svc = N - n_gw - n_db
+    
+    nodes_gw = list(range(n_gw))
+    nodes_svc = list(range(n_gw, n_gw + n_svc))
+    nodes_db = list(range(n_gw + n_svc, N))
+    
+    tier = {}
+    for i in nodes_gw: tier[i] = "gw"
+    for i in nodes_svc: tier[i] = "svc"
+    for i in nodes_db: tier[i] = rng.choice(["db", "cache", "mq"])
+    
+    node_names = [f"{tier[i]}-{i:03d}" for i in range(N)]
+    
+    directed_edges = [] # (v, u) meaning v depends on u
+    
+    # 1. GW -> SVC (each GW connects to 3-5 random services)
+    for gw in nodes_gw:
+        deps = rng.choice(nodes_svc, size=min(len(nodes_svc), rng.randint(3, 6)), replace=False)
+        for dep in deps:
+            directed_edges.append((gw, dep))
+            
+    # 2. SVC -> SVC (internal dependencies)
+    for svc in nodes_svc:
+        if rng.rand() < 0.3:
+            potential_deps = [n for n in nodes_svc if n != svc]
+            if potential_deps:
+                deps = rng.choice(potential_deps, size=rng.randint(1, 3), replace=False)
+                for dep in deps:
+                    directed_edges.append((svc, dep))
+                    
+    # 3. SVC -> DB
+    for svc in nodes_svc:
+        if rng.rand() < 0.7:
+            deps = rng.choice(nodes_db, size=rng.randint(1, 3), replace=False)
+            for dep in deps:
+                directed_edges.append((svc, dep))
+                
+    # Ensure weak connectedness
+    G_undirected = nx.Graph(directed_edges)
+    G_undirected.add_nodes_from(range(N))
+    if not nx.is_connected(G_undirected):
+        components = list(nx.connected_components(G_undirected))
+        main_comp = components[0]
+        for comp in components[1:]:
+            u = rng.choice(list(comp))
+            v = rng.choice(list(main_comp))
+            if tier[u] == "gw" and tier[v] == "svc": directed_edges.append((u, v))
+            elif tier[v] == "gw" and tier[u] == "svc": directed_edges.append((v, u))
+            elif tier[u] == "svc" and tier[v] in ["db", "cache", "mq"]: directed_edges.append((u, v))
+            elif tier[v] == "svc" and tier[u] in ["db", "cache", "mq"]: directed_edges.append((v, u))
+            else: directed_edges.append((u, v))
+            main_comp.update(comp)
+            
+    G_directed = nx.DiGraph()
+    G_directed.add_nodes_from(range(N))
+    G_directed.add_edges_from(directed_edges)
+    
+    # Causal edge_index (effect -> cause)
+    src, dst = [], []
+    for s, d in directed_edges:
+        src.append(s)
+        dst.append(d)
+    edge_index = torch.tensor([src, dst], dtype=torch.long)
+    
+    # Propagation matrix (anomaly flows cause -> effect)
+    P = torch.zeros(N, N)
+    for s, d in directed_edges:
+        P[d, s] = 1.0
+    for s, d in directed_edges:
+        if P[s, d] == 0:
+            P[s, d] = 0.2
+            
+    logger.info("Microservice Topology: N=%d, E=%d (directed)", N, len(directed_edges))
     return node_names, edge_index, P, G_directed
 
 
@@ -343,6 +432,13 @@ def generate_scalable_dataset_v2(
     noise_level: float = 0.1,
     max_cascade_hops: int = 6,
     use_realistic_pattern_weights: bool = True,
+    topology_type: str = "microservice",
+    # NEW: Multi-root cause support
+    multi_root_prob: float = 0.15,  # 15% des incidents ont plusieurs RC
+    max_roots: int = 3,
+    # NEW: Realistic noise patterns
+    seasonal_noise: bool = True,
+    correlated_features: bool = True,
     seed: int = 42,
 ) -> Tuple[List[Data], List[str], torch.Tensor, List[Dict]]:
     """
@@ -350,6 +446,8 @@ def generate_scalable_dataset_v2(
     - Power-law root cause distribution (Pareto: top 10% = 80% of incidents)
     - 80% recurrence ratio (patterns repeat)
     - 8 varied temporal patterns including gray failures (39% of incidents!)
+    - Multi-root cause support (15% of incidents have 2-3 simultaneous RCs)
+    - Realistic noise: seasonal patterns + correlated features
 
     Args:
         num_nodes:        N in {50, 100, 150, 200}
@@ -363,22 +461,34 @@ def generate_scalable_dataset_v2(
         noise_level:      background noise sigma
         max_cascade_hops: max propagation depth
         use_realistic_pattern_weights: Use SOTA pattern weights (39% gray failures)
+        topology_type:    "microservice" or "ba"
+        multi_root_prob:  Probability of multi-root cause incident (default 0.15)
+        max_roots:        Maximum simultaneous root causes (default 3)
+        seasonal_noise:   Add time-of-day seasonal patterns to baseline
+        correlated_features: Add inter-feature correlations
         seed:             reproducibility
 
     Returns:
         dataset:     List[Data] with .x, .edge_index, .y, .root_cause, .is_recurrent, .pattern_type
         node_names:  List[str]
         edge_index:  [2, E]
-        metadata:    List[Dict] with is_recurrent, pattern_type, root_cause_idx
+        metadata:    List[Dict] with is_recurrent, pattern_type, root_cause_idx, is_multi_root
     """
     # Import SOTA modules
-    from anomaly_distribution import PowerLawRootCauseDistribution
-    from temporal_patterns import PATTERN_NAMES, PATTERN_WEIGHTS, PATTERN_DIFFICULTY, inject_anomaly_pattern
+    try:
+        from anomaly_distribution import PowerLawRootCauseDistribution
+        from temporal_patterns import PATTERN_NAMES, PATTERN_WEIGHTS, PATTERN_DIFFICULTY, inject_anomaly_pattern
+    except ImportError:
+        from rca_pipeline.anomaly_distribution import PowerLawRootCauseDistribution
+        from rca_pipeline.temporal_patterns import PATTERN_NAMES, PATTERN_WEIGHTS, PATTERN_DIFFICULTY, inject_anomaly_pattern
 
     rng = np.random.RandomState(seed)
     torch.manual_seed(seed)
 
-    node_names, edge_index, P_base, G = generate_ba_topology(num_nodes, ba_m, seed)
+    if topology_type == "microservice":
+        node_names, edge_index, P_base, G = generate_microservice_topology(num_nodes, seed)
+    else:
+        node_names, edge_index, P_base, G = generate_ba_topology(num_nodes, ba_m, seed)
     N = num_nodes
 
     # Initialize power-law distribution
@@ -416,11 +526,30 @@ def generate_scalable_dataset_v2(
     pattern_counts = {p: 0 for p in PATTERN_NAMES}
     recurrence_count = 0
     difficulty_counts = {"hard": 0, "medium": 0, "normal": 0, "easy": 0}
+    multi_root_count = 0
 
     for sample_idx in range(num_samples):
         is_anomaly = rng.rand() < anomaly_ratio
 
+        # === BASELINE NOISE GENERATION ===
         X = torch.randn(window_size, N, num_features) * noise_level
+
+        # NEW: Seasonal noise (time-of-day patterns)
+        if seasonal_noise:
+            # Simulate diurnal pattern: higher activity mid-window
+            time_idx = torch.arange(window_size, dtype=torch.float32)
+            seasonal_pattern = 0.3 * torch.sin(2 * np.pi * time_idx / window_size)
+            # Apply to subset of nodes (services have different usage patterns)
+            seasonal_nodes = rng.choice(N, size=max(1, N // 3), replace=False)
+            X[:, seasonal_nodes, :] += seasonal_pattern.view(-1, 1, 1)
+
+        # NEW: Correlated features (realistic: CPU correlates with memory)
+        if correlated_features:
+            # Feature pairs that correlate (e.g., CPU-Memory, Latency-ErrorRate)
+            for f1 in range(0, num_features - 1, 2):
+                f2 = f1 + 1
+                correlation = 0.3 + rng.rand() * 0.4  # 0.3-0.7 correlation
+                X[:, :, f2] = correlation * X[:, :, f1] + (1 - correlation) * X[:, :, f2]
 
         # ---- Distractor spikes (reduced strength for clear SNR) ----
         num_distractors = rng.randint(2, max(3, N // 15))
@@ -454,24 +583,42 @@ def generate_scalable_dataset_v2(
         }
 
         if is_anomaly:
-            # Sample root cause using power-law distribution with recurrence
+            # NEW: Determine if this is a multi-root cause incident
+            is_multi_root = rng.rand() < multi_root_prob
+            num_roots = rng.randint(2, max_roots + 1) if is_multi_root else 1
+
+            # Sample primary root cause using power-law distribution
             root_cause_idx, is_recurrent = rc_dist.sample_root_cause(
                 recurrence_prob=recurrence_ratio
             )
+            all_root_causes = [root_cause_idx]
+
+            # Sample additional root causes for multi-root scenarios
+            if is_multi_root:
+                # Additional RCs: sample from neighbors or power-law
+                for _ in range(num_roots - 1):
+                    if rng.rand() < 0.6:  # 60%: sample neighbor (cascade scenario)
+                        neighbors = neighbor_mask[root_cause_idx].nonzero(as_tuple=False).squeeze(-1)
+                        if len(neighbors) > 0:
+                            secondary_rc = neighbors[rng.randint(0, len(neighbors))].item()
+                        else:
+                            secondary_rc, _ = rc_dist.sample_root_cause(is_recurrent=False)
+                    else:  # 40%: independent root cause
+                        secondary_rc, _ = rc_dist.sample_root_cause(is_recurrent=False)
+                    if secondary_rc not in all_root_causes:
+                        all_root_causes.append(secondary_rc)
+                multi_root_count += 1
 
             # Sample pattern type
             if is_recurrent:
-                # Try to reuse pattern from history
                 pattern_type, pattern_reused = rc_dist.sample_pattern_for_rc(
                     root_cause=root_cause_idx,
                     is_recurrent=is_recurrent,
                     available_patterns=PATTERN_NAMES,
                 )
                 if not pattern_reused:
-                    # Fall back to weighted sampling
                     pattern_type = rng.choice(PATTERN_NAMES, p=pattern_probs)
             else:
-                # Novel incident: weighted sampling
                 pattern_type = rng.choice(PATTERN_NAMES, p=pattern_probs)
 
             pattern_difficulty = PATTERN_DIFFICULTY.get(pattern_type, "normal")
@@ -486,19 +633,25 @@ def generate_scalable_dataset_v2(
             else:
                 signal_strength = 2.5 + rng.rand() * 3.0
 
-            # Inject anomaly with temporal pattern and cascade propagation
-            X = inject_anomaly_pattern(
-                X=X,
-                root_cause_idx=root_cause_idx,
-                pattern_type=pattern_type,
-                P_base=P_base,
-                affected_feats=affected_feats,
-                rng=rng,
-                max_cascade_hops=max_cascade_hops,
-                cascade_amplification=1.5 + rng.rand() * 0.5,
-                cascade_decay=0.4 + rng.rand() * 0.2,
-                strength=signal_strength,
-            )
+            # Inject anomaly for ALL root causes (multi-root support)
+            for rc_idx in all_root_causes:
+                # Secondary root causes get different patterns sometimes
+                rc_pattern = pattern_type
+                if rc_idx != root_cause_idx and rng.rand() < 0.3:
+                    rc_pattern = rng.choice(PATTERN_NAMES, p=pattern_probs)
+
+                X = inject_anomaly_pattern(
+                    X=X,
+                    root_cause_idx=rc_idx,
+                    pattern_type=rc_pattern,
+                    P_base=P_base,
+                    affected_feats=affected_feats,
+                    rng=rng,
+                    max_cascade_hops=max_cascade_hops,
+                    cascade_amplification=1.5 + rng.rand() * 0.5,
+                    cascade_decay=0.4 + rng.rand() * 0.2,
+                    strength=signal_strength * (1.0 if rc_idx == root_cause_idx else 0.7),
+                )
 
             # Background correlation (reduced)
             t_start = rng.randint(0, max(1, window_size - 4))
@@ -519,6 +672,8 @@ def generate_scalable_dataset_v2(
                 "pattern_type": pattern_type,
                 "pattern_difficulty": pattern_difficulty,
                 "root_cause_idx": root_cause_idx,
+                "is_multi_root": is_multi_root if 'is_multi_root' in dir() else False,
+                "all_root_causes": all_root_causes if 'all_root_causes' in dir() else [root_cause_idx],
             })
 
             # Update stats
@@ -537,6 +692,9 @@ def generate_scalable_dataset_v2(
             data.is_recurrent = is_recurrent
             data.pattern_type = pattern_type
             data.pattern_difficulty = pattern_difficulty
+            # NEW: Multi-root cause support
+            data.is_multi_root = is_multi_root if 'is_multi_root' in dir() else False
+            data.all_root_causes = [node_names[rc] for rc in all_root_causes] if 'all_root_causes' in dir() else [node_names[root_cause_idx]]
         else:
             data.y = torch.tensor([0], dtype=torch.long)
             data.root_cause = [""]
@@ -559,9 +717,14 @@ def generate_scalable_dataset_v2(
     if anomalies:
         rc_dist_stats = rc_dist.get_statistics()
         actual_recurrence_rate = recurrence_count / len(anomalies)
+        actual_multi_root_rate = multi_root_count / len(anomalies)
         logger.info(
             "Recurrence: %.1f%% (target: %.1f%%)",
             actual_recurrence_rate * 100, recurrence_ratio * 100,
+        )
+        logger.info(
+            "Multi-root cause: %.1f%% (target: %.1f%%)",
+            actual_multi_root_rate * 100, multi_root_prob * 100,
         )
         logger.info(
             "Top 10%% RC weight (theoretical): %.1f%%",
@@ -590,6 +753,12 @@ if __name__ == "__main__":
     parser.add_argument("--v2", action="store_true", help="Use SOTA V2 with power-law and recurrence")
     parser.add_argument("--recurrence-ratio", type=float, default=0.8, help="Fraction of recurrent anomalies (V2 only)")
     parser.add_argument("--power-law-alpha", type=float, default=2.0, help="Zipf exponent (V2 only)")
+    parser.add_argument("--topology-type", type=str, default="microservice", choices=["ba", "microservice"], help="Topology type (V2 only)")
+    # NEW: Dataset improvements
+    parser.add_argument("--multi-root-prob", type=float, default=0.15, help="Probability of multi-root cause (default: 0.15)")
+    parser.add_argument("--max-roots", type=int, default=3, help="Max simultaneous root causes (default: 3)")
+    parser.add_argument("--seasonal-noise", action="store_true", help="Add time-of-day seasonal patterns")
+    parser.add_argument("--correlated-features", action="store_true", help="Add inter-feature correlations")
     args = parser.parse_args()
 
     if args.output is None:
@@ -606,6 +775,12 @@ if __name__ == "__main__":
             anomaly_ratio=args.anomaly_ratio,
             recurrence_ratio=args.recurrence_ratio,
             power_law_alpha=args.power_law_alpha,
+            topology_type=args.topology_type,
+            # NEW: Dataset improvements
+            multi_root_prob=args.multi_root_prob,
+            max_roots=args.max_roots,
+            seasonal_noise=args.seasonal_noise,
+            correlated_features=args.correlated_features,
             seed=args.seed,
         )
 

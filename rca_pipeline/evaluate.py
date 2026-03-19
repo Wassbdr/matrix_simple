@@ -33,6 +33,7 @@ from torch_geometric.data import Data
 from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
 from model import SpatioTemporalRCA
 from model_sta import SelectThenAnalyze
+from memory_module import MemoryAugmentedRCA
 
 from common import load_dataset_payload
 
@@ -102,12 +103,22 @@ class RCAMetrics:
         if targets_np.ndim == 2:
             # Multi-hot: get all positive indices
             for i in range(B):
-                self.targets.append(np.where(targets_np[i] > 0)[0])
+                target_indices = np.where(targets_np[i] > 0)[0]
+                # Fix: Validate indices are within bounds
+                valid_indices = target_indices[target_indices < logits_np.shape[1]]
+                if len(valid_indices) != len(target_indices):
+                    logger.warning(f"Found {len(target_indices) - len(valid_indices)} out-of-bounds target indices")
+                self.targets.append(valid_indices)
                 self.predictions.append(logits_np[i])
         else:
             # Single index
             for i in range(B):
-                self.targets.append(np.array([targets_np[i]]))
+                # Fix: Validate single index is within bounds
+                target_idx = targets_np[i]
+                if target_idx >= logits_np.shape[1]:
+                    logger.warning(f"Target index {target_idx} out of bounds for logits size {logits_np.shape[1]}")
+                    target_idx = logits_np.shape[1] - 1  # Clamp to valid range
+                self.targets.append(np.array([target_idx]))
                 self.predictions.append(logits_np[i])
 
         # Add metadata
@@ -135,6 +146,9 @@ class RCAMetrics:
 
     def _get_best_rank(self, pred: np.ndarray, targets: np.ndarray) -> int:
         """Get the best (lowest) rank among all true targets."""
+        # Fix: Handle empty targets array
+        if len(targets) == 0:
+            return len(pred) + 1
         return min(self._get_rank(pred, t) for t in targets)
 
     def compute_metrics(self) -> Dict[str, float]:
@@ -340,7 +354,13 @@ def evaluate_with_sota_metrics(
 
                 # Get logits
                 if mode == "select_then_analyze":
-                    logits_full, _, _, sel_logits = model(x_batch, edge_index)
+                    outputs = model(x_batch, edge_index)
+                    # Handle both dict (MemoryAugmented) and tuple (base) outputs
+                    if isinstance(outputs, dict):
+                        logits_full = outputs["logits_full"]
+                        sel_logits = outputs["sel_logits"]
+                    else:
+                        logits_full, _, _, sel_logits = outputs
                     scorer = logits_full.clone()
                     scorer[scorer == float("-inf")] = 0.0
                     logits = sel_logits + 0.5 * scorer
@@ -377,7 +397,13 @@ def evaluate_with_sota_metrics(
                 edge_index = d.edge_index.to(device)
 
                 if mode == "select_then_analyze":
-                    logits_full, _, _, sel_logits = model(x, edge_index)
+                    outputs = model(x, edge_index)
+                    # Handle both dict (MemoryAugmented) and tuple (base) outputs
+                    if isinstance(outputs, dict):
+                        logits_full = outputs["logits_full"]
+                        sel_logits = outputs["sel_logits"]
+                    else:
+                        logits_full, _, _, sel_logits = outputs
                     scorer = logits_full.clone()
                     scorer[scorer == float("-inf")] = 0.0
                     logits = sel_logits + 0.5 * scorer
@@ -419,22 +445,41 @@ def load_model(checkpoint_path: str):
         hidden_dim = checkpoint.get("hidden_dim", 32)
         num_nodes = checkpoint.get("num_nodes", 5)
         k = checkpoint.get("k", max(1, min(3, num_nodes)))
+        use_memory = checkpoint.get("use_memory", False)
 
-        model = SelectThenAnalyze(
+        base_model = SelectThenAnalyze(
             num_features=num_features,
             hidden_dim=hidden_dim,
             num_nodes=num_nodes,
             k=k,
         )
+
+        # SOTA: Wrap with Memory Module if checkpoint was trained with it
+        if use_memory:
+            memory_slots = checkpoint.get("memory_slots", 128)
+            memory_dim = checkpoint.get("memory_dim", 64)
+            model = MemoryAugmentedRCA(
+                base_model=base_model,
+                memory_slots=memory_slots,
+                memory_dim=memory_dim,
+            )
+            logger.info(
+                "Loaded Memory-Augmented STA checkpoint (memory_slots=%d, memory_dim=%d)",
+                memory_slots, memory_dim,
+            )
+        else:
+            model = base_model
+
         model.load_state_dict(checkpoint["model_state_dict"])
         model.eval()
         logger.info(
-            "Loaded STA checkpoint from %s (features=%d, hidden=%d, nodes=%d, k=%d)",
+            "Loaded STA checkpoint from %s (features=%d, hidden=%d, nodes=%d, k=%d, memory=%s)",
             checkpoint_path,
             num_features,
             hidden_dim,
             num_nodes,
             k,
+            use_memory,
         )
         return model, False, mode
 
@@ -517,7 +562,12 @@ def evaluate(
 
                 for start in range(0, len(test_anomalies), batch_size):
                     xb = X_test[start:start + batch_size]
-                    logits_full, _, _, sel_logits = model(xb, edge_index)
+                    outputs = model(xb, edge_index)
+                    if isinstance(outputs, dict):
+                        logits_full = outputs["logits_full"]
+                        sel_logits = outputs["sel_logits"]
+                    else:
+                        logits_full, _, _, sel_logits = outputs
                     scorer = logits_full.clone()
                     scorer[scorer == float('-inf')] = 0.0
                     combined = sel_logits + 0.5 * scorer
@@ -527,7 +577,12 @@ def evaluate(
                 for data in test_anomalies:
                     x = data.x.unsqueeze(0).to(device)
                     edge_index = data.edge_index.to(device)
-                    logits_full, _, _, sel_logits = model(x, edge_index)
+                    outputs = model(x, edge_index)
+                    if isinstance(outputs, dict):
+                        logits_full = outputs["logits_full"]
+                        sel_logits = outputs["sel_logits"]
+                    else:
+                        logits_full, _, _, sel_logits = outputs
                     scorer = logits_full.clone()
                     scorer[scorer == float('-inf')] = 0.0
                     combined = sel_logits + 0.5 * scorer

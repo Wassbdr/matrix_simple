@@ -85,6 +85,11 @@ def get_ranking_metrics(y_true_list, y_pred_logits_list, severity_list=None, top
             total_sev += sev
             
     sw_mrr = sw_mrr_sum / total_sev if total_sev > 0 else 0.0
+
+    # Fix: Handle division by zero for count
+    if count == 0:
+        return {n: 0.0 for n in top_ns}, 0.0, sw_mrr
+
     return {n: tops[n] / count for n in top_ns}, mrr / count, sw_mrr
 
 
@@ -226,26 +231,28 @@ def train_baseline_gcn(train_anom, edge_index, name_to_idx, N, F_, hidden_dim=32
     return model
 
 
-def train_baseline_mlp(train_anom, name_to_idx, N, hidden_dim=64, epochs=150,
+def train_baseline_mlp(train_anom, name_to_idx, N, hidden_dim=32, epochs=150,
                        batch_size=256, seed=42):
     torch.manual_seed(seed)
-    # Per-node temporal statistics (mean, std, max) instead of raw flatten
-    # Reduces input from N*F*W to N*F*3 — much less overfitting
+    # FIX: Node-wise MLP to prevent positional memorization
     def extract_features(data_list):
         feats = []
         for d in data_list:
             x = d.x  # [N, F, W]
             stats = torch.cat([x.mean(dim=-1), x.std(dim=-1), x.max(dim=-1).values], dim=-1)  # [N, F*3]
-            feats.append(stats.flatten())
-        return torch.stack(feats)
+            feats.append(stats) # Keep [N, F*3] format
+        return torch.stack(feats) # [B, N, F*3]
 
     X = extract_features(train_anom)
     y = torch.tensor([name_to_idx[d.root_cause[0]] for d in train_anom], dtype=torch.long)
-    input_dim = X.size(1)
+    input_dim = X.size(-1)
+    
+    # MLP applied independently to each node (outputs logits over N via squeeze)
     model = nn.Sequential(
-        nn.Linear(input_dim, hidden_dim), nn.ReLU(), nn.BatchNorm1d(hidden_dim),
+        nn.Linear(input_dim, hidden_dim), nn.ReLU(), nn.LayerNorm(hidden_dim),
         nn.Dropout(0.4), nn.Linear(hidden_dim, hidden_dim // 2), nn.ReLU(),
-        nn.Dropout(0.3), nn.Linear(hidden_dim // 2, N))
+        nn.Dropout(0.3), nn.Linear(hidden_dim // 2, 1))
+
     opt = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-3)
     sch = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs, eta_min=1e-5)
     model.train()
@@ -254,7 +261,8 @@ def train_baseline_mlp(train_anom, name_to_idx, N, hidden_dim=64, epochs=150,
         for s in range(0, len(train_anom), batch_size):
             idx = perm[s:s + batch_size]
             opt.zero_grad()
-            loss = F.cross_entropy(model(X[idx]), y[idx])
+            logits = model(X[idx]).squeeze(-1) # [B, N, 1] -> [B, N]
+            loss = F.cross_entropy(logits, y[idx])
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt.step()
@@ -264,12 +272,23 @@ def train_baseline_mlp(train_anom, name_to_idx, N, hidden_dim=64, epochs=150,
 
 def train_baseline_rf(train_anom, name_to_idx, N, seed=42):
     from sklearn.ensemble import RandomForestClassifier
-    X = np.array([d.x.numpy().flatten() for d in train_anom])
-    y = np.array([name_to_idx[d.root_cause[0]] for d in train_anom])
-    clf = RandomForestClassifier(n_estimators=200, random_state=seed,
-                                 class_weight="balanced", max_depth=20,
-                                 min_samples_leaf=5)
-    clf.fit(X, y)
+    # FIX: Node-wise Random Forest to prevent positional memorization
+    X_nodes = []
+    y_nodes = []
+    for d in train_anom:
+        x = d.x  # [N, F, W]
+        stats = torch.cat([x.mean(dim=-1), x.std(dim=-1), x.max(dim=-1).values], dim=-1).numpy()
+        rc_idx = name_to_idx[d.root_cause[0]]
+        for i in range(N):
+            X_nodes.append(stats[i])
+            y_nodes.append(1 if i == rc_idx else 0)
+            
+    X_nodes = np.array(X_nodes)
+    y_nodes = np.array(y_nodes)
+    clf = RandomForestClassifier(n_estimators=100, random_state=seed,
+                                 class_weight="balanced", max_depth=15,
+                                 n_jobs=-1)
+    clf.fit(X_nodes, y_nodes)
     return clf
 
 
@@ -284,7 +303,8 @@ def train_v1_compact(
     hidden_dim=32,
     contrastive_epochs=80, supervised_epochs=150,
     lr=1e-3, batch_size=256,
-    nce_temperature=0.07, beta_max=0.5, warmup_epochs=40,
+    nce_temperature=0.5,  # FIX: Increased from 0.07 to 0.5
+    beta_max=0.5, warmup_epochs=40,
 ):
     """
     Train V1 (SpatioTemporalRCA) with the same two-phase approach as train.py:
@@ -300,8 +320,8 @@ def train_v1_compact(
     if len(healthy) < 2 or len(anomalous) < 2:
         raise ValueError(f"Not enough data: {len(healthy)} healthy, {len(anomalous)} anomalous")
 
-    x_anchor = torch.stack([healthy[i].x for i in range(len(healthy) - 1)]).to(device)
-    x_positive = torch.stack([healthy[i + 1].x for i in range(len(healthy) - 1)]).to(device)
+    # FIX: Use all healthy windows with augmentation instead of consecutive windows
+    x_anchor = torch.stack([d.x for d in healthy]).to(device)
     x_negative = torch.stack([d.x for d in anomalous]).to(device)
     ei = edge_index.to(device)
     num_features = x_anchor.size(2)
@@ -336,8 +356,9 @@ def train_v1_compact(
 
                 optimizer.zero_grad()
                 z_a, probs_a, _ = model(x_anchor[idx_h], ei, use_gib=True)
-                x_pos_aug = augment_positive(x_positive[idx_h], noise_sigma=0.05,
-                                             jitter_shift=1, feature_mask_ratio=0.1)
+                # FIX: Generate positive via augmentation of the same anchor
+                x_pos_aug = augment_positive(x_anchor[idx_h], noise_sigma=0.1,
+                                             jitter_shift=2, feature_mask_ratio=0.15)
                 z_p, probs_p, _ = model(x_pos_aug, ei, use_gib=True)
                 z_n, probs_n, _ = model(x_negative[idx_n], ei, use_gib=True)
 
@@ -494,7 +515,7 @@ def train_sta_compact(
     hidden_dim=32, k=5,
     warmup_epochs=20, supervised_epochs=150,
     lr=1e-3, batch_size=256,
-    nce_temperature=0.07,
+    nce_temperature=0.5,  # FIX: Increased from 0.07 to 0.5 for stable contrastive learning
     k_anneal_epochs=60,
     use_severity_weights=False,
     curriculum=False,
@@ -521,8 +542,8 @@ def train_sta_compact(
     if len(healthy) < 2 or len(anomalous) < 2:
         raise ValueError(f"Not enough data: {len(healthy)} healthy, {len(anomalous)} anomalous")
 
-    x_anchor = torch.stack([healthy[i].x for i in range(len(healthy) - 1)]).to(device)
-    x_positive = torch.stack([healthy[i + 1].x for i in range(len(healthy) - 1)]).to(device)
+    # FIX: Use all healthy windows with augmentation instead of consecutive windows
+    x_anchor = torch.stack([d.x for d in healthy]).to(device)
     x_negative = torch.stack([d.x for d in anomalous]).to(device)
     ei = edge_index.to(device)
     num_features = x_anchor.size(2)
@@ -551,8 +572,9 @@ def train_sta_compact(
                 bei_h = model._batch_edge_index(ei, B_h)
                 bei_n = model._batch_edge_index(ei, B_n)
                 z_a = model.light_encoder(x_anchor[idx_h].view(B_h * N, num_features, -1), bei_h).view(B_h, N, -1).mean(1)
-                x_pos_aug = augment_positive(x_positive[idx_h], noise_sigma=0.05,
-                                             jitter_shift=1, feature_mask_ratio=0.1)
+                # FIX: Generate positive via augmentation of the same anchor (proper contrastive learning)
+                x_pos_aug = augment_positive(x_anchor[idx_h], noise_sigma=0.1,
+                                             jitter_shift=2, feature_mask_ratio=0.15)
                 z_p = model.light_encoder(x_pos_aug.view(B_h * N, num_features, -1), bei_h).view(B_h, N, -1).mean(1)
                 z_n = model.light_encoder(x_negative[idx_n].view(B_n * N, num_features, -1), bei_n).view(B_n, N, -1).mean(1)
 
@@ -796,21 +818,13 @@ def eval_gcn_baseline(model, test_anom, edge_index, name_to_idx, N):
 
 
 def eval_mlp_baseline(model, test_anom, name_to_idx, N):
-    def extract_features(data_list):
-        feats = []
-        for d in data_list:
-            x = d.x
-            stats = torch.cat([x.mean(dim=-1), x.std(dim=-1), x.max(dim=-1).values], dim=-1)
-            feats.append(stats.flatten())
-        return torch.stack(feats)
-
     y_true, y_logits = [], []
     model.eval()
     with torch.no_grad():
         for data in test_anom:
             x = data.x
-            stats = torch.cat([x.mean(dim=-1), x.std(dim=-1), x.max(dim=-1).values], dim=-1)
-            lo = model(stats.flatten().unsqueeze(0))
+            stats = torch.cat([x.mean(dim=-1), x.std(dim=-1), x.max(dim=-1).values], dim=-1) # [N, F*3]
+            lo = model(stats.unsqueeze(0)).squeeze(-1) # [1, N, 1] -> [1, N]
             y_true.append(name_to_idx[data.root_cause[0]])
             y_logits.append(lo[0].cpu().numpy())
     severity_list = [getattr(d, 'severity', 1.0) for d in test_anom]
@@ -826,12 +840,26 @@ def eval_mlp_baseline(model, test_anom, name_to_idx, N):
 
 
 def eval_rf_baseline(clf, test_anom, name_to_idx, N):
-    X_test = np.array([d.x.numpy().flatten() for d in test_anom])
-    y_test = [name_to_idx[d.root_cause[0]] for d in test_anom]
-    probs = clf.predict_proba(X_test)
-    logits = np.zeros((len(X_test), N))
-    for i, c in enumerate(clf.classes_):
-        logits[:, c] = probs[:, i]
+    y_test, logits_list = [], []
+    for d in test_anom:
+        x = d.x.numpy() # [N, F, W]
+        # Same stats logic but in numpy
+        mean_x = np.mean(x, axis=-1)
+        std_x = np.std(x, axis=-1)
+        max_x = np.max(x, axis=-1)
+        stats = np.concatenate([mean_x, std_x, max_x], axis=-1) # [N, F*3]
+        
+        probs = clf.predict_proba(stats) # [N, 2]
+        # The positive class (anomaly) probability is used as the logit to rank nodes
+        if probs.shape[1] > 1:
+            node_logits = probs[:, 1]
+        else:
+            node_logits = probs[:, 0]
+        
+        logits_list.append(node_logits)
+        y_test.append(name_to_idx[d.root_cause[0]])
+        
+    logits = np.array(logits_list) # [num_graphs, N]
     severity_list = [getattr(d, 'severity', 1.0) for d in test_anom]
     tops, mrr, sw_mrr = get_ranking_metrics(y_test, logits, severity_list, top_ns=(1, 2, 5))
     
@@ -1026,7 +1054,6 @@ def main(args):
             # Print V2 statistics
             anomalies_meta = [m for m in metadata if m["is_anomaly"]]
             if anomalies_meta:
-                from collections import Counter
                 pattern_dist = Counter(m["pattern_type"] for m in anomalies_meta)
                 recurrent_count = sum(1 for m in anomalies_meta if m["is_recurrent"])
                 print(f"  V2 Stats: {len(anomalies_meta)} anomalies, {recurrent_count} recurrent ({recurrent_count/len(anomalies_meta)*100:.1f}%)")
@@ -1120,7 +1147,7 @@ def main(args):
             gcn_runs.append(eval_gcn_baseline(gcn_model, test_anom, edge_index, name_to_idx, N))
 
             print(f"  -- Training MLP baseline --")
-            mlp_model = train_baseline_mlp(train_anom, name_to_idx, N, hidden_dim=64,
+            mlp_model = train_baseline_mlp(train_anom, name_to_idx, N, hidden_dim=32,  # FIX: Reduced for fair comparison
                                            epochs=args.baseline_epochs,
                                            batch_size=args.batch_size,
                                            seed=seed)

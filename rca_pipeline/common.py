@@ -6,6 +6,44 @@ Single source of truth for node names, indices, and dataset splitting.
 import torch
 from typing import Dict, List, Tuple, Optional
 from torch_geometric.data import Data
+import time
+
+
+def generate_checkpoint_name(
+    model_type: str,
+    training_type: str = "full",
+    num_nodes: Optional[int] = None,
+    timestamp: bool = True,
+    suffix: str = "pt"
+) -> str:
+    """
+    Generate standardized checkpoint names for better organization.
+
+    Args:
+        model_type: "late_bottleneck", "sta", "baseline_gcn", etc.
+        training_type: "full", "contrastive_only", "supervised_only", "no_gib"
+        num_nodes: Number of nodes in training data (for multi-scale experiments)
+        timestamp: Whether to include timestamp for uniqueness
+        suffix: File extension
+
+    Returns:
+        Standardized checkpoint filename
+
+    Examples:
+        generate_checkpoint_name("sta", "full", 100) -> "sta_full_N100_20240318_142035.pt"
+        generate_checkpoint_name("late_bottleneck", "no_gib") -> "late_bottleneck_no_gib_20240318_142035.pt"
+    """
+    parts = [model_type, training_type]
+
+    if num_nodes is not None:
+        parts.append(f"N{num_nodes}")
+
+    if timestamp:
+        time_str = time.strftime("%Y%m%d_%H%M%S")
+        parts.append(time_str)
+
+    return f"{'_'.join(parts)}.{suffix}"
+
 
 # Default 5-node K8S topology (used by legacy scripts: train.py, benchmark.py)
 NODE_NAMES = ['frontend', 'auth', 'backend', 'cache', 'database']

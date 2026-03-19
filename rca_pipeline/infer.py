@@ -32,6 +32,13 @@ def load_model(checkpoint_path: str, hidden_dim: int = 32) -> Tuple[SpatioTempor
     Returns the model and the use_gib flag stored at training time."""
     try:
         checkpoint = torch.load(checkpoint_path, weights_only=False, map_location="cpu")
+
+        # Fix: Validate checkpoint integrity
+        if not isinstance(checkpoint, dict):
+            raise ValueError(f"Invalid checkpoint format: expected dict, got {type(checkpoint)}")
+        if 'model_state_dict' not in checkpoint:
+            raise ValueError(f"Invalid checkpoint format: missing model_state_dict")
+
         # Read dimensions from checkpoint
         num_features = checkpoint.get('num_features',
             checkpoint['model_state_dict']['temporal_block.conv1.weight'].size(1))
@@ -109,7 +116,12 @@ def identify_root_cause(
     # Build score map
     score_map: Dict[str, float] = {}
     for idx, name in names.items():
-        score_map[name] = round(float(node_scores[idx]), 4)
+        # Fix: Validate index is within node_scores bounds
+        if 0 <= idx < len(node_scores):
+            score_map[name] = round(float(node_scores[idx]), 4)
+        else:
+            logger.warning(f"Index {idx} for node '{name}' is out of bounds for node_scores size {len(node_scores)}")
+            score_map[name] = 0.0
 
     # Root cause = node with highest score
     root_idx = int(torch.argmax(node_scores))
@@ -146,14 +158,38 @@ def run_inference(
     if not anomaly_windows:
         logger.warning("No windows with y==1 found; falling back to the last %d windows.", num_windows)
         anomaly_windows = windows[-num_windows:]
-    else:
-        anomaly_windows = anomaly_windows[-num_windows:]
+
+    # Fix: Validate we have windows to work with
+    if not anomaly_windows:
+        raise ValueError("No windows available for inference")
+
+    # Fix: Ensure we don't request more windows than available
+    num_windows = min(num_windows, len(anomaly_windows))
+    anomaly_windows = anomaly_windows[-num_windows:]
     logger.info("Analyzing %d anomalous windows...", len(anomaly_windows))
 
     logger.info("=" * 60)
     predicted_roots: List[str] = []
     names = node_idx_names if node_idx_names is not None else _DEFAULT_NODE_IDX_NAMES
+
+    # Fix: Validate topology consistency
     edge_index = anomaly_windows[0].edge_index.to(device)
+    same_topology = all(torch.equal(w.edge_index, anomaly_windows[0].edge_index)
+                       for w in anomaly_windows[1:])
+    if not same_topology:
+        logger.warning("Mixed topologies detected, using per-sample inference")
+        # For mixed topologies, process each window individually
+        for i, window in enumerate(anomaly_windows):
+            logger.info(f"--- Window {i+1} ---")
+            single_window = [window]
+            edge_index_single = window.edge_index.to(device)
+            X_single = window.x.unsqueeze(0).to(device)
+            root_cause = identify_root_cause(model, X_single, edge_index_single, names, use_gib)
+            predicted_roots.append(root_cause)
+            logger.info("Predicted root cause: %s", root_cause)
+        return
+
+    # Process all windows together (same topology)
     X = torch.stack([w.x for w in anomaly_windows]).to(device)
 
     with torch.no_grad():
