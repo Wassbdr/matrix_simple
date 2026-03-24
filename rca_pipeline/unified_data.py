@@ -70,6 +70,52 @@ class UnifiedDataLoader:
         self.datasets: Dict[str, List[Data]] = {}
         self.node_names: Optional[List[str]] = None
         self.num_nodes: Optional[int] = None
+        self.scaler_stats: Dict[str, Tuple[torch.Tensor, torch.Tensor]] = {}
+
+    @staticmethod
+    def _feature_presence_from_dim(feature_dim: int) -> torch.Tensor:
+        """Build feature-level presence mask for canonical 13D layout."""
+        if feature_dim >= 13:
+            return torch.ones(13, dtype=torch.float32)
+        mask = torch.zeros(13, dtype=torch.float32)
+        if feature_dim >= 5:
+            mask[:5] = 1.0
+        if feature_dim >= 9:
+            mask[5:9] = 1.0
+        if feature_dim >= 13:
+            mask[9:13] = 1.0
+        return mask
+
+    def _ensure_feature_layout(
+        self,
+        dataset: List[Data],
+        modality_mask: torch.Tensor,
+    ) -> List[Data]:
+        """Ensure each sample follows configured feature width with explicit modality masks."""
+        if not dataset:
+            return dataset
+
+        target_f = self.num_features
+        for d in dataset:
+            x = d.x  # [N, F, W]
+            _, feat_dim, _ = x.shape
+
+            if feat_dim < target_f:
+                pad = torch.zeros(x.size(0), target_f - feat_dim, x.size(2), dtype=x.dtype, device=x.device)
+                x = torch.cat([x, pad], dim=1)
+            elif feat_dim > target_f:
+                x = x[:, :target_f, :]
+
+            d.x = x
+
+            # Keep masks explicit so "missing modality" is not confused with true zero values.
+            d.modality_mask = modality_mask.clone()
+            if target_f == 13:
+                d.feature_presence_mask = self._feature_presence_from_dim(feat_dim)
+            else:
+                d.feature_presence_mask = torch.ones(target_f, dtype=torch.float32)
+
+        return dataset
 
     def add_synthetic(
         self,
@@ -197,6 +243,8 @@ class UnifiedDataLoader:
             from rca_pipeline.simulated_data_scalable import generate_scalable_dataset_v2
 
         params = config.params.copy()
+        # Synthetic generator is metric-centric in this project; traces/logs are represented via explicit zero-padding.
+        params["num_features"] = min(params.get("num_features", self.num_features), 5)
         params.setdefault("seed", self.seed)
         params.setdefault("seasonal_noise", True)
         params.setdefault("correlated_features", True)
@@ -206,6 +254,11 @@ class UnifiedDataLoader:
         if self.node_names is None:
             self.node_names = node_names
             self.num_nodes = len(node_names)
+
+        dataset = self._ensure_feature_layout(
+            dataset,
+            modality_mask=torch.tensor([1.0, 0.0, 0.0], dtype=torch.float32),
+        )
 
         logger.info("Loaded synthetic: %d samples", len(dataset))
         return dataset
@@ -328,20 +381,22 @@ class UnifiedDataLoader:
         # ========================================
         # Fuse Features
         # ========================================
-        feature_tensors = [X_metrics]  # [T, N, 5]
-        feature_names = ["metrics"]
+        has_traces = X_traces is not None
+        has_logs = X_logs is not None
 
-        if X_traces is not None:
-            feature_tensors.append(X_traces)  # [T, N, 4]
-            feature_names.append("traces")
+        # Canonical explicit fusion layout: metrics(5) + traces(4) + logs(4) = 13
+        if not has_traces:
+            X_traces = torch.zeros(X_metrics.size(0), X_metrics.size(1), 4, dtype=X_metrics.dtype)
+        if not has_logs:
+            X_logs = torch.zeros(X_metrics.size(0), X_metrics.size(1), 4, dtype=X_metrics.dtype)
 
-        if X_logs is not None:
-            feature_tensors.append(X_logs)  # [T, N, 4]
-            feature_names.append("logs")
-
-        # Concatenate along feature dimension
-        X = torch.cat(feature_tensors, dim=2)  # [T, N, F]
+        X = torch.cat([X_metrics, X_traces, X_logs], dim=2)
         total_features = X.shape[2]
+        feature_names = ["metrics"]
+        if has_traces:
+            feature_names.append("traces")
+        if has_logs:
+            feature_names.append("logs")
 
         logger.info("Fused features: %s -> total F=%d", feature_names, total_features)
 
@@ -364,13 +419,23 @@ class UnifiedDataLoader:
             services=services,
         )
 
+        modality_mask = torch.tensor([1.0, 1.0 if has_traces else 0.0, 1.0 if has_logs else 0.0], dtype=torch.float32)
+        feature_presence_mask = torch.tensor(
+            [1.0] * 5 + ([1.0] * 4 if has_traces else [0.0] * 4) + ([1.0] * 4 if has_logs else [0.0] * 4),
+            dtype=torch.float32,
+        )
+
         # Tag with modality info
         for d in dataset:
             d.modalities = feature_names
             d.num_features = total_features
+            d.modality_mask = modality_mask.clone()
+            d.feature_presence_mask = feature_presence_mask.clone()
 
         # Adapt topology if needed
         dataset = self._adapt_topology(dataset, services)
+
+        dataset = self._ensure_feature_layout(dataset, modality_mask=modality_mask)
 
         logger.info("Loaded cluster: %d samples (modalities: %s)", len(dataset), feature_names)
         return dataset
@@ -430,12 +495,17 @@ class UnifiedDataLoader:
             train, test, node_names = load_rcaeval_as_pyg(
                 dataset_name=params["dataset_name"],
                 window_size=params.get("window_size", self.window_size),
-                num_features=params.get("num_features", self.num_features),
+                num_features=min(params.get("num_features", self.num_features), 5),
             )
             dataset = train + test
 
             # Adapt topology
             dataset = self._adapt_topology(dataset, node_names)
+
+            dataset = self._ensure_feature_layout(
+                dataset,
+                modality_mask=torch.tensor([1.0, 0.0, 0.0], dtype=torch.float32),
+            )
 
             logger.info("Loaded RCAEval %s: %d samples", params["dataset_name"], len(dataset))
             return dataset
@@ -470,6 +540,11 @@ class UnifiedDataLoader:
         else:
             logger.error("Unknown file format: %s", filepath)
             return []
+
+        dataset = self._ensure_feature_layout(
+            dataset,
+            modality_mask=torch.tensor([1.0, 0.0, 0.0], dtype=torch.float32),
+        )
 
         logger.info("Loaded file %s: %d samples", filepath, len(dataset))
         return dataset
@@ -518,9 +593,21 @@ class UnifiedDataLoader:
             new_d = Data(x=x_new, edge_index=edge_index)
 
             # Copy attributes
-            for key in d.keys:
-                if key not in ['x', 'edge_index']:
+            for key in d.keys():
+                if key not in ['x', 'edge_index', 'root_cause']:
                     setattr(new_d, key, getattr(d, key))
+
+            # Adapt root_cause if present
+            if hasattr(d, 'root_cause') and d.root_cause and self.node_names is not None:
+                new_rc = []
+                for rc in getattr(d, 'root_cause'):
+                    if rc in source_node_names:
+                        idx = source_node_names.index(rc)
+                        if idx < target_N:
+                            new_rc.append(self.node_names[idx])
+                new_d.root_cause = new_rc
+            elif hasattr(d, 'root_cause'):
+                new_d.root_cause = d.root_cause
 
             # Mark as adapted
             new_d.source_topology_size = N
@@ -532,19 +619,18 @@ class UnifiedDataLoader:
         return adapted
 
     def _normalize_dataset(self, dataset: List[Data]) -> List[Data]:
-        """Z-normalize features."""
-        if not dataset:
-            return dataset
+        """DEPRECATED: normalizes train+test together, causing data leakage.
 
-        # Compute global stats
-        all_x = torch.stack([d.x for d in dataset])  # [B, N, F, W]
-        mean = all_x.mean(dim=(0, 3), keepdim=True)  # [1, N, F, 1]
-        std = all_x.std(dim=(0, 3), keepdim=True) + 1e-8
-
-        for d in dataset:
-            d.x = (d.x - mean.squeeze(0)) / std.squeeze(0)
-
-        return dataset
+        DO NOT USE. Use fit_scaler(train) + apply_scaler(data, stats) instead.
+        This method is kept only to avoid ImportError in legacy scripts that
+        may reference it, but it will raise immediately if called.
+        """
+        raise RuntimeError(
+            "_normalize_dataset() applies normalization on the ENTIRE dataset "
+            "(train + test together), causing data leakage that inflates scores. "
+            "Use fit_scaler(train_data) + apply_scaler(data, stats) instead. "
+            "See benchmark.py for the correct pattern."
+        )
 
     def load_all(self) -> "UnifiedDataLoader":
         """Load all configured data sources."""
@@ -569,21 +655,75 @@ class UnifiedDataLoader:
 
                 self.datasets[config.name] = data
 
-        # Normalize if requested
-        if self.normalize == "per_source":
-            for name, data in self.datasets.items():
-                self.datasets[name] = self._normalize_dataset(data)
-        elif self.normalize == "global":
-            all_data = [d for ds in self.datasets.values() for d in ds]
-            all_data = self._normalize_dataset(all_data)
-            # Redistribute
-            idx = 0
-            for name in self.datasets:
-                n = len(self.datasets[name])
-                self.datasets[name] = all_data[idx:idx + n]
-                idx += n
+        # Important: we intentionally do NOT normalize in load_all.
+        # Normalization must be fit on train only and then applied to both train/test.
 
         return self
+
+    def fit_scaler(self, train_data: List[Data]) -> Dict[str, Tuple[torch.Tensor, torch.Tensor]]:
+        """Fit per-source or global scaler stats on train split only."""
+        stats: Dict[str, Tuple[torch.Tensor, torch.Tensor]] = {}
+        if not train_data:
+            self.scaler_stats = stats
+            return stats
+
+        if self.normalize == "none":
+            self.scaler_stats = stats
+            return stats
+
+        if self.normalize == "global":
+            xs = torch.cat([d.x for d in train_data], dim=0)  # [sumN, F, W]
+            mean = xs.mean(dim=(0, 2), keepdim=True)
+            std = xs.std(dim=(0, 2), keepdim=True).clamp(min=1e-8)
+            stats["__global__"] = (mean, std)
+            self.scaler_stats = stats
+            return stats
+
+        # per_source
+        by_source: Dict[str, List[Data]] = defaultdict(list)
+        for d in train_data:
+            by_source[getattr(d, "source", "unknown")].append(d)
+
+        for source, ds in by_source.items():
+            xs = torch.cat([d.x for d in ds], dim=0)
+            mean = xs.mean(dim=(0, 2), keepdim=True)
+            std = xs.std(dim=(0, 2), keepdim=True).clamp(min=1e-8)
+            stats[source] = (mean, std)
+
+        self.scaler_stats = stats
+        return stats
+
+    def apply_scaler(
+        self,
+        data: List[Data],
+        stats: Optional[Dict[str, Tuple[torch.Tensor, torch.Tensor]]] = None,
+    ) -> List[Data]:
+        """Apply pre-fitted scaler stats to a split."""
+        if self.normalize == "none":
+            return data
+
+        stats = stats if stats is not None else self.scaler_stats
+        if not stats:
+            raise ValueError("Scaler stats are empty. Call fit_scaler(train_data) first.")
+
+        out: List[Data] = []
+        for d in data:
+            nd = d.clone()
+            source = getattr(nd, "source", "unknown")
+            if self.normalize == "global":
+                mean, std = stats["__global__"]
+            else:
+                if source not in stats:
+                    # Fallback to global-like aggregate if a source exists only in test split.
+                    all_means = torch.stack([m for m, _ in stats.values()], dim=0).mean(dim=0)
+                    all_stds = torch.stack([s for _, s in stats.values()], dim=0).mean(dim=0).clamp(min=1e-8)
+                    mean, std = all_means, all_stds
+                else:
+                    mean, std = stats[source]
+            nd.x = (nd.x - mean) / std
+            out.append(nd)
+
+        return out
 
     def get_splits(
         self,

@@ -143,7 +143,7 @@ def normalize_dataset(data_list, mean, std):
 
 class EarlyStopping:
     """Patience-based early stopping. Call .step(val_loss) each epoch."""
-    def __init__(self, patience=15):
+    def __init__(self, patience=50):
         self.patience = patience
         self.best_loss = float('inf')
         self.counter = 0
@@ -305,6 +305,8 @@ def train_v1_compact(
     lr=1e-3, batch_size=256,
     nce_temperature=0.5,  # FIX: Increased from 0.07 to 0.5
     beta_max=0.5, warmup_epochs=40,
+    early_stopping_patience=50,
+    seed: int = 42,  # FIX-REC2: propagate benchmark seed for reproducible ES split
 ):
     """
     Train V1 (SpatioTemporalRCA) with the same two-phase approach as train.py:
@@ -383,8 +385,11 @@ def train_v1_compact(
     n_sup = x_sup.size(0)
 
     # Hold out 5% for early stopping validation
+    # FIX-REC2: seed the split so variance comes only from model init, not from split randomness
     n_val = max(1, int(n_sup * 0.05))
-    perm_split = torch.randperm(n_sup, device=device)
+    _es_gen = torch.Generator(device='cpu')
+    _es_gen.manual_seed(seed)  # now uses propagated benchmark seed
+    perm_split = torch.randperm(n_sup, generator=_es_gen)
     val_idx = perm_split[:n_val]
     train_idx_sup = perm_split[n_val:]
     x_val, y_val = x_sup[val_idx], y_sup[val_idx]
@@ -394,7 +399,7 @@ def train_v1_compact(
     # Full LR for all params -- backbone needs to adapt for N-way discrimination
     opt_sup = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     sch_sup = torch.optim.lr_scheduler.CosineAnnealingLR(opt_sup, T_max=supervised_epochs, eta_min=1e-5)
-    es = EarlyStopping(patience=30)
+    es = EarlyStopping(patience=early_stopping_patience)
 
     for epoch in range(supervised_epochs):
         model.train()
@@ -519,6 +524,8 @@ def train_sta_compact(
     k_anneal_epochs=60,
     use_severity_weights=False,
     curriculum=False,
+    early_stopping_patience=50,
+    seed: int = 42,  # FIX-REC2: propagate benchmark seed for reproducible ES split
 ):
     """
     Train STA with k-annealing curriculum.
@@ -600,8 +607,11 @@ def train_sta_compact(
         severity_weights = torch.ones(n_sup, dtype=torch.float, device=device)
 
     # Hold out 5% for early stopping validation
+    # FIX-REC2: seed the split — was unseeded, inflating inter-seed variance artificially
     n_val = max(1, int(n_sup * 0.05))
-    perm_split = torch.randperm(n_sup, device=device)
+    _es_gen = torch.Generator(device='cpu')
+    _es_gen.manual_seed(seed)  # now uses propagated benchmark seed
+    perm_split = torch.randperm(n_sup, generator=_es_gen)
     val_idx = perm_split[:n_val]
     train_idx_sta = perm_split[n_val:]
     x_val_sta, y_val_sta = x_sup[val_idx], y_sup[val_idx]
@@ -612,7 +622,7 @@ def train_sta_compact(
     # Full LR for all parameters (encoder needs to adapt fully for node selection)
     opt_sup = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     sch_sup = torch.optim.lr_scheduler.CosineAnnealingLR(opt_sup, T_max=supervised_epochs, eta_min=1e-5)
-    es = EarlyStopping(patience=30)
+    es = EarlyStopping(patience=early_stopping_patience)
 
     k_warm = min(N // 2, N - 1)  # start with large k
     k_target = k
@@ -673,7 +683,8 @@ def train_sta_compact(
             else:
                 loss_scorer = torch.tensor(0.0, device=device)
 
-            loss = loss_sel + loss_scorer
+            # Strengthen direct supervision on selector logits
+            loss = 5.0 * loss_sel + loss_scorer
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt_sup.step()
@@ -1103,6 +1114,7 @@ def main(args):
                 supervised_epochs=args.supervised_epochs,
                 batch_size=args.batch_size,
                 k_anneal_epochs=dynamic_k_anneal,
+                early_stopping_patience=args.early_stopping_patience,
             )
             print(f"  STA training completed in {time.time()-t0:.1f}s")
             sta_runs.append(eval_sta(sta_model, test_anom, edge_index, name_to_idx, device))
@@ -1119,6 +1131,7 @@ def main(args):
                 k_anneal_epochs=dynamic_k_anneal,
                 use_severity_weights=True,
                 curriculum=True,
+                early_stopping_patience=args.early_stopping_patience,
             )
             print(f"  STA Data-Centric training completed in {time.time()-t0:.1f}s")
             sta_dc_runs.append(eval_sta(sta_dc_model, test_anom, edge_index, name_to_idx, device))
@@ -1132,6 +1145,7 @@ def main(args):
                 contrastive_epochs=args.late_contrastive_epochs,
                 supervised_epochs=args.supervised_epochs,
                 batch_size=args.batch_size,
+                early_stopping_patience=args.early_stopping_patience,
             )
             print(f"  Late Bottleneck training completed in {time.time()-t0:.1f}s")
             late_runs.append(eval_v1(late_model, test_anom, edge_index, name_to_idx, device))
@@ -1225,7 +1239,7 @@ if __name__ == "__main__":
                         help="Use SOTA V2 dataset (power-law, 80%% recurrence, 8 patterns)")
 
     # Training/eval settings
-    parser.add_argument("--seeds", type=str, default="42,123,7",
+    parser.add_argument("--seeds", type=str, default="42,123,7,0,99",
                         help="Comma-separated training seeds")
     parser.add_argument("--hidden-dim", type=int, default=32,
                         help="Hidden dimension for graph models")
@@ -1241,5 +1255,7 @@ if __name__ == "__main__":
                         help="k-annealing epochs for STA")
     parser.add_argument("--baseline-epochs", type=int, default=150,
                         help="Training epochs for GCN/MLP baselines")
+    parser.add_argument("--early-stopping-patience", type=int, default=50,
+                        help="Early stopping patience for STA and Late BN")
 
     main(parser.parse_args())

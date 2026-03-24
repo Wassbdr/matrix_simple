@@ -375,7 +375,10 @@ def train_sta(
         else:
             epoch_power = 1.0
 
-        perm = torch.randperm(n_sup, device=device)
+        # FIX-REC2: seed per-epoch shuffle for reproducibility
+        _perm_gen = torch.Generator(device='cpu')
+        _perm_gen.manual_seed(42 + epoch)
+        perm = torch.randperm(n_sup, generator=_perm_gen).to(device)
         ep_loss = ep_correct = ep_selected = 0
         n_batches = 0
 
@@ -449,7 +452,7 @@ def train_sta(
                     l_memory = memory_regularization_loss(mem_attn, mem_gate)
 
             loss = (
-                loss_sel
+                5.0 * loss_sel
                 + loss_scorer
                 + gamma_sparsity * l_sparse
                 + lambda_causality * l_causality

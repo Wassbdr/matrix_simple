@@ -25,7 +25,7 @@ Key innovations:
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GCNConv
+from torch_geometric.nn import GATConv
 from torch_geometric.utils import subgraph as pyg_subgraph
 from typing import Tuple
 import logging
@@ -59,8 +59,9 @@ class CausalConv1d(nn.Module):
 
 class LightEncoder(nn.Module):
     """
-    Two-layer GCN + temporal attention pooling.
+    Two-layer GAT + temporal attention pooling.
     Runs on all N nodes -- must remain cheap since it sees the full graph.
+    GAT is used instead of GCN to prevent oversmoothing and signal dilution.
     """
 
     def __init__(self, num_features: int, hidden_dim: int) -> None:
@@ -72,9 +73,16 @@ class LightEncoder(nn.Module):
             nn.Tanh(),
             nn.Linear(hidden_dim // 2, 1),
         )
-        self.norm = nn.BatchNorm1d(hidden_dim)
-        self.gcn1 = GCNConv(hidden_dim, hidden_dim)
-        self.gcn2 = GCNConv(hidden_dim, hidden_dim)
+        # FIX-REC3: LayerNorm instead of BatchNorm1d.
+        # BatchNorm1d on [B*N, H] normalises across all N nodes in the batch,
+        # pushing the lone causal node toward the mean of N-1 healthy nodes.
+        # LayerNorm normalises each node independently, preserving its signal.
+        self.norm = nn.LayerNorm(hidden_dim)
+        
+        # Using GATConv to mitigate oversmoothing
+        # 4 heads * (hidden_dim // 4) = hidden_dim output
+        self.gat1 = GATConv(hidden_dim, hidden_dim // 4, heads=4, concat=True)
+        self.gat2 = GATConv(hidden_dim, hidden_dim, heads=1, concat=False)
         self.spat_norm = nn.LayerNorm(hidden_dim)
 
     def forward(self, x_flat: torch.Tensor, edge_index: torch.Tensor) -> torch.Tensor:
@@ -92,8 +100,8 @@ class LightEncoder(nn.Module):
         h = (h_t * attn.unsqueeze(-1)).sum(dim=1)                          # [B*N, H]
         h = self.norm(h)
         residual = h
-        h = F.relu(self.gcn1(h, edge_index))
-        h = F.relu(self.gcn2(h, edge_index))
+        h = F.relu(self.gat1(h, edge_index))
+        h = F.relu(self.gat2(h, edge_index))
         h = self.spat_norm(h + residual)
         return h
 
@@ -191,7 +199,8 @@ class DeepTemporalBlock(nn.Module):
         super().__init__()
         self.conv1 = CausalConv1d(in_channels, hidden_dim, kernel_size=kernel_size)
         self.conv2 = CausalConv1d(hidden_dim, hidden_dim, kernel_size=kernel_size)
-        self.norm = nn.BatchNorm1d(hidden_dim)
+        # FIX-REC3: LayerNorm instead of BatchNorm1d (same rationale as LightEncoder).
+        self.norm = nn.LayerNorm(hidden_dim)
         self.temporal_attn = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.Tanh(),
@@ -217,14 +226,14 @@ class DeepSpatialBlock(nn.Module):
 
     def __init__(self, hidden_dim: int) -> None:
         super().__init__()
-        self.gcn1 = GCNConv(hidden_dim, hidden_dim)
-        self.gcn2 = GCNConv(hidden_dim, hidden_dim)
+        self.gat1 = GATConv(hidden_dim, hidden_dim // 4, heads=4, concat=True)
+        self.gat2 = GATConv(hidden_dim, hidden_dim, heads=1, concat=False)
         self.norm = nn.LayerNorm(hidden_dim)
 
     def forward(self, h: torch.Tensor, edge_index: torch.Tensor) -> torch.Tensor:
         residual = h
-        h = F.relu(self.gcn1(h, edge_index))
-        h = F.relu(self.gcn2(h, edge_index))
+        h = F.relu(self.gat1(h, edge_index))
+        h = F.relu(self.gat2(h, edge_index))
         h = self.norm(h + residual)
         return h
 

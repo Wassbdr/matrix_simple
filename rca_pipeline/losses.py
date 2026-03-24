@@ -334,13 +334,22 @@ def temporal_causality_regularizer(
     X_future = X[:, :, :, lag:]  # [B, N, F, W-lag]
     future_activity = X_future.var(dim=(2, 3))  # [B, N]
 
-    # Causal score: high past activity should predict high mask value
-    # if the node is truly causal
-    causal_alignment = (M_soft * past_activity).sum(dim=1) / (past_activity.sum(dim=1) + 1e-8)
-
-    # We want to encourage the mask to select nodes with high past->future influence
-    # Negative because we want to maximize alignment
-    loss = -causal_alignment.mean()
+    # FIX-REC6: Corrected temporal causality regulariser.
+    #
+    # OLD (WRONG): -causal_alignment.mean()
+    #   = maximise (M_soft * past_activity) / past_activity_total
+    #   Problem: rewards ANY high-variance node in the past window,
+    #   including symptom nodes that became active before lag (false positives).
+    #
+    # NEW (CORRECT): penalise nodes that are ONLY active in the future window.
+    #   A true root cause has: past_activity ≥ future_activity  (it fires first)
+    #   A pure symptom has:    future_activity >> past_activity  (it fires later)
+    #
+    # future_excess[i] = max(0, future_i - past_i - margin)
+    # loss = mean(M_soft * future_excess)   <- push mask to 0 for symptom nodes
+    margin = 0.05  # small slack to avoid penalising nodes active in both windows
+    future_excess = F.relu(future_activity - past_activity - margin)  # [B, N]
+    loss = (M_soft * future_excess).mean()
 
     return loss
 
