@@ -98,6 +98,38 @@ def asymmetric_gib_loss(
     return loss_healthy + loss_anomalous
 
 
+def variational_gib_loss(
+    M_soft: torch.Tensor,
+    target_rate: float,
+    eps: float = 1e-8,
+) -> torch.Tensor:
+    """
+    Variational Graph Information Bottleneck loss.
+
+    Implements a tractable KL-divergence upper bound on I(Z; X):
+        L_GIB = sum_i KL( Bernoulli(sigma(logit_i)) || Bernoulli(k/N) )
+
+    The closed-form KL for Bernoulli distributions is:
+        KL(p || q) = p*log(p/q) + (1-p)*log((1-p)/(1-q))
+
+    This replaces the naive L1 norm which doesn't measure mutual information.
+    At the same computational cost, it provides a principled sparsity signal
+    that distinguishes informative selections from random ones of equal norm.
+
+    Args:
+        M_soft:      [B, N]  -- sigmoid probabilities from the selector
+        target_rate: k/N     -- prior selection probability (Bernoulli rate)
+        eps:         numerical stability
+    Returns:
+        Scalar KL-divergence loss (mean over batch and nodes).
+    """
+    p = M_soft.clamp(eps, 1.0 - eps)
+    q = torch.tensor(target_rate, device=p.device).clamp(eps, 1.0 - eps)
+
+    kl = p * torch.log(p / q) + (1.0 - p) * torch.log((1.0 - p) / (1.0 - q))
+    return kl.mean()
+
+
 def root_cause_loss(
     logits: torch.Tensor,
     targets: torch.Tensor,
@@ -106,4 +138,65 @@ def root_cause_loss(
     Cross-entropy loss for root cause classification.
     """
     return F.cross_entropy(logits, targets)
+
+
+# ---------------------------------------------------------------------------
+# Multi-root-cause support: ||U||_0 > 1
+# ---------------------------------------------------------------------------
+
+def multi_root_cause_loss(
+    logits: torch.Tensor,
+    targets: torch.Tensor,
+    num_nodes: int,
+) -> torch.Tensor:
+    """
+    Multi-label BCE loss for multi-root-cause scenarios.
+
+    When supp(U) = {i_1, ..., i_m}, the target is a multi-hot vector
+    and we use sigmoid + BCE instead of softmax + CE.
+
+    Args:
+        logits:    [B, N] raw per-node scores
+        targets:   [B, N] multi-hot target (1.0 for each root cause node)
+        num_nodes: N (for potential normalization)
+    Returns:
+        Scalar multi-label BCE loss.
+    """
+    return F.binary_cross_entropy_with_logits(logits, targets)
+
+
+def multi_root_cause_metrics(
+    logits: torch.Tensor,
+    targets: torch.Tensor,
+    k: int = 5,
+) -> dict:
+    """
+    Set-based metrics for multi-root-cause evaluation.
+
+    Args:
+        logits:  [B, N] per-node scores
+        targets: [B, N] multi-hot ground truth
+        k: top-k for precision/recall
+    Returns:
+        dict with set_precision@k, set_recall@k, exact_match_ratio
+    """
+    B, N = logits.shape
+    _, top_k_idx = logits.topk(k, dim=-1)                                   # [B, k]
+    pred_mask = torch.zeros_like(logits)
+    pred_mask.scatter_(1, top_k_idx, 1.0)
+
+    # Set intersection
+    intersection = (pred_mask * targets).sum(dim=-1)                         # [B]
+    n_true = targets.sum(dim=-1).clamp(min=1)                                # [B]
+    n_pred = pred_mask.sum(dim=-1).clamp(min=1)                              # [B]
+
+    precision = (intersection / n_pred).mean().item()
+    recall = (intersection / n_true).mean().item()
+    exact_match = ((pred_mask == targets).all(dim=-1).float()).mean().item()
+
+    return {
+        f"set_precision@{k}": precision,
+        f"set_recall@{k}": recall,
+        "exact_match_ratio": exact_match,
+    }
 

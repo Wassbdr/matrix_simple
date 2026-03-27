@@ -45,7 +45,7 @@ Le pipeline supporte à la fois les **données réelles** (Prometheus + Chaos Me
 
 - [kubectl](https://kubernetes.io/docs/tasks/tools/) configuré sur le contexte `observit-cluster1`
 - [Helm](https://helm.sh/docs/intro/install/) v3+
-- Python 3.9+ avec `torch>=2.0`, `torch_geometric>=2.4`, `pandas`, `scikit-learn`, `networkx`, `locust`
+- Python 3.9+ avec les dépendances listées dans [`requirements.txt`](requirements.txt) (notamment `torch>=2.0`, `torch_geometric>=2.4`, `numpy`, `pandas`, `scikit-learn`, `networkx`, `locust`, `matplotlib`)
 - Accès RBAC suffisant pour créer des ressources dans un namespace dédié
 
 ---
@@ -68,9 +68,14 @@ matrix_simple/
 │   ├── simulated_data_scalable.py           # Générateur BA(N,m) pour N quelconque
 │   ├── simulated_data.py                    # Générateur simulé 20 nœuds (legacy)
 │   ├── locustfile.py                        # Générateur de trafic (80% lecture, 20% écriture)
+│   ├── loaders/                             # Loaders RCAEval + ObservIT (CSV ou dossier dataset_*.csv)
+│   ├── tests/                               # Tests unitaires (pytest)
 │   │── # ── Modèles ──
 │   ├── model.py                             # Late Bottleneck : STGCN + GIB (O(N²))
 │   ├── model_sta.py                         # STA : Select-then-Analyze (O(N+k²))
+│   ├── model_late_gat.py                    # Variante Late-BN en GATv2
+│   ├── model_sta_mm.py                      # Variante STA multimodale (metrics + logs/traces)
+│   ├── model_late_gat_mm.py                 # Variante Late-BN GATv2 multimodale
 │   ├── losses.py                            # InfoNCE + GIB sparsity asymétrique
 │   ├── augment.py                           # Augmentation contrastive (bruit, jitter, masking)
 │   ├── common.py                            # Constantes partagées, stratified_split()
@@ -80,7 +85,7 @@ matrix_simple/
 │   │── # ── Évaluation ──
 │   ├── benchmark.py                         # Benchmark unifié multi-échelle multi-seed
 │   ├── benchmark_ablation.py                # Étude d'ablation (composants, k, protocole)
-│   ├── baselines.py                         # Modèles baseline (PureGCN, RandomForest)
+│   ├── benchmark_real.py                    # Benchmark sur RCAEval + ObservIT (STA/GATv2, options MM/drift)
 │   │── # ── Outils ──
 │   ├── infer.py                             # Inférence RCA (Late BN ou STA, tout N)
 │   ├── evaluate.py                          # Évaluation détaillée (P/R/F1, Top-K, MRR)
@@ -93,10 +98,7 @@ matrix_simple/
 │   ├── 03-deploy-app.sh                     # Déploie l'application 5-tiers
 │   └── 04-install-chaos-mesh.sh             # Installe Chaos Mesh (scope rca-sandbox)
 ├── requirements.txt
-├── Week1.md                                 # Rapport semaine 1
-├── Week2.md                                 # Rapport semaine 2 (ablation, scaling)
-├── presentation_script_week1.md             # Script de présentation semaine 1
-├── presentation_script_week2.md             # Script de présentation semaine 2
+├── docs/                                    # Rapports & audits (Week3, ObservIT, validations, etc.)
 └── README.md
 ```
 
@@ -158,7 +160,7 @@ kubectl get pods -n rca-sandbox
 ## Accès aux services
 
 ```bash
-kubectl port-forward svc/frontend -n rca-sandbox 8000:80       # Frontend
+kubectl port-forward svc/frontend -n rca-sandbox 8080:80       # Frontend
 kubectl port-forward svc/grafana -n rca-sandbox 3000:80         # Grafana (admin/admin)
 kubectl port-forward svc/rca-prometheus-server -n rca-sandbox 9090:80  # Prometheus
 kubectl port-forward svc/rca-jaeger -n rca-sandbox 16686:16686 # Jaeger
@@ -169,6 +171,29 @@ kubectl port-forward svc/rca-jaeger -n rca-sandbox 16686:16686 # Jaeger
 ## Pipeline RCA
 
 Le pipeline supporte deux sources de données et deux architectures de modèles.
+
+## Quickstart (local)
+
+### 1) Setup Python
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 2) Benchmark simulé (Barabási–Albert)
+
+```bash
+cd rca_pipeline
+python3 benchmark.py --sizes 20 --seeds 42 --num-samples 400 --supervised-epochs 40 --late-contrastive-epochs 10 --baseline-epochs 40
+```
+
+### 3) Benchmark RCAEval (réel, si `rcaeval/` est présent)
+
+```bash
+.venv/bin/python rca_pipeline/benchmark_real.py --dataset trainticket --seeds 42 --epochs 30 --output-json rca_pipeline/benchmark_real_smoke.json
+```
 
 ### Source A : Données réelles (Prometheus + Chaos Mesh)
 
@@ -181,13 +206,15 @@ python3 rca_pipeline/dataset_builder.py \
     --users 30 --baseline-duration 300 --anomaly-duration 300 \
     --root-cause database --output-dir datasets/
 
-# 2. Convertir CSV -> graphes PyG (topologie fixe 5 nœuds)
+# 2. Convertir CSV -> fenêtres PyG (topologie fixe 5 nœuds)
+# - si tu as un seul run: passe le fichier `datasets/dataset_<run_id>.csv`
+# - si tu as plusieurs runs: passe directement le dossier `datasets/` (fusion interne)
 python3 -c "
-from rca_pipeline.graph_builder import GraphBuilder
-builder = GraphBuilder('datasets/dataset_merged.csv')
-snapshots = builder.build_snapshots()
-windows = builder.create_sliding_windows(snapshots, window_size=6)
-builder.save_windows(windows, 'dataset_windows.pt')
+from rca_pipeline.loaders.observit_loader import load_observit
+windows, node_names, edge_index = load_observit('datasets/', window_size=12)
+import torch
+torch.save(windows, 'dataset_windows.pt')
+print('saved:', len(windows), 'windows -> dataset_windows.pt')
 "
 ```
 
@@ -223,6 +250,70 @@ cd rca_pipeline && python3 train.py --dataset ../dataset_windows.pt \
 cd rca_pipeline && python3 train_sta.py --num-nodes 100 --k 10 \
     --supervised-epochs 150 --hidden-dim 32
 ```
+
+---
+
+## Évaluation RCAEval (données réelles) — `benchmark_real.py`
+
+Le script [`rca_pipeline/benchmark_real.py`](rca_pipeline/benchmark_real.py) évalue **STA** et **GATv2** sur les datasets RCAEval (TrainTicket, SockShop, OnlineBoutique…) avec les métriques **Avg@k, MRR, NDCG**.
+
+### Correctif important (STA réel)
+
+Sur RCAEval réel, le warmup contrastif STA peut dégrader fortement les scores. Le benchmark expose donc :
+- `--sta-contrastive-warmup` (**défaut: 0** pour le réel)
+
+Exemple (campagne longue comparable) :
+
+```bash
+.venv/bin/python rca_pipeline/benchmark_real.py \
+  --dataset all \
+  --seeds 42,123,7 \
+  --epochs 100 \
+  --max-cases 90 \
+  --sta-contrastive-warmup 0 \
+  --output-json rca_pipeline/benchmark_real_run.json
+```
+
+### Validation protocolaire (presets `smoke` / `long`)
+
+Le script [`rca_pipeline/validation_protocol.py`](rca_pipeline/validation_protocol.py) lance une petite matrice de configs et écrit les JSON dans `rca_pipeline/validation_runs/`.
+
+Variables d’environnement :
+- `RCA_VAL_PRESET=smoke|long` (défaut: `smoke`)
+- `RCA_VAL_STA_WARMUP=0` (défaut: `0`)
+- `RCA_VAL_DRIFT=0|1` (défaut: `1`)
+
+Exemple :
+
+```bash
+RCA_VAL_PRESET=long RCA_VAL_STA_WARMUP=0 RCA_VAL_DRIFT=0 \
+  .venv/bin/python rca_pipeline/validation_protocol.py
+```
+
+---
+
+## ObservIT (cluster K8s) — collecte + dataset réel + benchmark
+
+Le flux ObservIT complète RCAEval avec des runs contrôlés sur cluster (Chaos Mesh + Locust + Prometheus).
+
+- **Collecte** : `rca_pipeline/dataset_builder.py` produit `dataset_<run_id>.csv`
+- **Conversion + benchmark** : `rca_pipeline/benchmark_real.py --observit-csv <csv_ou_dossier>`
+
+Doc dédiée (schéma colonnes, commandes, dépannage) :
+- [`docs/observit_dataset.md`](docs/observit_dataset.md)
+
+Scripts pratiques :
+- `scripts/run_observit_dataset.sh`
+- `scripts/run_observit_benchmark.sh`
+- `scripts/run_observit_sota_campaign.sh`
+
+---
+
+## Résultats & rapports
+
+- Compte rendu semaine 3 : [`docs/Week3.md`](docs/Week3.md)
+- Validation (v1 vs v2, fix STA warmup=0, décisions) : [`docs/validation_comparison_v1_v2.md`](docs/validation_comparison_v1_v2.md)
+- Audit stage + roadmap (STA vs Late-Bottleneck) : [`docs/stage_audit_sta_latebn.md`](docs/stage_audit_sta_latebn.md)
 
 | Phase | Objectif | Perte |
 |-------|---------|-------|

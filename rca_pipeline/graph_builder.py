@@ -38,6 +38,11 @@ class GraphBuilder:
         self.features: List[str] = [
             "cpu_usage", "ram_usage", "network_tx", "network_rx", "error_rate"
         ]
+        self.optional_features: List[str] = ["latency_p99"]
+
+    def get_node_names(self) -> List[str]:
+        """Return node names sorted by graph index."""
+        return [n for n, _ in sorted(self.node_mapping.items(), key=lambda kv: kv[1])]
 
     def _map_pod_to_node(self, pod_name: str) -> int:
         """Map a pod name to a graph node index.
@@ -68,9 +73,37 @@ class GraphBuilder:
         except Exception as e:
             logger.error(f"Failed to read CSV: {e}")
             return []
+
+        # Optional compatibility: include latency when present (e.g. prometheus_connector).
+        active_features = list(self.features)
+        for feat in self.optional_features:
+            if feat in df.columns and feat not in active_features:
+                active_features.append(feat)
+        if len(active_features) != len(self.features):
+            logger.info("Detected optional metrics in CSV: using features=%s", active_features)
         
         # Associate rows with node indices
+        n_rows_before = len(df)
         df['node_idx'] = df['pod'].apply(self._map_pod_to_node)
+        unmapped_rows = int((df['node_idx'] == -1).sum())
+        if n_rows_before > 0:
+            logger.info(
+                "Pod mapping coverage: mapped=%d/%d (%.1f%%), dropped=%d",
+                n_rows_before - unmapped_rows,
+                n_rows_before,
+                100.0 * (n_rows_before - unmapped_rows) / n_rows_before,
+                unmapped_rows,
+            )
+        if unmapped_rows > 0:
+            sample_unmapped = (
+                df.loc[df['node_idx'] == -1, 'pod']
+                .dropna()
+                .astype(str)
+                .unique()[:8]
+                .tolist()
+            )
+            if sample_unmapped:
+                logger.warning("Unmapped pod examples: %s", sample_unmapped)
         df = df[df['node_idx'] != -1]
         
         if df.empty:
@@ -79,7 +112,7 @@ class GraphBuilder:
             
         # Aggregate over multiple pod replicas per microservice using average
         df['label'] = pd.to_numeric(df['label'], errors='coerce').fillna(0)
-        grouped = df.groupby(['timestamp', 'node_idx'])[self.features].mean().reset_index()
+        grouped = df.groupby(['timestamp', 'node_idx'])[active_features].mean().reset_index()
         
         # Merge label and root_cause back
         labels_df = df.groupby('timestamp')[['label', 'root_cause']].first().reset_index()
@@ -90,9 +123,9 @@ class GraphBuilder:
         
         for ts in timestamps:
             ts_data = grouped[grouped['timestamp'] == ts]
-            x = torch.zeros((5, len(self.features)), dtype=torch.float)
+            x = torch.zeros((len(self.node_mapping), len(active_features)), dtype=torch.float)
             idxs = ts_data['node_idx'].to_numpy(dtype=np.int64)
-            feats = ts_data[self.features].to_numpy(dtype=np.float32)
+            feats = ts_data[active_features].to_numpy(dtype=np.float32)
             if len(idxs) > 0:
                 x[idxs] = torch.from_numpy(feats)
             snapshot = Data(x=x, edge_index=self.edge_index)

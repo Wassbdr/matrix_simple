@@ -14,8 +14,11 @@ Usage:
 """
 
 import torch
+import json
+import time
 import argparse
 import logging
+import numpy as np
 from typing import List, Dict, Tuple
 from collections import Counter
 
@@ -24,6 +27,8 @@ from sklearn.metrics import precision_score, recall_score, f1_score, classificat
 from model import SpatioTemporalRCA
 
 from common import load_dataset_payload
+from failure_type_utils import split_logits_by_failure_type
+from metrics_rcaeval import RCAEvalMetrics
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -152,6 +157,83 @@ def evaluate(
     # Prediction distribution
     pred_names = [node_idx_to_name[p] for p in y_pred]
     logger.info("Prediction distribution: %s", dict(Counter(pred_names)))
+
+    # ----- Top-k / MRR / RCAEval metrics -----
+    y_logits_list = []
+    with torch.no_grad():
+        if same_topology:
+            for start in range(0, len(test_anomalies), batch_size):
+                xb = X_test[start:start + batch_size]
+                _, _, h = model(xb, edge_index)
+                lo = model.gib_logits(h) if use_gib else model.classify_root_cause(h)
+                for i in range(lo.size(0)):
+                    y_logits_list.append(lo[i].cpu().numpy())
+        else:
+            for data in test_anomalies:
+                x = data.x.unsqueeze(0).to(device)
+                ei = data.edge_index.to(device)
+                _, _, h = model(x, ei)
+                lo = model.gib_logits(h) if use_gib else model.classify_root_cause(h)
+                y_logits_list.append(lo[0].cpu().numpy())
+
+    rca_metrics = RCAEvalMetrics().compute(y_true, y_logits_list)
+    logger.info("RCAEval: Avg@1=%.4f  Avg@3=%.4f  Avg@5=%.4f  MRR=%.4f  NDCG@3=%.4f  NDCG@5=%.4f",
+                rca_metrics["avg1"], rca_metrics["avg3"], rca_metrics["avg5"],
+                rca_metrics["mrr"], rca_metrics["ndcg3"], rca_metrics["ndcg5"])
+
+    # ----- Metrics split by failure type -----
+    split = split_logits_by_failure_type(test_anomalies, y_true, y_logits_list)
+    out = {"overall": rca_metrics}
+    for ft in ("hard", "gray", "cascade"):
+        if split[ft]["y_true"]:
+            out[ft] = RCAEvalMetrics().compute(split[ft]["y_true"], split[ft]["y_logits"])
+            logger.info(
+                "%-8s failures: Avg@1=%.4f  MRR=%.4f  (n=%d)",
+                ft.capitalize(),
+                out[ft]["avg1"],
+                out[ft]["mrr"],
+                len(split[ft]["y_true"]),
+            )
+
+    if split["other"]["y_true"]:
+        out["other"] = RCAEvalMetrics().compute(split["other"]["y_true"], split["other"]["y_logits"])
+        logger.info(
+            "Other    failures: Avg@1=%.4f  MRR=%.4f  (n=%d)",
+            out["other"]["avg1"],
+            out["other"]["mrr"],
+            len(split["other"]["y_true"]),
+        )
+
+    gray_ratio = len(split["gray"]["y_true"]) / max(len(test_anomalies), 1)
+    logger.info("Gray ratio in test: %.2f%%", gray_ratio * 100)
+
+    # ----- Latency -----
+    model.eval()
+    latencies = []
+    with torch.no_grad():
+        for d in test_anomalies[:100]:
+            x = d.x.unsqueeze(0).to(device)
+            ei = d.edge_index.to(device) if not same_topology else edge_index
+            t0 = time.perf_counter()
+            _ = model(x, ei)
+            latencies.append(time.perf_counter() - t0)
+    logger.info("Latency (100 samples): mean=%.2f ms, std=%.2f ms",
+                np.mean(latencies)*1000, np.std(latencies)*1000)
+
+    # ----- JSON export -----
+    json_path = checkpoint_path.replace(".pt", "_eval.json")
+    json.dump({
+        "precision": float(p), "recall": float(r), "f1": float(f1),
+        "rcaeval": rca_metrics,
+        "hard_rcaeval": out.get("hard"),
+        "gray_rcaeval": out.get("gray"),
+        "cascade_rcaeval": out.get("cascade"),
+        "other_rcaeval": out.get("other"),
+        "gray_ratio": gray_ratio,
+        "n_test": len(test_anomalies),
+        "mean_latency_ms": float(np.mean(latencies)*1000),
+    }, open(json_path, "w"), indent=2)
+    logger.info("Results saved to %s", json_path)
 
 
 if __name__ == "__main__":

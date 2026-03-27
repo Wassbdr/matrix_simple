@@ -25,6 +25,7 @@ import argparse
 import os
 
 from model import SpatioTemporalRCA
+from k_selection import adaptive_gib_beta
 from losses import info_nce_loss, asymmetric_gib_loss, root_cause_loss
 from augment import augment_positive
 from common import NODE_NAMES, NAME_TO_IDX, stratified_split, load_windows_dataset
@@ -141,7 +142,8 @@ def train(
 
         for epoch in range(contrastive_epochs):
             model.train()
-            beta = compute_beta(epoch, warmup_epochs, beta_max)
+            beta_eff = adaptive_gib_beta(beta_max, num_nodes)
+            beta = compute_beta(epoch, warmup_epochs, beta_eff)
             # Anneal GIB temperature
             if use_gib:
                 t = epoch / max(contrastive_epochs - 1, 1)

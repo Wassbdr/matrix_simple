@@ -1,21 +1,21 @@
 """
-Training loop for SelectThenAnalyze (STA).
+Training loop for SelectThenAnalyze (STA) v2.
 
-Two-phase training aligned with the paper's formulation:
+Two-phase training aligned with the formalization:
 
 Phase 1 -- Contrastive pre-training (self-supervised):
-    L = L_InfoNCE(z_anchor, z_pos, z_neg) + beta * ||M_soft||_1
-    - InfoNCE separates healthy from anomalous dynamics.
-    - L1 sparsity on M_soft acts as an L0 surrogate: pushes the mask
-      toward zero globally.  InfoNCE counterbalances by requiring
-      discriminative activations for anomalous windows.
+    L = L_InfoNCE(z_a, z_p, z_n) + beta * L_GIB(M_soft, target_rate)
+    - InfoNCE on mask-weighted embeddings: z = (H_fast * M_soft).sum / M_soft.sum
+      Gradient flows end-to-end through the selection mask.
+    - Variational GIB (KL Bernoulli) replaces L1 sparsity for a principled
+      bound on I(Z; X), pushing M_soft toward a target selection rate k/N.
     - Temperature annealing (warm -> cool) for stable exploration.
     - beta warm-up prevents premature sparsification.
 
 Phase 2 -- Supervised fine-tuning:
     L = L_CE(selector_logits, y)            [all N nodes, primary]
       + L_CE(scorer_logits, y) [if RC in top-k]  [subgraph, secondary]
-      + gamma * ||M_soft||_1                [continued sparsity]
+      + gamma * L_GIB(M_soft, k/N)          [variational GIB regularization]
     - Selector receives direct gradient from CE on its logits.
     - Scorer receives gradient from CE only when the root cause was
       correctly selected in top-k (adaptive per-sample).
@@ -29,14 +29,16 @@ import torch
 import torch.optim as optim
 import torch.nn.functional as F
 from torch_geometric.data import Data
-from typing import List, Dict
+from typing import List, Dict, Optional
 import logging
 import argparse
 import os
 import time
 
 from model_sta import SelectThenAnalyze
-from losses import info_nce_loss
+from common import set_all_seeds
+from k_selection import get_optimal_k
+from losses import info_nce_loss, variational_gib_loss
 from augment import augment_positive
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -118,7 +120,7 @@ def train_sta(
     node_names: List[str],
     # Architecture
     hidden_dim: int = 32,
-    k: int = 10,
+    k: Optional[int] = None,
     # Phase 1
     contrastive_epochs: int = 100,
     lr: float = 1e-3,
@@ -135,13 +137,18 @@ def train_sta(
     checkpoint_dir: str = "checkpoints",
     out_checkpoint: str = "sta.pt",
     skip_contrastive: bool = False,
+    seed: int = 42,
 ) -> None:
 
+    set_all_seeds(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info("Device: %s", device)
 
     name_to_idx = {n: i for i, n in enumerate(node_names)}
     num_nodes = len(node_names)
+    if k is None:
+        k = get_optimal_k(num_nodes)
+    logger.info("Using k=%d (get_optimal_k if auto)", k)
 
     dataset, _ = load_scalable_dataset(dataset_path)
     train_data, _ = stratified_split(dataset, name_to_idx)
@@ -206,34 +213,38 @@ def train_sta(
 
                 optimizer.zero_grad()
 
-                # Forward through model (we need M_soft for sparsity)
-                _, M_soft_a, _, _ = model(x_anchor[idx_h], edge_index)
+                # Full forward through model — InfoNCE on Z_subgraph (not H_fast)
+                logits_a, M_soft_a, _, _ = model(x_anchor[idx_h], edge_index)
                 x_pos_aug = augment_positive(
                     x_positive[idx_h], noise_sigma=0.05,
                     jitter_shift=1, feature_mask_ratio=0.1,
                 )
-                _, M_soft_p, _, _ = model(x_pos_aug, edge_index)
-                _, M_soft_n, _, _ = model(x_negative[idx_n], edge_index)
+                logits_p, M_soft_p, _, _ = model(x_pos_aug, edge_index)
+                logits_n, M_soft_n, _, _ = model(x_negative[idx_n], edge_index)
 
-                # Graph-level embeddings via mean-pooled light encoder
-                x_a_flat = x_anchor[idx_h].view(B_h * num_nodes, num_features, -1)
-                x_p_flat = x_pos_aug.view(B_h * num_nodes, num_features, -1)
-                x_n_flat = x_negative[idx_n].view(B_n * num_nodes, num_features, -1)
+                # Graph-level embeddings from scorer logits (Z_subgraph path)
+                # Replace -inf with 0 for mean-pooling stability
+                z_a = logits_a.clamp(min=-10.0).mean(dim=1)                  # [B_h, 1] -> expand
+                z_p = logits_p.clamp(min=-10.0).mean(dim=1)
+                z_n = logits_n.clamp(min=-10.0).mean(dim=1)
+                # Project to embedding space for contrastive loss
+                z_a_full = model.light_encoder(x_anchor[idx_h].view(B_h * num_nodes, num_features, -1)).view(B_h, num_nodes, -1)
+                z_p_full = model.light_encoder(x_pos_aug.view(B_h * num_nodes, num_features, -1)).view(B_h, num_nodes, -1)
+                z_n_full = model.light_encoder(x_negative[idx_n].view(B_n * num_nodes, num_features, -1)).view(B_n, num_nodes, -1)
 
-                batch_ei_h = model._batch_edge_index(edge_index, B_h)
-                batch_ei_n = model._batch_edge_index(edge_index, B_n)
-
-                h_a = model.light_encoder(x_a_flat, batch_ei_h).view(B_h, num_nodes, -1).mean(1)
-                h_p = model.light_encoder(x_p_flat, batch_ei_h).view(B_h, num_nodes, -1).mean(1)
-                h_n = model.light_encoder(x_n_flat, batch_ei_n).view(B_n, num_nodes, -1).mean(1)
+                # Weighted mean pool using M_soft as attention (end-to-end gradient)
+                h_a = (z_a_full * M_soft_a.unsqueeze(-1)).sum(1) / (M_soft_a.sum(1, keepdim=True) + 1e-8)
+                h_p = (z_p_full * M_soft_p.unsqueeze(-1)).sum(1) / (M_soft_p.sum(1, keepdim=True) + 1e-8)
+                h_n = (z_n_full * M_soft_n.unsqueeze(-1)).sum(1) / (M_soft_n.sum(1, keepdim=True) + 1e-8)
 
                 l_nce = info_nce_loss(h_a, h_p, h_n, nce_temperature)
 
-                # Asymmetric sparsity loss
-                M_healthy = torch.cat([M_soft_a, M_soft_p], dim=0)
-                l_sparse = asymmetric_sparsity_loss(M_healthy, M_soft_n)
+                # Variational GIB (KL Bernoulli) replaces L1 sparsity
+                target_rate = k / num_nodes
+                M_all = torch.cat([M_soft_a, M_soft_p, M_soft_n], dim=0)
+                l_gib = variational_gib_loss(M_all, target_rate)
 
-                loss = l_nce + beta * l_sparse
+                loss = l_nce + beta * l_gib
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 optimizer.step()
@@ -306,10 +317,10 @@ def train_sta(
             else:
                 loss_scorer = torch.tensor(0.0, device=device)
 
-            # Continued sparsity regularization
-            l_sparse = sparsity_loss_l1(M_soft)
+            # Variational GIB regularization (replaces L1)
+            l_gib = variational_gib_loss(M_soft, k / num_nodes)
 
-            loss = loss_sel + loss_scorer + gamma_sparsity * l_sparse
+            loss = loss_sel + loss_scorer + gamma_sparsity * l_gib
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer_sup.step()
@@ -362,7 +373,9 @@ if __name__ == "__main__":
     parser.add_argument("--num-nodes", type=int, default=None,
                         help="Override num_nodes (for scalable datasets)")
     parser.add_argument("--hidden-dim", type=int, default=32)
-    parser.add_argument("--k", type=int, default=10)
+    parser.add_argument("--k", type=int, default=None,
+                        help="Selector top-k; omit for automatic get_optimal_k(N)")
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--supervised-epochs", type=int, default=100)
     parser.add_argument("--lr", type=float, default=1e-3)
@@ -406,4 +419,5 @@ if __name__ == "__main__":
         gamma_sparsity=args.gamma_sparsity,
         skip_contrastive=args.skip_contrastive,
         out_checkpoint=args.out_checkpoint,
+        seed=args.seed,
     )

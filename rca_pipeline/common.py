@@ -3,6 +3,8 @@ Shared constants and utilities for the RCA pipeline.
 Single source of truth for node names, indices, and dataset splitting.
 """
 
+import random
+import numpy as np
 import torch
 from typing import Dict, List, Tuple, Optional
 from torch_geometric.data import Data
@@ -11,6 +13,14 @@ from torch_geometric.data import Data
 NODE_NAMES = ['frontend', 'auth', 'backend', 'cache', 'database']
 NAME_TO_IDX = {name: i for i, name in enumerate(NODE_NAMES)}
 NUM_NODES = len(NODE_NAMES)
+
+
+def set_all_seeds(seed: int) -> None:
+    """Reproducible RNG: Python, NumPy, PyTorch (CPU + CUDA)."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
 
 def load_windows_dataset(filepath: str) -> List[Data]:

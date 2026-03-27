@@ -17,6 +17,19 @@ dataset_merged.csv
 datasets/
 rca_pipeline/datasets/
 
+# ObservIT merge artifacts
+**/_merged_observit.csv
+
+# Benchmark / validation outputs (generated)
+rca_pipeline/validation_runs/
+rca_pipeline/benchmark*.json
+rca_pipeline/ablation_*.json
+rca_pipeline/benchmark_real_*.json
+
+# RCAEval downloaded data + caches (keep code, ignore huge data)
+rcaeval/data/
+rcaeval/**/.mm_cache/
+
 # Logs
 port_forward.log
 *.log
@@ -24,6 +37,9 @@ port_forward.log
 # IDE
 .vscode/
 .idea/
+
+# Test / tooling caches
+.pytest_cache/
 
 # OS
 .DS_Store

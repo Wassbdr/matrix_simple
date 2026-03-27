@@ -31,6 +31,8 @@ import time
 import argparse
 import os
 import sys
+import json
+import random
 import warnings
 from collections import Counter
 from typing import List, Dict, Tuple
@@ -42,12 +44,57 @@ warnings.filterwarnings("ignore")
 # Local imports
 from model_sta import SelectThenAnalyze
 from model import SpatioTemporalRCA
-from losses import info_nce_loss, asymmetric_gib_loss
+from model_late_gat import SpatioTemporalRCA_GAT
+from common import set_all_seeds
+from k_selection import get_optimal_k, adaptive_gib_beta
+from losses import info_nce_loss, asymmetric_gib_loss, variational_gib_loss
 from augment import augment_positive
+from causal_graph_builder import CausalGraphBuilder
+from cascade_aware_loss import CausalCascadeAwareLoss
+from drift_detector import make_k8s_drift_detector
+from failure_type_utils import split_logits_by_failure_type
+from sta_fusion_utils import gated_selector_scorer_fusion
+from training_utils import EarlyStopping
 
 import logging
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
+
+from metrics_rcaeval import RCAEvalMetrics
+
+
+# =====================================================================
+# Reference Top-1 (multi-seed means) for regression alerts
+# =====================================================================
+
+# Calibrated from benchmark_full.json (3 seeds: 42, 123, 7) — honest multi-seed means.
+# Previous values (0.93–0.98) were from non-reproducible single-run conditions.
+REFERENCE_TOP1 = {
+    "FullGraphGCN": {20: 0.731, 50: 0.260, 100: 0.253},
+    "LateBN_GIB":   {20: 0.702, 50: 0.273, 100: 0.229},
+    "STA":          {20: 0.300, 50: 0.183, 100: 0.067},
+    "LateBN_GAT":   {20: 0.676, 50: 0.083, 100: 0.188},
+}
+
+REFERENCE_TOP1_STD = {
+    "FullGraphGCN": {20: 0.030, 50: 0.036, 100: 0.033},
+    "LateBN_GIB":   {20: 0.033, 50: 0.029, 100: 0.070},
+    "STA":          {20: 0.122, 50: 0.085, 100: 0.031},
+    "LateBN_GAT":   {20: 0.051, 50: 0.022, 100: 0.044},
+}
+
+
+def _regression_flag(model_key: str, n: int, top1: float, threshold: float = 0.005) -> bool:
+    ref = REFERENCE_TOP1.get(model_key, {}).get(n)
+    if ref is None:
+        return False
+    std = REFERENCE_TOP1_STD.get(model_key, {}).get(n, 0.05)
+    return (ref - top1) > max(threshold, 2.0 * std)
+
+
+def _attach_rcaeval(y_true: List[int], y_logits_list) -> Dict[str, float]:
+    m = RCAEvalMetrics().compute(y_true, y_logits_list)
+    return {f"rcaeval_{k}": v for k, v in m.items()}
 
 
 # =====================================================================
@@ -100,50 +147,61 @@ def get_anomalies(data_list, name_to_idx):
             and hasattr(d, 'root_cause') and d.root_cause[0] in name_to_idx]
 
 
+def _sample_to_metric_dict(x_tensor):
+    """
+    Convert sample tensor x [N,F,W] to 6 canonical metrics for drift detector.
+    """
+    x_np = x_tensor.detach().cpu().numpy()
+    agg = x_np.mean(axis=(0, 2)) if x_np.size else np.zeros((0,), dtype=np.float32)
+    names = ["cpu_usage", "memory_bytes", "network_rx", "network_tx", "latency_p99", "error_rate"]
+    out = {}
+    for i, n in enumerate(names):
+        out[n] = float(agg[i]) if i < len(agg) else 0.0
+    return out
+
+
+def _apply_drift_filter(data_list, enable_drift=False, delta=0.002, cooldown_steps=30):
+    """
+    Sequentially updates ADWIN detector and drops samples during cooldown.
+    """
+    if not enable_drift:
+        return data_list
+    detector = make_k8s_drift_detector(delta=delta, cooldown_steps=cooldown_steps)
+    kept = []
+    for d in data_list:
+        detector.update_batch(_sample_to_metric_dict(d.x))
+        if detector.is_in_cooldown():
+            continue
+        kept.append(d)
+    return kept
+
+
 # =====================================================================
 # Normalization
 # =====================================================================
 
-def compute_norm_stats(data_list):
-    """Compute per-feature mean/std across all nodes and samples.
-    x shape per sample: [N, F, W]. Returns (mean, std) each [1, F, 1]."""
-    all_x = torch.cat([d.x for d in data_list], dim=0)  # [total_nodes, F, W]
+def compute_norm_stats(train_data_list):
+    """Compute per-feature mean/std on the TRAINING SET ONLY (no data leakage).
+    x shape per sample: [N, F, W]. Returns (mean, std) each [1, F, 1].
+
+    IMPORTANT: only pass train_data here, never the full dataset.
+    Apply the returned stats to both train and test via normalize_dataset().
+    """
+    all_x = torch.cat([d.x for d in train_data_list], dim=0)  # [total_nodes, F, W]
     mean = all_x.mean(dim=(0, 2), keepdim=True)  # [1, F, 1]
     std = all_x.std(dim=(0, 2), keepdim=True).clamp(min=1e-8)
     return mean, std
 
 
 def normalize_dataset(data_list, mean, std):
-    """In-place z-score normalization on x tensors."""
+    """In-place z-score normalization on x tensors (apply train stats to both splits)."""
     for d in data_list:
         d.x = (d.x - mean) / std
     return data_list
 
 
-# =====================================================================
-# Early-stopping helper
-# =====================================================================
 
-class EarlyStopping:
-    """Patience-based early stopping. Call .step(val_loss) each epoch."""
-    def __init__(self, patience=15):
-        self.patience = patience
-        self.best_loss = float('inf')
-        self.counter = 0
-        self.best_state = None
-
-    def step(self, val_loss, model):
-        if val_loss < self.best_loss - 1e-6:
-            self.best_loss = val_loss
-            self.counter = 0
-            self.best_state = {k: v.clone() for k, v in model.state_dict().items()}
-        else:
-            self.counter += 1
-        return self.counter >= self.patience
-
-    def restore(self, model):
-        if self.best_state is not None:
-            model.load_state_dict(self.best_state)
+# EarlyStopping imported from training_utils
 
 
 # =====================================================================
@@ -193,7 +251,7 @@ class FullGraphGCN(nn.Module):
 
 def train_baseline_gcn(train_anom, edge_index, name_to_idx, N, F_, hidden_dim=32,
                        epochs=150, batch_size=256, seed=42):
-    torch.manual_seed(seed)
+    set_all_seeds(seed)
     model = FullGraphGCN(F_, hidden_dim, N)
     X = torch.stack([d.x for d in train_anom])
     y = torch.tensor([name_to_idx[d.root_cause[0]] for d in train_anom], dtype=torch.long)
@@ -216,7 +274,7 @@ def train_baseline_gcn(train_anom, edge_index, name_to_idx, N, F_, hidden_dim=32
 
 def train_baseline_mlp(train_anom, name_to_idx, N, hidden_dim=64, epochs=150,
                        batch_size=256, seed=42):
-    torch.manual_seed(seed)
+    set_all_seeds(seed)
     # Per-node temporal statistics (mean, std, max) instead of raw flatten
     # Reduces input from N*F*W to N*F*3 — much less overfitting
     def extract_features(data_list):
@@ -267,164 +325,226 @@ def train_baseline_rf(train_anom, name_to_idx, N, seed=42):
 # Preferred for small/medium topologies where O(N²) is acceptable.
 # =====================================================================
 
+def _compute_val_mrr(model, x_val, y_val, ei, device, N, num_features):
+    """Compute MRR on validation set for early stopping (higher = better)."""
+    model.eval()
+    with torch.no_grad():
+        B_v = x_val.size(0)
+        x_flat_v = x_val.view(B_v * N, num_features, -1)
+        h_t_v = model.temporal_block(x_flat_v)
+        if B_v > 1:
+            offsets_v = torch.arange(B_v, device=device) * N
+            batch_ei_v = ei.unsqueeze(0).expand(B_v, -1, -1) + offsets_v.view(-1, 1, 1)
+            batch_ei_v = batch_ei_v.reshape(2, -1)
+        else:
+            batch_ei_v = ei
+        h_s_v = model.spatial_block(h_t_v, batch_ei_v)
+        logits_v = model.gib.mlp(h_s_v).squeeze(-1).view(B_v, N)  # [B_v, N]
+
+    mrr = 0.0
+    logits_np = logits_v.cpu().numpy()
+    y_np = y_val.cpu().numpy()
+    for i in range(B_v):
+        ranked = np.argsort(logits_np[i])[::-1]
+        rank = int(np.where(ranked == y_np[i])[0][0]) + 1
+        mrr += 1.0 / rank
+    return mrr / B_v
+
+
+def _compute_val_mrr_gat(model, x_val, y_val, ei, device):
+    """Validation MRR for Late BN GAT (logits [B, N])."""
+    model.eval()
+    with torch.no_grad():
+        logits, _, _ = model(x_val, ei)
+        logits_np = logits.cpu().numpy()
+        y_np = y_val.cpu().numpy()
+    mrr = 0.0
+    for i in range(len(y_np)):
+        ranked = np.argsort(logits_np[i])[::-1]
+        rank = int(np.where(ranked == y_np[i])[0][0]) + 1
+        mrr += 1.0 / rank
+    return mrr / len(y_np)
+
+
 def train_v1_compact(
     train_data, node_names, edge_index, device,
     hidden_dim=32,
     contrastive_epochs=80, supervised_epochs=150,
     lr=1e-3, batch_size=256,
     nce_temperature=0.07, beta_max=0.5, warmup_epochs=40,
+    patience=75,
+    restart_seed_offset=1000,
+    edge_weights=None,
+    cascade_loss_weight=0.0,
 ):
     """
     Train V1 (SpatioTemporalRCA) with the same two-phase approach as train.py:
     Phase 1: Contrastive + asymmetric GIB (target_sparsity = 1/N)
     Phase 2: Supervised CE on raw GIB logits (not BCE on sigmoid probs)
+
+    Fixes vs original:
+    - Adaptive beta: beta_eff = beta_max * sqrt(N_ref / N) prevents excessive
+      sparsity at large N (critical for N=100 variance reduction).
+    - EarlyStopping monitored on val MRR (patience=75, not 30 on loss).
+    - Degenerate convergence detection at epoch 30 with auto-restart.
+    - Full seeding via set_all_seeds() at entry.
     """
     name_to_idx = {n: i for i, n in enumerate(node_names)}
     N = len(node_names)
 
-    healthy = [d for d in train_data if d.y is not None and d.y.item() == 0]
-    anomalous = get_anomalies(train_data, name_to_idx)
+    # Adaptive GIB beta: ~4.5× smaller at N=100 vs N=20 (see k_selection.adaptive_gib_beta)
+    beta_eff = adaptive_gib_beta(beta_max, N)
 
-    if len(healthy) < 2 or len(anomalous) < 2:
-        raise ValueError(f"Not enough data: {len(healthy)} healthy, {len(anomalous)} anomalous")
+    def _run_training(seed_offset=0, skip_degenerate_check=False):
+        if seed_offset > 0:
+            set_all_seeds(torch.initial_seed() % (2**31) + seed_offset)
 
-    x_anchor = torch.stack([healthy[i].x for i in range(len(healthy) - 1)]).to(device)
-    x_positive = torch.stack([healthy[i + 1].x for i in range(len(healthy) - 1)]).to(device)
-    x_negative = torch.stack([d.x for d in anomalous]).to(device)
-    ei = edge_index.to(device)
-    num_features = x_anchor.size(2)
+        healthy = [d for d in train_data if d.y is not None and d.y.item() == 0]
+        anomalous = get_anomalies(train_data, name_to_idx)
 
-    # Dynamic target_sparsity = 1/N (not hardcoded 0.2 which was tuned for N=5)
-    target_sparsity = 1.0 / N
+        if len(healthy) < 2 or len(anomalous) < 2:
+            raise ValueError(f"Not enough data: {len(healthy)} healthy, {len(anomalous)} anomalous")
 
-    model = SpatioTemporalRCA(
-        num_features=num_features, hidden_dim=hidden_dim,
-        num_nodes=N, gib_temperature=1.0,
-    ).to(device)
+        x_anchor = torch.stack([healthy[i].x for i in range(len(healthy) - 1)]).to(device)
+        x_positive = torch.stack([healthy[i + 1].x for i in range(len(healthy) - 1)]).to(device)
+        x_negative = torch.stack([d.x for d in anomalous]).to(device)
+        ei = edge_index.to(device)
+        num_features = x_anchor.size(2)
 
-    # ---- Phase 1: Contrastive + Asymmetric GIB ----
-    if contrastive_epochs > 0:
-        optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=contrastive_epochs, eta_min=1e-5)
-        n_h, n_n = x_anchor.size(0), x_negative.size(0)
-        temp_start, temp_end = 1.0, 0.3
+        # Dynamic target_sparsity = 1/N (not hardcoded 0.2 which was tuned for N=5)
+        target_sparsity = 1.0 / N
 
-        for epoch in range(contrastive_epochs):
+        model = SpatioTemporalRCA(
+            num_features=num_features, hidden_dim=hidden_dim,
+            num_nodes=N, gib_temperature=1.0,
+        ).to(device)
+
+        # ---- Phase 1: Contrastive + Asymmetric GIB (adaptive beta) ----
+        if contrastive_epochs > 0:
+            optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, T_max=contrastive_epochs, eta_min=1e-5)
+            n_h, n_n = x_anchor.size(0), x_negative.size(0)
+            temp_start, temp_end = 1.0, 0.3
+
+            for epoch in range(contrastive_epochs):
+                model.train()
+                beta = min(1.0, epoch / max(warmup_epochs, 1)) * beta_eff
+                t_frac = epoch / max(contrastive_epochs - 1, 1)
+                model.gib.set_temperature(temp_start + t_frac * (temp_end - temp_start))
+
+                perm_h = torch.randperm(n_h, device=device)
+                perm_n = torch.randperm(n_n, device=device)
+
+                for start in range(0, min(n_h, n_n), batch_size):
+                    idx_h = perm_h[start:start + batch_size]
+                    idx_n = perm_n[start:start + batch_size]
+
+                    optimizer.zero_grad()
+                    z_a, probs_a, _ = model(x_anchor[idx_h], ei, use_gib=True)
+                    x_pos_aug = augment_positive(x_positive[idx_h], noise_sigma=0.05,
+                                                 jitter_shift=1, feature_mask_ratio=0.1)
+                    z_p, probs_p, _ = model(x_pos_aug, ei, use_gib=True)
+                    z_n, probs_n, _ = model(x_negative[idx_n], ei, use_gib=True)
+
+                    l_nce = info_nce_loss(z_a, z_p, z_n, nce_temperature)
+                    probs_healthy = torch.cat([probs_a, probs_p], dim=0)
+                    l_gib = asymmetric_gib_loss(probs_healthy, probs_n, target_sparsity)
+                    loss = l_nce + beta * l_gib
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                    optimizer.step()
+
+                scheduler.step()
+
+            print(f"    [V1-Phase1] {contrastive_epochs} epochs done | beta_eff={beta_eff:.4f} | "
+                  f"last_loss={loss.item():.4f}")
+
+        # ---- Phase 2: Supervised CE on raw GIB logits ----
+        x_sup = x_negative
+        y_sup = torch.tensor([name_to_idx[d.root_cause[0]] for d in anomalous],
+                              dtype=torch.long, device=device)
+        n_sup = x_sup.size(0)
+
+        # Deterministic val split (reproducible with current seed)
+        perm_split = torch.randperm(n_sup, device=device)
+        n_val = max(1, int(n_sup * 0.05))
+        val_idx = perm_split[:n_val]
+        train_idx_sup = perm_split[n_val:]
+        x_val, y_val = x_sup[val_idx], y_sup[val_idx]
+        x_train_sup, y_train_sup = x_sup[train_idx_sup], y_sup[train_idx_sup]
+        n_train = x_train_sup.size(0)
+
+        # Warmup cosine LR
+        opt_sup = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+        sch_sup = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+            opt_sup, T_0=50, T_mult=2, eta_min=1e-5)
+        # MRR-based early stopping (patience=75)
+        es = EarlyStopping(patience=patience)
+        cascade_loss_fn = CausalCascadeAwareLoss()
+        ew = edge_weights.to(device) if edge_weights is not None else None
+
+        for epoch in range(supervised_epochs):
             model.train()
-            beta = min(1.0, epoch / max(warmup_epochs, 1)) * beta_max
-            t_frac = epoch / max(contrastive_epochs - 1, 1)
-            model.gib.set_temperature(temp_start + t_frac * (temp_end - temp_start))
+            perm = torch.randperm(n_train, device=device)
+            ep_loss = ep_correct = 0
+            nb = 0
 
-            perm_h = torch.randperm(n_h, device=device)
-            perm_n = torch.randperm(n_n, device=device)
+            for start in range(0, n_train, batch_size):
+                idx = perm[start:start + batch_size]
+                x_b, y_b = x_train_sup[idx], y_train_sup[idx]
+                B = x_b.size(0)
+                opt_sup.zero_grad()
 
-            for start in range(0, min(n_h, n_n), batch_size):
-                idx_h = perm_h[start:start + batch_size]
-                idx_n = perm_n[start:start + batch_size]
+                x_flat = x_b.view(B * N, num_features, -1)
+                h_temporal = model.temporal_block(x_flat)
+                if B > 1:
+                    offsets = torch.arange(B, device=device) * N
+                    batch_ei = ei.unsqueeze(0).expand(B, -1, -1) + offsets.view(-1, 1, 1)
+                    batch_ei = batch_ei.reshape(2, -1)
+                else:
+                    batch_ei = ei
+                h_spatial = model.spatial_block(h_temporal, batch_ei)
 
-                optimizer.zero_grad()
-                z_a, probs_a, _ = model(x_anchor[idx_h], ei, use_gib=True)
-                x_pos_aug = augment_positive(x_positive[idx_h], noise_sigma=0.05,
-                                             jitter_shift=1, feature_mask_ratio=0.1)
-                z_p, probs_p, _ = model(x_pos_aug, ei, use_gib=True)
-                z_n, probs_n, _ = model(x_negative[idx_n], ei, use_gib=True)
-
-                l_nce = info_nce_loss(z_a, z_p, z_n, nce_temperature)
-                probs_healthy = torch.cat([probs_a, probs_p], dim=0)
-                l_gib = asymmetric_gib_loss(probs_healthy, probs_n, target_sparsity)
-                loss = l_nce + beta * l_gib
+                gib_logits = model.gib.mlp(h_spatial).squeeze(-1).view(B, N)
+                loss = F.cross_entropy(gib_logits, y_b)
+                if cascade_loss_weight > 0.0:
+                    loss = loss + cascade_loss_weight * cascade_loss_fn(gib_logits, y_b, ei, ew)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-                optimizer.step()
+                opt_sup.step()
 
-            scheduler.step()
+                preds = gib_logits.argmax(dim=1)
+                ep_loss += loss.item()
+                ep_correct += (preds == y_b).sum().item()
+                nb += 1
 
-        print(f"    [V1-Phase1] {contrastive_epochs} contrastive epochs done | last_loss={loss.item():.4f}")
+            sch_sup.step()
 
-    # ---- Phase 2: Supervised CE on raw GIB logits ----
-    # KEY FIX: BCE on sigmoid probs collapses at N>5 because the 19:1
-    # negative-to-positive gradient ratio pushes all probs → 0.
-    # CE on raw logits normalizes via softmax and works at any N.
-    x_sup = x_negative
-    y_sup = torch.tensor([name_to_idx[d.root_cause[0]] for d in anomalous], dtype=torch.long, device=device)
-    n_sup = x_sup.size(0)
+            train_acc = ep_correct / n_train
+            degen_thresh = max(5.0 / N, 0.05)
+            if epoch == 50 and train_acc < degen_thresh and not skip_degenerate_check:
+                # Keep training; use EarlyStopping (MRR patience) only.
+                print(f"    [V1-Phase2] ⚠️  Epoch 50 acc={train_acc:.3f} < {degen_thresh:.3f} — "
+                      f"slow/degenerate-looking convergence (no restart).")
 
-    # Hold out 5% for early stopping validation
-    n_val = max(1, int(n_sup * 0.05))
-    perm_split = torch.randperm(n_sup, device=device)
-    val_idx = perm_split[:n_val]
-    train_idx_sup = perm_split[n_val:]
-    x_val, y_val = x_sup[val_idx], y_sup[val_idx]
-    x_train_sup, y_train_sup = x_sup[train_idx_sup], y_sup[train_idx_sup]
-    n_train = x_train_sup.size(0)
+            if epoch % 30 == 0 or epoch == supervised_epochs - 1:
+                print(f"    [V1-Phase2] Ep {epoch:03d}/{supervised_epochs} | "
+                      f"loss={ep_loss/nb:.4f} | acc={train_acc:.4f}")
 
-    # Full LR for all params -- backbone needs to adapt for N-way discrimination
-    opt_sup = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
-    sch_sup = torch.optim.lr_scheduler.CosineAnnealingLR(opt_sup, T_max=supervised_epochs, eta_min=1e-5)
-    es = EarlyStopping(patience=30)
+            # MRR-based early stopping
+            val_mrr = _compute_val_mrr(model, x_val, y_val, ei, device, N, num_features)
+            if es.step(val_mrr, model):
+                print(f"    [V1-Phase2] Early stop at epoch {epoch} "
+                      f"(patience={es.patience}, best_mrr={es.best_mrr:.4f})")
+                break
 
-    for epoch in range(supervised_epochs):
-        model.train()
-        perm = torch.randperm(n_train, device=device)
-        ep_loss = ep_correct = 0
-        nb = 0
-
-        for start in range(0, n_train, batch_size):
-            idx = perm[start:start + batch_size]
-            x_b, y_b = x_train_sup[idx], y_train_sup[idx]
-            B = x_b.size(0)
-            opt_sup.zero_grad()
-
-            # Forward through temporal + spatial blocks
-            x_flat = x_b.view(B * N, num_features, -1)
-            h_temporal = model.temporal_block(x_flat)
-            if B > 1:
-                offsets = torch.arange(B, device=device) * N
-                batch_ei = ei.unsqueeze(0).expand(B, -1, -1) + offsets.view(-1, 1, 1)
-                batch_ei = batch_ei.reshape(2, -1)
-            else:
-                batch_ei = ei
-            h_spatial = model.spatial_block(h_temporal, batch_ei)
-
-            # Raw GIB logits (before sigmoid) — proper N-way classification
-            gib_logits = model.gib.mlp(h_spatial).squeeze(-1).view(B, N)
-            loss = F.cross_entropy(gib_logits, y_b)
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            opt_sup.step()
-
-            preds = gib_logits.argmax(dim=1)
-            ep_loss += loss.item()
-            ep_correct += (preds == y_b).sum().item()
-            nb += 1
-
-        sch_sup.step()
-        if epoch % 30 == 0 or epoch == supervised_epochs - 1:
-            print(f"    [V1-Phase2] Ep {epoch:03d}/{supervised_epochs} | loss={ep_loss/nb:.4f} | "
-                  f"acc={ep_correct/n_train:.4f}")
-
-        # Early stopping on validation set
+        es.restore(model)
         model.eval()
-        with torch.no_grad():
-            B_v = x_val.size(0)
-            x_flat_v = x_val.view(B_v * N, num_features, -1)
-            h_t_v = model.temporal_block(x_flat_v)
-            if B_v > 1:
-                offsets_v = torch.arange(B_v, device=device) * N
-                batch_ei_v = ei.unsqueeze(0).expand(B_v, -1, -1) + offsets_v.view(-1, 1, 1)
-                batch_ei_v = batch_ei_v.reshape(2, -1)
-            else:
-                batch_ei_v = ei
-            h_s_v = model.spatial_block(h_t_v, batch_ei_v)
-            gib_logits_v = model.gib.mlp(h_s_v).squeeze(-1).view(B_v, N)
-            val_loss = F.cross_entropy(gib_logits_v, y_val).item()
-        if es.step(val_loss, model):
-            print(f"    [V1-Phase2] Early stop at epoch {epoch} (patience={es.patience})")
-            break
+        return model
 
-    es.restore(model)
-    model.eval()
-    return model
+    # No degenerate-convergence restarts: rely on EarlyStopping only.
+    return _run_training(0, False)
 
 
 def eval_v1(model, test_anom, edge_index, name_to_idx, device):
@@ -456,12 +576,195 @@ def eval_v1(model, test_anom, edge_index, name_to_idx, device):
             y_logits.append(gib_logits.cpu().numpy())
 
     tops, mrr = get_ranking_metrics(y_true, y_logits, top_ns=(1, 2, 5))
-    return {
+    out = {
         "top1": tops[1], "top2": tops[2], "top5": tops[5], "mrr": mrr,
         "mean_latency_ms": np.mean(latencies) * 1000,
         "std_latency_ms": np.std(latencies) * 1000,
         "params": count_parameters(model), "k": N, "N": N,
     }
+    out.update(_attach_rcaeval(y_true, y_logits))
+    return out
+
+
+# =====================================================================
+# Late Bottleneck GATv2 (no GIB sparsity)
+# =====================================================================
+
+def train_gat_compact(
+    train_data, node_names, edge_index, device,
+    hidden_dim=32,
+    contrastive_epochs=80, supervised_epochs=150,
+    lr=1e-3, batch_size=256,
+    nce_temperature=0.07,
+    warmup_epochs=40,
+    patience=75,
+    restart_seed_offset=1000,
+    edge_weights=None,
+    cascade_loss_weight=0.0,
+):
+    """Two-phase training: InfoNCE on pooled embeddings, then supervised CE on logits."""
+    name_to_idx = {n: i for i, n in enumerate(node_names)}
+    N = len(node_names)
+
+    def _run_training(seed_offset=0, skip_degenerate_check=False):
+        if seed_offset > 0:
+            set_all_seeds(torch.initial_seed() % (2**31) + seed_offset)
+
+        healthy = [d for d in train_data if d.y is not None and d.y.item() == 0]
+        anomalous = get_anomalies(train_data, name_to_idx)
+        if len(healthy) < 2 or len(anomalous) < 2:
+            raise ValueError(f"Not enough data: {len(healthy)} healthy, {len(anomalous)} anomalous")
+
+        x_anchor = torch.stack([healthy[i].x for i in range(len(healthy) - 1)]).to(device)
+        x_positive = torch.stack([healthy[i + 1].x for i in range(len(healthy) - 1)]).to(device)
+        x_negative = torch.stack([d.x for d in anomalous]).to(device)
+        ei = edge_index.to(device)
+        num_features = x_anchor.size(2)
+
+        model = SpatioTemporalRCA_GAT(
+            num_features=num_features, hidden_dim=hidden_dim,
+            num_nodes=N,
+        ).to(device)
+
+        if contrastive_epochs > 0:
+            optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, T_max=contrastive_epochs, eta_min=1e-5)
+            n_h, n_n = x_anchor.size(0), x_negative.size(0)
+
+            for epoch in range(contrastive_epochs):
+                model.train()
+                perm_h = torch.randperm(n_h, device=device)
+                perm_n = torch.randperm(n_n, device=device)
+
+                for start in range(0, min(n_h, n_n), batch_size):
+                    idx_h = perm_h[start:start + batch_size]
+                    idx_n = perm_n[start:start + batch_size]
+
+                    optimizer.zero_grad()
+                    _, _, h_a = model(x_anchor[idx_h], ei)
+                    x_pos_aug = augment_positive(
+                        x_positive[idx_h], noise_sigma=0.05,
+                        jitter_shift=1, feature_mask_ratio=0.1,
+                    )
+                    _, _, h_p = model(x_pos_aug, ei)
+                    _, _, h_n = model(x_negative[idx_n], ei)
+
+                    z_a = h_a.mean(dim=1)
+                    z_p = h_p.mean(dim=1)
+                    z_n = h_n.mean(dim=1)
+
+                    l_nce = info_nce_loss(z_a, z_p, z_n, nce_temperature)
+                    l_nce.backward()
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                    optimizer.step()
+
+                scheduler.step()
+
+            if contrastive_epochs > 0:
+                print(f"    [GAT-Phase1] {contrastive_epochs} contrastive epochs done | last_nce={l_nce.item():.4f}")
+
+        x_sup = x_negative
+        y_sup = torch.tensor(
+            [name_to_idx[d.root_cause[0]] for d in anomalous],
+            dtype=torch.long, device=device,
+        )
+        n_sup = x_sup.size(0)
+        perm_split = torch.randperm(n_sup, device=device)
+        n_val = max(1, int(n_sup * 0.05))
+        val_idx = perm_split[:n_val]
+        train_idx_sup = perm_split[n_val:]
+        x_val, y_val = x_sup[val_idx], y_sup[val_idx]
+        x_train_sup, y_train_sup = x_sup[train_idx_sup], y_sup[train_idx_sup]
+        n_train = x_train_sup.size(0)
+
+        opt_sup = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+        sch_sup = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+            opt_sup, T_0=50, T_mult=2, eta_min=1e-5)
+        es = EarlyStopping(patience=patience)
+        cascade_loss_fn = CausalCascadeAwareLoss()
+        ew = edge_weights.to(device) if edge_weights is not None else None
+
+        for epoch in range(supervised_epochs):
+            model.train()
+            perm = torch.randperm(n_train, device=device)
+            ep_loss = ep_correct = 0.0
+            nb = 0
+
+            for start in range(0, n_train, batch_size):
+                idx = perm[start:start + batch_size]
+                x_b, y_b = x_train_sup[idx], y_train_sup[idx]
+                B = x_b.size(0)
+                opt_sup.zero_grad()
+                logits, _, _ = model(x_b, ei)
+                loss = F.cross_entropy(logits, y_b)
+                if cascade_loss_weight > 0.0:
+                    loss = loss + cascade_loss_weight * cascade_loss_fn(logits, y_b, ei, ew)
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                opt_sup.step()
+                preds = logits.argmax(dim=1)
+                ep_loss += loss.item()
+                ep_correct += (preds == y_b).sum().item()
+                nb += 1
+
+            sch_sup.step()
+            train_acc = ep_correct / n_train
+
+            degen_thresh = max(5.0 / N, 0.05)
+            if epoch == 50 and train_acc < degen_thresh and not skip_degenerate_check:
+                # Keep training; use EarlyStopping (MRR patience) only.
+                print(f"    [GAT-Phase2] ⚠️  Epoch 50 acc={train_acc:.3f} < {degen_thresh:.3f} — "
+                      f"slow/degenerate-looking convergence (no restart).")
+
+            if epoch % 30 == 0 or epoch == supervised_epochs - 1:
+                print(f"    [GAT-Phase2] Ep {epoch:03d}/{supervised_epochs} | "
+                      f"loss={ep_loss/nb:.4f} | acc={train_acc:.4f}")
+
+            val_mrr = _compute_val_mrr_gat(model, x_val, y_val, ei, device)
+            if es.step(val_mrr, model):
+                print(f"    [GAT-Phase2] Early stop at epoch {epoch} "
+                      f"(patience={es.patience}, best_mrr={es.best_mrr:.4f})")
+                break
+
+        es.restore(model)
+        model.eval()
+        return model
+
+    # No degenerate-convergence restarts: rely on EarlyStopping only.
+    return _run_training(0, False)
+
+
+def eval_gat(model, test_anom, edge_index, name_to_idx, device):
+    """Evaluate Late BN GAT."""
+    N = model.num_nodes
+    y_true, y_logits = [], []
+    ei = edge_index.to(device)
+
+    with torch.no_grad():
+        _ = model(test_anom[0].x.unsqueeze(0).to(device), ei)
+
+    latencies = []
+    with torch.no_grad():
+        for data in test_anom:
+            x = data.x.unsqueeze(0).to(device)
+            true_idx = name_to_idx[data.root_cause[0]]
+            t0 = time.perf_counter()
+            logits, _, _ = model(x, ei)
+            t1 = time.perf_counter()
+            latencies.append(t1 - t0)
+            y_true.append(true_idx)
+            y_logits.append(logits.squeeze(0).cpu().numpy())
+
+    tops, mrr = get_ranking_metrics(y_true, y_logits, top_ns=(1, 2, 5))
+    out = {
+        "top1": tops[1], "top2": tops[2], "top5": tops[5], "mrr": mrr,
+        "mean_latency_ms": np.mean(latencies) * 1000,
+        "std_latency_ms": np.std(latencies) * 1000,
+        "params": count_parameters(model), "k": N, "N": N,
+    }
+    out.update(_attach_rcaeval(y_true, y_logits))
+    return out
 
 
 # =====================================================================
@@ -470,11 +773,16 @@ def eval_v1(model, test_anom, edge_index, name_to_idx, device):
 
 def train_sta_compact(
     train_data, node_names, edge_index, device,
-    hidden_dim=32, k=5,
+    hidden_dim=32, k=None,  # None = auto via get_optimal_k(N)
     warmup_epochs=20, supervised_epochs=150,
     lr=1e-3, batch_size=256,
     nce_temperature=0.07,
     k_anneal_epochs=60,
+    skip_degenerate_check=False,
+    use_gib: bool = True,
+    mask_weighted_nce: bool = True,
+    selector_type: str = "ste",
+    temporal_encoder: str = "conv",
 ):
     """
     Train STA with k-annealing curriculum.
@@ -492,6 +800,11 @@ def train_sta_compact(
     name_to_idx = {n: i for i, n in enumerate(node_names)}
     N = len(node_names)
 
+    # Use get_optimal_k if k not explicitly provided
+    if k is None:
+        k = get_optimal_k(N)
+    print(f"    [STA] N={N}, k={k} (empirical optimal={get_optimal_k(N)})")
+
     healthy = [d for d in train_data if d.y is not None and d.y.item() == 0]
     anomalous = get_anomalies(train_data, name_to_idx)
 
@@ -507,15 +820,19 @@ def train_sta_compact(
     model = SelectThenAnalyze(
         num_features=num_features, hidden_dim=hidden_dim,
         num_nodes=N, k=k, gib_temperature=1.0,
+        selector_type=selector_type, temporal_encoder=temporal_encoder,
     ).to(device)
 
-    # ---- Phase 1: Short contrastive warmup (encoder only) ----
+    # ---- Phase 1: Contrastive warmup (InfoNCE on Z_subgraph + variational GIB) ----
     if warmup_epochs > 0:
         optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
         n_h, n_n = x_anchor.size(0), x_negative.size(0)
+        target_rate = k / N
+        model.set_temperature(2.0)
 
         for epoch in range(warmup_epochs):
             model.train()
+            beta = min(1.0, epoch / max(warmup_epochs // 2, 1)) * 0.3
             perm_h = torch.randperm(n_h, device=device)
             perm_n = torch.randperm(n_n, device=device)
 
@@ -525,19 +842,39 @@ def train_sta_compact(
                 B_h, B_n = idx_h.size(0), idx_n.size(0)
 
                 optimizer.zero_grad()
-                bei_h = model._batch_edge_index(ei, B_h)
-                bei_n = model._batch_edge_index(ei, B_n)
-                z_a = model.light_encoder(x_anchor[idx_h].view(B_h * N, num_features, -1), bei_h).view(B_h, N, -1).mean(1)
+
+                # Full forward — InfoNCE guided by mask-weighted embeddings
+                _, M_a, _, _ = model(x_anchor[idx_h], ei)
                 x_pos_aug = augment_positive(x_positive[idx_h], noise_sigma=0.05,
                                              jitter_shift=1, feature_mask_ratio=0.1)
-                z_p = model.light_encoder(x_pos_aug.view(B_h * N, num_features, -1), bei_h).view(B_h, N, -1).mean(1)
-                z_n = model.light_encoder(x_negative[idx_n].view(B_n * N, num_features, -1), bei_n).view(B_n, N, -1).mean(1)
+                _, M_p, _, _ = model(x_pos_aug, ei)
+                _, M_n, _, _ = model(x_negative[idx_n], ei)
 
-                loss = info_nce_loss(z_a, z_p, z_n, nce_temperature)
+                h_a_all = model.light_encoder(x_anchor[idx_h].view(B_h * N, num_features, -1)).view(B_h, N, -1)
+                h_p_all = model.light_encoder(x_pos_aug.view(B_h * N, num_features, -1)).view(B_h, N, -1)
+                h_n_all = model.light_encoder(x_negative[idx_n].view(B_n * N, num_features, -1)).view(B_n, N, -1)
+
+                if mask_weighted_nce:
+                    z_a = (h_a_all * M_a.unsqueeze(-1)).sum(1) / (M_a.sum(1, keepdim=True) + 1e-8)
+                    z_p = (h_p_all * M_p.unsqueeze(-1)).sum(1) / (M_p.sum(1, keepdim=True) + 1e-8)
+                    z_n = (h_n_all * M_n.unsqueeze(-1)).sum(1) / (M_n.sum(1, keepdim=True) + 1e-8)
+                else:
+                    z_a = h_a_all.mean(dim=1)
+                    z_p = h_p_all.mean(dim=1)
+                    z_n = h_n_all.mean(dim=1)
+
+                l_nce = info_nce_loss(z_a, z_p, z_n, nce_temperature)
+                if use_gib:
+                    l_reg = variational_gib_loss(torch.cat([M_a, M_p, M_n], dim=0), target_rate)
+                else:
+                    l_reg = torch.cat([M_a, M_p, M_n], dim=0).abs().sum(dim=-1).mean()
+
+                loss = l_nce + beta * l_reg
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 optimizer.step()
 
+        model.set_temperature(1.0)
         print(f"    [Phase1] {warmup_epochs} warmup epochs done | last_nce={loss.item():.4f}")
 
     # ---- Phase 2: Supervised with k-annealing ----
@@ -556,11 +893,15 @@ def train_sta_compact(
 
     # Full LR for all parameters (encoder needs to adapt fully for node selection)
     opt_sup = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
-    sch_sup = torch.optim.lr_scheduler.CosineAnnealingLR(opt_sup, T_max=supervised_epochs, eta_min=1e-5)
-    es = EarlyStopping(patience=30)
+    sch_sup = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+        opt_sup, T_0=50, T_mult=2, eta_min=1e-5)
+    # MRR-based early stopping (patience=75)
+    es = EarlyStopping(patience=75)
 
     k_warm = min(N // 2, N - 1)  # start with large k
-    k_target = k
+    k_target = k  # already the optimal k from get_optimal_k()
+
+    # Degenerate-convergence detection is only a warning; training continues.
 
     for epoch in range(supervised_epochs):
         model.train()
@@ -609,18 +950,34 @@ def train_sta_compact(
             nb += 1
 
         sch_sup.step()
+        train_acc = ep_correct / n_train_sta
+
+        degen_thresh = max(5.0 / N, 0.05)
+        if epoch == 50 and train_acc < degen_thresh and not skip_degenerate_check:
+            print(f"    [STA-Phase2] ⚠️  Epoch 50 acc={train_acc:.3f} < {degen_thresh:.3f} — "
+                  f"slow/degenerate-looking convergence (no restart).")
+
         if epoch % 30 == 0 or epoch == supervised_epochs - 1:
             print(f"    [Phase2] Ep {epoch:03d}/{supervised_epochs} | loss={ep_loss/nb:.4f} | "
-                  f"acc={ep_correct/n_train_sta:.4f} | RC-in-top-{k_cur}={ep_selected/n_train_sta:.4f} | k={k_cur}")
+                  f"acc={train_acc:.4f} | RC-in-top-{k_cur}={ep_selected/n_train_sta:.4f} | k={k_cur}")
 
-        # Early stopping on validation set (only after k-annealing completes)
+        # MRR-based early stopping (starts after k-annealing to ensure stable k)
         if epoch >= k_anneal_epochs:
             model.eval()
             with torch.no_grad():
-                vl_full, _, _, vl_sel = model(x_val_sta, ei)
-                val_loss = F.cross_entropy(vl_sel, y_val_sta).item()
-            if es.step(val_loss, model):
-                print(f"    [Phase2] Early stop at epoch {epoch} (patience={es.patience})")
+                _, _, val_topk, val_sel = model(x_val_sta, ei)
+                # Compute val MRR on selector logits
+                val_mrr = 0.0
+                val_sel_np = val_sel.cpu().numpy()
+                y_val_np = y_val_sta.cpu().numpy()
+                for i in range(len(y_val_np)):
+                    ranked = np.argsort(val_sel_np[i])[::-1]
+                    rk = int(np.where(ranked == y_val_np[i])[0][0]) + 1
+                    val_mrr += 1.0 / rk
+                val_mrr /= len(y_val_np)
+            if es.step(val_mrr, model):
+                print(f"    [Phase2] Early stop at epoch {epoch} "
+                      f"(patience={es.patience}, best_mrr={es.best_mrr:.4f})")
                 break
 
     # Reset to target k for inference
@@ -662,13 +1019,9 @@ def eval_sta(model, test_anom, edge_index, name_to_idx, device):
             # Primary signal: selector logits (trained as N-way classifier)
             sel = sel_logits.squeeze(0)  # [N]
 
-            # Boost: for the k selected nodes, add the scorer's opinion
-            # scorer logits are -inf for non-selected, finite for selected
+            # Gated fusion: only adjust selected nodes with scorer signal.
             scorer = logits_full.squeeze(0)  # [N]
-            # Replace -inf with 0 for safe addition, then scale
-            scorer_safe = scorer.clone()
-            scorer_safe[scorer == float('-inf')] = 0.0
-            combined = sel + 0.5 * scorer_safe
+            combined = gated_selector_scorer_fusion(sel, scorer, top_k[0], gamma=0.35)
 
             y_true.append(true_idx)
             y_logits_combined.append(combined.cpu().numpy())
@@ -679,7 +1032,7 @@ def eval_sta(model, test_anom, edge_index, name_to_idx, device):
 
     tops, mrr = get_ranking_metrics(y_true, y_logits_combined, top_ns=(1, 2, 5))
     tops_sel, mrr_sel = get_ranking_metrics(y_true, y_logits_selector, top_ns=(1, 2, 5))
-    return {
+    out = {
         "top1": tops[1], "top2": tops[2], "top5": tops[5], "mrr": mrr,
         "sel_top1": tops_sel[1], "sel_top2": tops_sel[2], "sel_top5": tops_sel[5],
         "sel_mrr": mrr_sel,
@@ -690,6 +1043,14 @@ def eval_sta(model, test_anom, edge_index, name_to_idx, device):
         "params": count_parameters(model),
         "k": k, "N": N,
     }
+    out.update(_attach_rcaeval(y_true, y_logits_combined))
+    split = split_logits_by_failure_type(test_anom, y_true, y_logits_combined)
+    for ft in ("hard", "gray", "cascade"):
+        if split[ft]["y_true"]:
+            ft_m = RCAEvalMetrics().compute(split[ft]["y_true"], split[ft]["y_logits"])
+            out[f"rcaeval_{ft}_avg1"] = ft_m["avg1"]
+            out[f"rcaeval_{ft}_mrr"] = ft_m["mrr"]
+    return out
 
 
 def eval_gcn_baseline(model, test_anom, edge_index, name_to_idx, N):
@@ -712,12 +1073,14 @@ def eval_gcn_baseline(model, test_anom, edge_index, name_to_idx, N):
             y_true.append(name_to_idx[data.root_cause[0]])
             y_logits.append(lo[0].cpu().numpy())
     tops, mrr = get_ranking_metrics(y_true, y_logits, top_ns=(1, 2, 5))
-    return {
+    out = {
         "top1": tops[1], "top2": tops[2], "top5": tops[5], "mrr": mrr,
         "mean_latency_ms": np.mean(latencies) * 1000,
         "std_latency_ms": np.std(latencies) * 1000,
         "params": count_parameters(model), "k": N, "N": N,
     }
+    out.update(_attach_rcaeval(y_true, y_logits))
+    return out
 
 
 def eval_mlp_baseline(model, test_anom, name_to_idx, N):
@@ -739,7 +1102,9 @@ def eval_mlp_baseline(model, test_anom, name_to_idx, N):
             y_true.append(name_to_idx[data.root_cause[0]])
             y_logits.append(lo[0].cpu().numpy())
     tops, mrr = get_ranking_metrics(y_true, y_logits, top_ns=(1, 2, 5))
-    return {"top1": tops[1], "top2": tops[2], "top5": tops[5], "mrr": mrr, "params": count_parameters(model)}
+    out = {"top1": tops[1], "top2": tops[2], "top5": tops[5], "mrr": mrr, "params": count_parameters(model)}
+    out.update(_attach_rcaeval(y_true, y_logits))
+    return out
 
 
 def eval_rf_baseline(clf, test_anom, name_to_idx, N):
@@ -750,7 +1115,10 @@ def eval_rf_baseline(clf, test_anom, name_to_idx, N):
     for i, c in enumerate(clf.classes_):
         logits[:, c] = probs[:, i]
     tops, mrr = get_ranking_metrics(y_test, logits, top_ns=(1, 2, 5))
-    return {"top1": tops[1], "top2": tops[2], "top5": tops[5], "mrr": mrr}
+    y_logits_list = [logits[i] for i in range(len(y_test))]
+    out = {"top1": tops[1], "top2": tops[2], "top5": tops[5], "mrr": mrr}
+    out.update(_attach_rcaeval(y_test, y_logits_list))
+    return out
 
 
 # =====================================================================
@@ -783,6 +1151,11 @@ def print_results_table(results: Dict[str, dict], title: str):
     for name, m in results.items():
         if m is None:
             print(f"  {name:<38} | {'N/A':>7}")
+            continue
+        if m.get("missing_runs") or m.get("top1") is None:
+            print(f"  {name:<38} | {'N/A':>7} | {'N/A':>7} | {'N/A':>7} | {'N/A':>7}"
+                  + (f" | {'N/A':>7}" if has_sel else "")
+                  + (f" | {'N/A':>9} | {'—':>9}" if has_lat else ""))
             continue
         if has_std and "top1_std" in m:
             row = (f"  {name:<38} | {m['top1']:.4f}" + (f"\u00b1{m['top1_std']:.3f}" if m.get('top1_std') else "") +
@@ -819,16 +1192,23 @@ def print_latency_scaling(scaling_results):
 
 def aggregate_seeds(runs: List[dict]) -> dict:
     """Aggregate metrics over multiple seed runs into mean ± std."""
+    if not runs:
+        return {
+            "top1": None, "top2": None, "top5": None, "mrr": None,
+            "selection_rate": None, "mean_latency_ms": None,
+            "params": 0, "missing_runs": True,
+        }
     if len(runs) == 1:
         return runs[0]
     keys = ["top1", "top2", "top5", "mrr", "selection_rate", "mean_latency_ms"]
+    rcaeval_keys = sorted({k for r in runs for k in r if k.startswith("rcaeval_")})
+    keys = keys + rcaeval_keys
     agg = {}
     for k in keys:
-        vals = [r[k] for r in runs if k in r]
+        vals = [r[k] for r in runs if k in r and r[k] is not None]
         if vals:
             agg[k] = float(np.mean(vals))
             agg[f"{k}_std"] = float(np.std(vals))
-    # Copy non-metric fields from first run
     for k in ["params", "k", "N", "n_test"]:
         if k in runs[0]:
             agg[k] = runs[0][k]
@@ -902,6 +1282,7 @@ def main(args):
     )
 
     all_scaling = []
+    json_runs = []
 
     for cfg in configs:
         N = cfg["N"]
@@ -922,10 +1303,46 @@ def main(args):
         )
         print(f"  Generated {len(dataset)} samples in {time.time()-t0:.1f}s")
 
+        # Causal / hybrid graph construction
+        graph_type = getattr(args, "graph_type", "structural")
+        edge_weights = None
+        if graph_type in ("causal", "hybrid"):
+            healthy_windows = [d for d in dataset if d.y.item() == 0]
+            if healthy_windows:
+                # Build [T, N] healthy matrix by concatenating temporal node means.
+                xh_blocks = [d.x.mean(dim=1).transpose(0, 1) for d in healthy_windows]  # [W, N]
+                X_h = torch.cat(xh_blocks, dim=0).cpu().numpy()
+                builder = CausalGraphBuilder(method=graph_type)
+                cg_result = builder.build(X_h, edge_index)
+                print(f"  Causal graph: method={cg_result.method_used}, "
+                      f"edges={cg_result.edge_index.size(1)}, "
+                      f"CS={cg_result.causal_sufficiency_score:.2f}")
+                edge_index = cg_result.edge_index
+                edge_weights = cg_result.edge_weights
+
         name_to_idx = {n: i for i, n in enumerate(node_names)}
         train_data, test_data = stratified_split(dataset, name_to_idx)
+        train_data_raw, test_data_raw = train_data, test_data
+        train_data = _apply_drift_filter(
+            train_data,
+            enable_drift=args.enable_drift,
+            delta=args.drift_delta,
+            cooldown_steps=args.drift_cooldown_steps,
+        )
+        test_data = _apply_drift_filter(
+            test_data,
+            enable_drift=args.enable_drift,
+            delta=args.drift_delta,
+            cooldown_steps=args.drift_cooldown_steps,
+        )
+        if not train_data or not test_data:
+            # Fallback to unfiltered split when drift cooldown removes too many windows.
+            train_data, test_data = train_data_raw, test_data_raw
 
-        # NOTE: Normalization disabled — simulated data already has controlled scale.
+        if not args.no_normalize:
+            mean, std = compute_norm_stats(train_data)
+            normalize_dataset(train_data, mean, std)
+            normalize_dataset(test_data, mean, std)
 
         train_anom = get_anomalies(train_data, name_to_idx)
         test_anom = get_anomalies(test_data, name_to_idx)
@@ -936,23 +1353,28 @@ def main(args):
         print(f"  Test:  {len(test_data)} ({len(test_anom)} anomalies)")
 
         # Collect multi-seed results
-        sta_runs, late_runs, gcn_runs, mlp_runs, rf_runs = [], [], [], [], []
+        sta_runs, late_runs, gat_runs, gcn_runs, mlp_runs, rf_runs = [], [], [], [], [], []
 
         for seed_idx, seed in enumerate(SEEDS):
             print(f"\n  === Seed {seed_idx+1}/{NUM_SEEDS} (seed={seed}) ===")
-            torch.manual_seed(seed)
-            np.random.seed(seed)
+            set_all_seeds(seed)
 
             # ---- STA ----
-            print(f"\n  -- Training SelectThenAnalyze (k={k}) --")
+            # k=None means get_optimal_k(N) is used automatically
+            k_opt = get_optimal_k(N)
+            print(f"\n  -- Training SelectThenAnalyze (k={k_opt}, auto from get_optimal_k) --")
             t0 = time.time()
             sta_model = train_sta_compact(
                 train_data, node_names, edge_index, device,
-                hidden_dim=hidden, k=k,
+                hidden_dim=hidden, k=k_opt,
                 warmup_epochs=args.sta_warmup_epochs,
                 supervised_epochs=args.supervised_epochs,
                 batch_size=args.batch_size,
                 k_anneal_epochs=args.sta_k_anneal_epochs,
+                use_gib=not args.no_gib,
+                mask_weighted_nce=not args.no_mask_weighted_nce,
+                selector_type=args.selector_type,
+                temporal_encoder=args.temporal_encoder,
             )
             print(f"  STA training completed in {time.time()-t0:.1f}s")
             sta_runs.append(eval_sta(sta_model, test_anom, edge_index, name_to_idx, device))
@@ -960,15 +1382,39 @@ def main(args):
             # ---- Late Bottleneck (parallel approach) ----
             print(f"\n  -- Training STGCN+GIB (Late Bottleneck) --")
             t0 = time.time()
-            late_model = train_v1_compact(
-                train_data, node_names, edge_index, device,
-                hidden_dim=hidden,
-                contrastive_epochs=args.late_contrastive_epochs,
-                supervised_epochs=args.supervised_epochs,
-                batch_size=args.batch_size,
-            )
-            print(f"  Late Bottleneck training completed in {time.time()-t0:.1f}s")
-            late_runs.append(eval_v1(late_model, test_anom, edge_index, name_to_idx, device))
+            try:
+                late_model = train_v1_compact(
+                    train_data, node_names, edge_index, device,
+                    hidden_dim=hidden,
+                    contrastive_epochs=args.late_contrastive_epochs,
+                    supervised_epochs=args.supervised_epochs,
+                    batch_size=args.batch_size,
+                    edge_weights=edge_weights,
+                    cascade_loss_weight=args.cascade_loss_weight,
+                )
+                print(f"  Late Bottleneck training completed in {time.time()-t0:.1f}s")
+                late_runs.append(eval_v1(late_model, test_anom, edge_index, name_to_idx, device))
+            except RuntimeError as e:
+                print(f"  ⚠️  Late BN failed: {e}")
+
+            # ---- Late Bottleneck GATv2 ----
+            if not args.skip_late_gat:
+                print(f"\n  -- Training Late Bottleneck (GATv2, no GIB) --")
+                t0 = time.time()
+                try:
+                    gat_model = train_gat_compact(
+                        train_data, node_names, edge_index, device,
+                        hidden_dim=hidden,
+                        contrastive_epochs=args.late_contrastive_epochs,
+                        supervised_epochs=args.supervised_epochs,
+                        batch_size=args.batch_size,
+                        edge_weights=edge_weights,
+                        cascade_loss_weight=args.cascade_loss_weight,
+                    )
+                    print(f"  Late GAT training completed in {time.time()-t0:.1f}s")
+                    gat_runs.append(eval_gat(gat_model, test_anom, edge_index, name_to_idx, device))
+                except RuntimeError as e:
+                    print(f"  ⚠️  Late GAT failed: {e}")
 
             # ---- Baselines ----
             print(f"\n  -- Training Full-Graph GCN baseline --")
@@ -1005,6 +1451,9 @@ def main(args):
         r_late = aggregate_seeds(late_runs)
         results[f"Late Bottleneck STGCN+GIB (N={N})"] = r_late
 
+        if not args.skip_late_gat:
+            results[f"Late Bottleneck GATv2 (N={N})"] = aggregate_seeds(gat_runs)
+
         r_gcn = aggregate_seeds(gcn_runs)
         results[f"Full-Graph GCN (N={N})"] = r_gcn
 
@@ -1017,15 +1466,53 @@ def main(args):
         # ---- Print results ----
         print_results_table(results, f"RESULTS FOR N={N} (mean over {NUM_SEEDS} seeds)")
 
+        # Regression vs reference Top-1
+        print("\n  --- Regression check (vs reference Top-1, Δ>0.5% triggers ⚠️) ---")
+        short_map = {
+            f"STA Select-then-Analyze (k={k})": "STA",
+            f"Late Bottleneck STGCN+GIB (N={N})": "LateBN_GIB",
+            f"Full-Graph GCN (N={N})": "FullGraphGCN",
+            f"Late Bottleneck GATv2 (N={N})": "LateBN_GAT",
+        }
+        for disp, m in results.items():
+            sk = short_map.get(disp)
+            if sk is None or sk not in REFERENCE_TOP1 or N not in REFERENCE_TOP1[sk]:
+                continue
+            ref = REFERENCE_TOP1[sk][N]
+            top1 = m.get("top1")
+            if m.get("missing_runs") or top1 is None:
+                print(f"  — {disp}: no metric (run missing or training failed)")
+                continue
+            if _regression_flag(sk, N, top1):
+                print(f"  ⚠️  {disp}: Top-1={top1:.4f} ref={ref:.4f} (regression > 0.5%)")
+            else:
+                print(f"  OK {disp}: Top-1={top1:.4f} ref={ref:.4f}")
+
+        json_runs.append({
+            "N": N,
+            "k_map_entry": k,
+            "seeds": SEEDS,
+            "no_normalize": args.no_normalize,
+            "skip_late_gat": args.skip_late_gat,
+            "metrics": results,
+            "reference_top1": {m: REFERENCE_TOP1[m].get(N) for m in REFERENCE_TOP1},
+        })
+
         # ---- Collect latency for scaling plot ----
-        sta_lat = r_sta.get("mean_latency_ms", 0)
-        gcn_lat = r_gcn.get("mean_latency_ms", 0)
+        sta_lat = r_sta.get("mean_latency_ms") or 0
+        gcn_lat = r_gcn.get("mean_latency_ms") or 0
         all_scaling.append({"N": N, "k": k, "v3_lat": sta_lat, "gcn_lat": gcn_lat,
                             "v3_params": r_sta.get("params", 0), "gcn_params": r_gcn.get("params", 0)})
 
     # ---- Latency scaling summary ----
     if len(all_scaling) > 1:
         print_latency_scaling(all_scaling)
+
+    if getattr(args, "output_json", None):
+        out_path = args.output_json
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump({"runs": json_runs, "reference_top1": REFERENCE_TOP1}, f, indent=2)
+        print(f"\n  Wrote JSON results to {out_path}")
 
     print_header("BENCHMARK COMPLETE", char="*")
 
@@ -1068,5 +1555,34 @@ if __name__ == "__main__":
                         help="k-annealing epochs for STA")
     parser.add_argument("--baseline-epochs", type=int, default=150,
                         help="Training epochs for GCN/MLP baselines")
+    parser.add_argument("--no-normalize", action="store_true",
+                        help="Disable z-score normalization (train stats only when enabled)")
+    parser.add_argument("--graph-type", type=str, default="structural",
+                        choices=["structural", "causal", "hybrid"],
+                        help="Graph construction: structural (BA), causal (PC/Granger), hybrid (union)")
+    parser.add_argument("--cascade-loss-weight", type=float, default=0.0,
+                        help="Weight for optional causal cascade regularization in Late BN/GAT")
+    parser.add_argument("--enable-drift", action="store_true",
+                        help="Enable ADWIN drift cooldown filtering before training/eval split")
+    parser.add_argument("--drift-delta", type=float, default=0.002,
+                        help="ADWIN delta for drift detector")
+    parser.add_argument("--drift-cooldown-steps", type=int, default=30,
+                        help="Cooldown steps for drift detector filter")
+    parser.add_argument("--skip-late-gat", action="store_true",
+                        help="Skip Late Bottleneck GATv2 training/eval (faster)")
+    parser.add_argument("--output-json", type=str, default=None,
+                        help="Write aggregated metrics to this JSON path")
+
+    # Ablation flags for STA
+    parser.add_argument("--no-gib", action="store_true",
+                        help="[Ablation] Use L1 instead of variational GIB in warmup")
+    parser.add_argument("--no-mask-weighted-nce", action="store_true",
+                        help="[Ablation] Use mean-pooled H_fast for InfoNCE instead of mask-weighted")
+    parser.add_argument("--selector-type", type=str, default="ste",
+                        choices=["ste", "hierarchical"],
+                        help="Selector type for STA")
+    parser.add_argument("--temporal-encoder", type=str, default="conv",
+                        choices=["conv", "s4"],
+                        help="Temporal encoder type for STA deep path")
 
     main(parser.parse_args())
