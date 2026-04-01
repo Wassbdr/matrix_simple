@@ -13,6 +13,14 @@ Why GATv2 over GIB at N=100:
     without any L1/L0 sparsity constraint — the network learns which nodes
     matter contextually. This is the approach of DynaCausal (ICSE 2025).
 
+Design Decision — Why no GIB in GATv2:
+    GIB (Graph Information Bottleneck) uses a Bernoulli mask to enforce
+    explicit sparsity on node representations. GATv2's attention mechanism
+    already provides implicit sparsity through learned attention weights.
+    Stacking GIB on top of GATv2 introduces conflicting inductive biases
+    (hard masking vs soft attention) and tends to hurt optimization in this
+    setting, so this variant keeps pure GATv2 attention only.
+
 Architecture:
     1. TemporalConvBlock  (same as SpatioTemporalRCA)
     2. GATv2Conv x2       (replace GCNConv + GIB with soft attention)

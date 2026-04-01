@@ -4,6 +4,9 @@ validation_protocol.py — Fixed, repeatable validation runs for RCAEval.
 
 Runs a small matrix of configs and writes JSON outputs under rca_pipeline/validation_runs/.
 Then prints a compact summary table (Avg@1, MRR, NDCG@3) per dataset/method.
+
+Sockshop: only ``metrics_only`` is executed; MM configs write a stub JSON (skipped) — see
+docs/PAPER_BENCHMARKS.md.
 """
 
 from __future__ import annotations
@@ -38,8 +41,10 @@ class ProtocolPreset:
 PRESETS: Dict[str, ProtocolPreset] = {
     # Fast sanity check (quick iteration)
     "smoke": ProtocolPreset("smoke", "42,123", "20", "20"),
-    # Reference comparison (isoperimeter with historical long runs)
-    "long": ProtocolPreset("long", "42,123,7", "100", "90"),
+    # Reference comparison — 5 seeds for more stable CIs
+    "long": ProtocolPreset("long", "42,123,7,1337,2025", "100", "0"),
+    # Extended: 10 seeds for paper-grade statistical power
+    "paper": ProtocolPreset("paper", "42,123,7,1337,2025,314,555,888,999,4242", "100", "0"),
 }
 
 
@@ -49,6 +54,30 @@ RUNS: List[RunCfg] = [
     RunCfg("trace_prior", ["--use-mm", "--mm-trace-prior", "--mm-strict"]),
     RunCfg("full_mm_strict", ["--use-mm", "--mm-strict"]),
 ]
+
+# Multimodal runs are only defined for datasets with reliable logs/traces in our protocol.
+# sockshop is excluded from MM (see docs/PAPER_BENCHMARKS.md).
+MM_RUN_NAMES = frozenset({"traces_only", "trace_prior", "full_mm_strict"})
+
+
+def _build_mm_skipped_stub(dataset_name: str) -> Dict:
+    reason = (
+        "Multimodal RCAEval runs are not part of the paper protocol for sockshop "
+        "(trace coverage insufficient for strict MM); compare trainticket and "
+        "online-boutique for MM."
+    )
+    return {
+        dataset_name: {
+            "_skipped": True,
+            "_reason": reason,
+            "config": {
+                "use_mm": True,
+                "mm_strict": True,
+                "mm_dataset_status": "skipped_with_reason",
+                "mm_dataset_reason": reason,
+            },
+        }
+    }
 
 
 def _run(cmd: List[str]) -> None:
@@ -95,6 +124,16 @@ def main() -> None:
         results[ds] = {}
         for cfg in RUNS:
             out_json = OUT_DIR / f"{ds}__{cfg.name}.json"
+            if ds == "sockshop" and cfg.name in MM_RUN_NAMES:
+                stub = _build_mm_skipped_stub(ds)
+                out_json.write_text(json.dumps(stub, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+                print(
+                    f"\n=== SKIP {ds} :: {cfg.name} "
+                    f"(MM not in scope for sockshop; stub written to {out_json.name}) ==="
+                )
+                results[ds][cfg.name] = {"STA": None, "GATv2": None}
+                continue
+
             cmd = [
                 sys.executable,
                 "rca_pipeline/benchmark_real.py",
@@ -104,13 +143,13 @@ def main() -> None:
                 str(epochs),
                 "--seeds",
                 str(seeds),
-                "--max-cases",
-                str(max_cases),
                 "--sta-contrastive-warmup",
                 str(sta_warmup),
                 "--output-json",
                 str(out_json),
             ]
+            if int(max_cases) > 0:
+                cmd.extend(["--max-cases", str(max_cases)])
             if drift:
                 cmd.append("--enable-drift")
             cmd.extend(cfg.extra_args)

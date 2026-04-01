@@ -29,9 +29,12 @@ from torch_geometric.nn import GCNConv
 from typing import Optional, Tuple
 import logging
 
-from model_sta import (
-    STESelector, DeepTemporalBlock, DeepSpatialBlock,
-    SubgraphScorer, extract_subgraph_vectorized,
+from rca_pipeline.model_sta import (
+    STESelector,
+    DeepTemporalBlock,
+    DeepSpatialBlock,
+    SubgraphScorer,
+    extract_subgraph_vectorized,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")

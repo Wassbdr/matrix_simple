@@ -1,0 +1,140 @@
+{
+  "generated_at_utc": "2026-04-01T12:36:27.667737+00:00",
+  "source_artifacts": {
+    "metrics_only": "rca_pipeline/benchmark_real_long_prepublish.json",
+    "full_mm_strict": "rca_pipeline/benchmark_real_long_mm_strict_prepublish.json"
+  },
+  "protocol_rows": [
+    {
+      "dataset": "trainticket",
+      "mode": "metrics_only",
+      "seeds": "42,123,7",
+      "epochs": "100",
+      "max_cases": "90",
+      "split_mode": "varying_split_by_run_seed",
+      "drift": "on",
+      "normalized": "no",
+      "mm_status": "not_applicable",
+      "protocol_source": "fallback_inferred"
+    },
+    {
+      "dataset": "sockshop",
+      "mode": "metrics_only",
+      "seeds": "42,123,7",
+      "epochs": "100",
+      "max_cases": "90",
+      "split_mode": "varying_split_by_run_seed",
+      "drift": "on",
+      "normalized": "no",
+      "mm_status": "not_applicable",
+      "protocol_source": "fallback_inferred"
+    },
+    {
+      "dataset": "online-boutique",
+      "mode": "metrics_only",
+      "seeds": "42,123,7",
+      "epochs": "100",
+      "max_cases": "90",
+      "split_mode": "varying_split_by_run_seed",
+      "drift": "on",
+      "normalized": "no",
+      "mm_status": "not_applicable",
+      "protocol_source": "fallback_inferred"
+    },
+    {
+      "dataset": "trainticket",
+      "mode": "full_mm_strict",
+      "seeds": "42,123,7",
+      "epochs": "100",
+      "max_cases": "90",
+      "split_mode": "varying_split_by_run_seed",
+      "drift": "on",
+      "normalized": "no",
+      "mm_status": "comparable",
+      "protocol_source": "fallback_inferred"
+    },
+    {
+      "dataset": "sockshop",
+      "mode": "full_mm_strict",
+      "seeds": "42,123,7",
+      "epochs": "100",
+      "max_cases": "90",
+      "split_mode": "varying_split_by_run_seed",
+      "drift": "on",
+      "normalized": "no",
+      "mm_status": "skipped_with_reason",
+      "protocol_source": "fallback_inferred"
+    },
+    {
+      "dataset": "online-boutique",
+      "mode": "full_mm_strict",
+      "seeds": "42,123,7",
+      "epochs": "100",
+      "max_cases": "90",
+      "split_mode": "varying_split_by_run_seed",
+      "drift": "on",
+      "normalized": "no",
+      "mm_status": "comparable",
+      "protocol_source": "fallback_inferred"
+    }
+  ],
+  "published_baselines": [
+    {
+      "method": "BARO",
+      "avg1": 0.71,
+      "avg3": 0.82,
+      "avg5": 0.86,
+      "mrr": 0.77,
+      "ndcg3": 0.75,
+      "ndcg5": 0.79
+    },
+    {
+      "method": "CausaRank",
+      "avg1": 0.52,
+      "avg3": 0.7,
+      "avg5": 0.79,
+      "mrr": 0.63,
+      "ndcg3": 0.59,
+      "ndcg5": 0.66
+    },
+    {
+      "method": "E-Diagnosis",
+      "avg1": 0.64,
+      "avg3": 0.77,
+      "avg5": 0.83,
+      "mrr": 0.72,
+      "ndcg3": 0.7,
+      "ndcg5": 0.74
+    },
+    {
+      "method": "MicroRCA",
+      "avg1": 0.49,
+      "avg3": 0.68,
+      "avg5": 0.77,
+      "mrr": 0.6,
+      "ndcg3": 0.57,
+      "ndcg5": 0.63
+    }
+  ],
+  "comparability_findings": [
+    {
+      "claim": "Ours vs published RCAEval baselines (metrics-only)",
+      "evidence_in_repo": "Baseline values available, but no per-dataset split/preprocessing signatures.",
+      "verdict": "partially_comparable",
+      "required_for_full_isoperimeter": [
+        "Published baseline split protocol per dataset",
+        "Published preprocessing/normalization details",
+        "Case filtering policy alignment (max_cases, exclusions)"
+      ]
+    },
+    {
+      "claim": "Ours MM strict vs published baselines",
+      "evidence_in_repo": "Published baselines in repo are not multimodal and have no MM protocol signature.",
+      "verdict": "not_isoperimeter",
+      "required_for_full_isoperimeter": [
+        "Published multimodal baseline references with matching modality scope",
+        "Dataset-level MM comparability status for all compared datasets"
+      ]
+    }
+  ]
+}

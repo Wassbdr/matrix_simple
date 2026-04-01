@@ -21,10 +21,11 @@ Usage:
     metrics.print_summary(results)
 """
 
-import numpy as np
 import json
 import logging
-from typing import List, Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
+
+import numpy as np
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -294,32 +295,122 @@ def compare_with_rcaeval_baselines(
     print(f"{'='*75}\n")
 
 
+def top1_per_service_detailed(
+    y_true: List[int],
+    y_pred_logits: List[np.ndarray],
+    node_names: Optional[List[str]] = None,
+) -> Dict[str, Union[Dict[str, float], Dict[str, int], float]]:
+    """
+    Detailed per-service Top-1 summary.
+
+    Returns a payload with:
+      - per_service_top1: Top-1 accuracy per service
+      - per_service_counts: number of samples per service
+      - per_service_hits: number of Top-1 hits per service
+      - weighted_top1: micro-aggregated Top-1 across services
+    """
+    from collections import defaultdict
+
+    counts: Dict[int, int] = defaultdict(int)
+    hits: Dict[int, int] = defaultdict(int)
+
+    for true_idx, logits in zip(y_true, y_pred_logits):
+        true_int = int(true_idx)
+        counts[true_int] += 1
+        pred = int(np.argmax(logits))
+        if pred == true_int:
+            hits[true_int] += 1
+
+    per_service_top1: Dict[str, float] = {}
+    per_service_counts: Dict[str, int] = {}
+    per_service_hits: Dict[str, int] = {}
+
+    total_count = 0
+    total_hits = 0
+    for idx in sorted(counts.keys()):
+        name = node_names[idx] if node_names and idx < len(node_names) else str(idx)
+        c = int(counts[idx])
+        h = int(hits[idx])
+        per_service_counts[name] = c
+        per_service_hits[name] = h
+        per_service_top1[name] = (h / c) if c > 0 else 0.0
+        total_count += c
+        total_hits += h
+
+    weighted_top1 = (total_hits / total_count) if total_count > 0 else 0.0
+    return {
+        "per_service_top1": per_service_top1,
+        "per_service_counts": per_service_counts,
+        "per_service_hits": per_service_hits,
+        "weighted_top1": weighted_top1,
+    }
+
+
 def top1_per_service(
     y_true: List[int],
     y_pred_logits: List[np.ndarray],
     node_names: Optional[List[str]] = None,
 ) -> Dict[str, float]:
     """
-    Per-service Top-1 accuracy — identifies root causes with high variance.
+    Backward-compatible per-service Top-1 helper.
 
     Returns:
         dict mapping service name (or index) to Top-1 accuracy.
     """
-    from collections import defaultdict
-    counts: Dict[int, int] = defaultdict(int)
-    hits: Dict[int, int] = defaultdict(int)
+    detailed = top1_per_service_detailed(y_true, y_pred_logits, node_names)
+    return detailed["per_service_top1"]
 
-    for true_idx, logits in zip(y_true, y_pred_logits):
-        counts[true_idx] += 1
-        pred = int(np.argmax(logits))
-        if pred == true_idx:
-            hits[true_idx] += 1
 
-    result = {}
-    for idx in sorted(counts.keys()):
-        name = node_names[idx] if node_names and idx < len(node_names) else str(idx)
-        result[name] = hits[idx] / counts[idx] if counts[idx] > 0 else 0.0
-    return result
+def bootstrap_ci(
+    values: List[float],
+    n_boot: int = 2000,
+    alpha: float = 0.05,
+    seed: int = 42,
+    min_values_for_reliable_seed_bootstrap: int = 10,
+) -> Dict[str, Union[float, int, bool]]:
+    """
+    Non-parametric bootstrap CI for a scalar metric.
+
+    When ``values`` are per-seed aggregates (typical n=3), the interval is
+    **not** statistically stable; ``seed_level_bootstrap_reliable`` is False.
+
+    Returns:
+        dict with keys: mean, ci_low, ci_high, n, seed_level_bootstrap_reliable
+    """
+    if not values:
+        return {
+            "mean": float("nan"),
+            "ci_low": float("nan"),
+            "ci_high": float("nan"),
+            "n": 0,
+            "seed_level_bootstrap_reliable": False,
+        }
+    rng = np.random.default_rng(seed)
+    arr = np.asarray(values, dtype=np.float64)
+    n = int(arr.size)
+    reliable = n >= int(min_values_for_reliable_seed_bootstrap)
+    if n <= 1:
+        v = float(arr[0])
+        return {
+            "mean": v,
+            "ci_low": v,
+            "ci_high": v,
+            "n": n,
+            "seed_level_bootstrap_reliable": reliable,
+        }
+    boots = np.empty(int(n_boot), dtype=np.float64)
+    for i in range(int(n_boot)):
+        idx = rng.integers(0, n, size=n)
+        boots[i] = float(np.mean(arr[idx]))
+    low = float(np.quantile(boots, alpha / 2.0))
+    high = float(np.quantile(boots, 1.0 - alpha / 2.0))
+    return {
+        "mean": float(np.mean(arr)),
+        "ci_low": low,
+        "ci_high": high,
+        "n": n,
+        "seed_level_bootstrap_reliable": reliable,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -337,7 +428,7 @@ if __name__ == "__main__":
         data = json.load(f)
 
     y_true = data["y_true"]
-    y_logits = [np.array(l) for l in data["y_logits"]]
+    y_logits = [np.array(row) for row in data["y_logits"]]
 
     m = RCAEvalMetrics()
     results = m.compute(y_true, y_logits)

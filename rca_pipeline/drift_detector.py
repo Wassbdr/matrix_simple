@@ -477,7 +477,7 @@ class TestTimeAdaptation:
                         module.num_batches_tracked.copy_(state['num_batches_tracked'])
 
     def should_adapt(self) -> bool:
-        return self.drift_detector.check_drift()
+        return self.drift_detector.is_in_cooldown()
 
     def adapt(self, recent_windows, edge_index):
         """

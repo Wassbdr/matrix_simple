@@ -1,0 +1,273 @@
+{
+  "trainticket": {
+    "STA": {
+      "avg1": 0.6666666666666666,
+      "avg1_std": 0.0,
+      "avg3": 1.0,
+      "avg3_std": 0.0,
+      "avg5": 1.0,
+      "avg5_std": 0.0,
+      "mrr": 0.8333333333333334,
+      "mrr_std": 0.0,
+      "ndcg3": 0.8769765845238192,
+      "ndcg3_std": 0.0,
+      "ndcg5": 0.8769765845238192,
+      "ndcg5_std": 0.0,
+      "ci95": {
+        "avg1": {
+          "mean": 0.6666666666666666,
+          "ci_low": 0.6666666666666666,
+          "ci_high": 0.6666666666666666,
+          "n": 1,
+          "seed_level_bootstrap_reliable": false
+        },
+        "avg3": {
+          "mean": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n": 1,
+          "seed_level_bootstrap_reliable": false
+        },
+        "avg5": {
+          "mean": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n": 1,
+          "seed_level_bootstrap_reliable": false
+        },
+        "mrr": {
+          "mean": 0.8333333333333334,
+          "ci_low": 0.8333333333333334,
+          "ci_high": 0.8333333333333334,
+          "n": 1,
+          "seed_level_bootstrap_reliable": false
+        },
+        "ndcg3": {
+          "mean": 0.8769765845238192,
+          "ci_low": 0.8769765845238192,
+          "ci_high": 0.8769765845238192,
+          "n": 1,
+          "seed_level_bootstrap_reliable": false
+        },
+        "ndcg5": {
+          "mean": 0.8769765845238192,
+          "ci_low": 0.8769765845238192,
+          "ci_high": 0.8769765845238192,
+          "n": 1,
+          "seed_level_bootstrap_reliable": false
+        }
+      }
+    },
+    "GATv2": {
+      "avg1": 0.3333333333333333,
+      "avg1_std": 0.0,
+      "avg3": 1.0,
+      "avg3_std": 0.0,
+      "avg5": 1.0,
+      "avg5_std": 0.0,
+      "mrr": 0.611111111111111,
+      "mrr_std": 0.0,
+      "ndcg3": 0.7103099178571526,
+      "ndcg3_std": 0.0,
+      "ndcg5": 0.7103099178571526,
+      "ndcg5_std": 0.0,
+      "ci95": {
+        "avg1": {
+          "mean": 0.3333333333333333,
+          "ci_low": 0.3333333333333333,
+          "ci_high": 0.3333333333333333,
+          "n": 1,
+          "seed_level_bootstrap_reliable": false
+        },
+        "avg3": {
+          "mean": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n": 1,
+          "seed_level_bootstrap_reliable": false
+        },
+        "avg5": {
+          "mean": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n": 1,
+          "seed_level_bootstrap_reliable": false
+        },
+        "mrr": {
+          "mean": 0.611111111111111,
+          "ci_low": 0.611111111111111,
+          "ci_high": 0.611111111111111,
+          "n": 1,
+          "seed_level_bootstrap_reliable": false
+        },
+        "ndcg3": {
+          "mean": 0.7103099178571526,
+          "ci_low": 0.7103099178571526,
+          "ci_high": 0.7103099178571526,
+          "n": 1,
+          "seed_level_bootstrap_reliable": false
+        },
+        "ndcg5": {
+          "mean": 0.7103099178571526,
+          "ci_low": 0.7103099178571526,
+          "ci_high": 0.7103099178571526,
+          "n": 1,
+          "seed_level_bootstrap_reliable": false
+        }
+      }
+    },
+    "config": {
+      "dataset": "trainticket",
+      "seeds": [
+        42
+      ],
+      "n_cases_loaded": 10,
+      "n_nodes": 5,
+      "max_cases": 10,
+      "use_mm": false,
+      "mm_strict": false,
+      "mm_logs_only": false,
+      "mm_traces_only": false,
+      "mm_trace_prior": false,
+      "mm_effective": false,
+      "mm_coverage": {
+        "n": 10,
+        "logs_ratio": 0.0,
+        "traces_ratio": 0.0,
+        "both_ratio": 0.0
+      },
+      "mm_dataset_status": "not_applicable",
+      "mm_dataset_reason": "Multimodal mode is disabled for this run.",
+      "mm_requested_seeds": 1,
+      "mm_executed_seeds": 1,
+      "mm_skipped_seeds": [],
+      "enable_drift": false,
+      "drift_delta": 0.002,
+      "drift_cooldown_steps": 30,
+      "observit_normalized": false,
+      "normalized": false,
+      "split_mode": "varying_split_by_run_seed",
+      "hyperparams": {
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "batch_size": 64,
+        "hidden_dim": 32,
+        "epochs": 1,
+        "sta_contrastive_warmup": 0,
+        "allow_real_warmup": false
+      },
+      "split": {
+        "type": "stratified_split_shuffle",
+        "mode": "varying_split_by_run_seed",
+        "seed_source": "run_seed",
+        "train_ratio": 0.8,
+        "requested_seeds": [
+          42
+        ],
+        "executed_seeds": [
+          42
+        ],
+        "mm_skipped_seeds": []
+      }
+    },
+    "STA_per_root_cause": [
+      {
+        "order-service": 0.5,
+        "route-service": 1.0
+      }
+    ],
+    "STA_per_root_cause_details": [
+      {
+        "per_service_top1": {
+          "order-service": 0.5,
+          "route-service": 1.0
+        },
+        "per_service_counts": {
+          "order-service": 2,
+          "route-service": 1
+        },
+        "per_service_hits": {
+          "order-service": 1,
+          "route-service": 1
+        },
+        "weighted_top1": 0.6666666666666666,
+        "global_avg1": 0.6666666666666666,
+        "abs_gap_vs_global_avg1": 0.0
+      }
+    ],
+    "STA_per_root_cause_consistency": {
+      "tolerance": 1e-06,
+      "max_abs_gap": 0.0,
+      "checked_runs": 1
+    },
+    "STA_per_root_cause_summary": {
+      "source_model_key": "STA",
+      "mean_top1_by_service": {
+        "order-service": 0.5,
+        "route-service": 1.0
+      },
+      "total_support_by_service": {
+        "order-service": 2,
+        "route-service": 1
+      },
+      "support_share_by_service": {
+        "order-service": 0.6666666666666666,
+        "route-service": 0.3333333333333333
+      },
+      "num_seeds_aggregated": 1
+    },
+    "GATv2_per_root_cause": [
+      {
+        "order-service": 0.0,
+        "route-service": 1.0
+      }
+    ],
+    "GATv2_per_root_cause_details": [
+      {
+        "per_service_top1": {
+          "order-service": 0.0,
+          "route-service": 1.0
+        },
+        "per_service_counts": {
+          "order-service": 2,
+          "route-service": 1
+        },
+        "per_service_hits": {
+          "order-service": 0,
+          "route-service": 1
+        },
+        "weighted_top1": 0.3333333333333333,
+        "global_avg1": 0.3333333333333333,
+        "abs_gap_vs_global_avg1": 0.0
+      }
+    ],
+    "GATv2_per_root_cause_consistency": {
+      "tolerance": 1e-06,
+      "max_abs_gap": 0.0,
+      "checked_runs": 1
+    },
+    "GATv2_per_root_cause_summary": {
+      "source_model_key": "GATv2",
+      "mean_top1_by_service": {
+        "order-service": 0.0,
+        "route-service": 1.0
+      },
+      "total_support_by_service": {
+        "order-service": 2,
+        "route-service": 1
+      },
+      "support_share_by_service": {
+        "order-service": 0.6666666666666666,
+        "route-service": 0.3333333333333333
+      },
+      "num_seeds_aggregated": 1
+    },
+    "env": {
+      "python": "3.12.3 (main, Mar  3 2026, 12:15:18) [GCC 13.3.0]",
+      "torch": "2.11.0+cu130",
+      "cuda_available": false,
+      "device_count": 0
+    },
+    "deterministic": false
+  }
+}

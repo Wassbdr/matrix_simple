@@ -1,13 +1,7 @@
 """Unit tests for sta_fusion_utils (pytest or python)."""
-
-import os
-import sys
-
 import torch
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from sta_fusion_utils import gated_selector_scorer_fusion
+from rca_pipeline.sta_fusion_utils import gated_selector_scorer_fusion
 
 
 def test_non_selected_nodes_unchanged():

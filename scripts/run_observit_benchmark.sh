@@ -3,5 +3,5 @@
 # Prérequis : venv du projet avec torch (voir README).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT/rca_pipeline"
-exec "${ROOT}/.venv/bin/python" benchmark_real.py "$@"
+cd "$ROOT"
+exec python3 -m rca_pipeline.benchmark_real "$@"

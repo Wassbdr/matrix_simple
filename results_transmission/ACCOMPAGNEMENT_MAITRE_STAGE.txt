@@ -1,0 +1,15 @@
+Texte court à joindre au maître de stage (email ou annexe rapport)
+================================================================
+
+Ce travail s’articule en trois blocs d’expériences, à ne pas fusionner en un seul tableau :
+(1) graphes simulés Barabási–Albert (benchmark_full / ablation) ;
+(2) données publiques RCAEval (TrainTicket, SockShop, Online Boutique) avec métriques Avg@k, MRR, NDCG, plus une variante multimodale stricte limitée à TrainTicket et Online Boutique ;
+(3) traces réelles ObservIT (cluster contrôlé), avec validation de campagne et, le cas échéant, détail par cause racine.
+
+Limites à prendre en compte pour l’interprétation :
+— Les runs utilisent typiquement 3 graines ; le champ seed_level_bootstrap_reliable dans les JSON indique que les intervalles bootstrap au niveau seed ne sont pas suffisants pour une inférence statistique fine (présenter plutôt moyenne ± écart-type).
+— Le filtre de dérive (drift), lorsqu’il est activé sur RCAEval, peut ne retirer aucune fenêtre sur certains jeux : dans ce cas il ne mesure pas la robustesse au changement de distribution pour ces runs précis.
+— SockShop est exclu du périmètre multimodal strict dans notre protocole (stubs documentés dans validation_runs) ; les métriques « metrics only » restent valides pour SockShop.
+— Sur ObservIT, une partie des pods du CSV peut ne pas être mappée aux services du graphe modèle : c’est une hypothèse de périmètre applicatif, pas une erreur silencieuse si elle est décrite.
+
+Les fichiers JSON, le hash git et les commandes de reproduction sont listés dans README_resultats.txt du même dossier / archive.

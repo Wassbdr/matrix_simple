@@ -26,30 +26,37 @@ Systematically isolates the contribution of each architectural component:
        D3. STA no k-annealing                           [new]
 """
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
+import argparse
+import json
+import logging
 import time
 import warnings
 from collections import Counter
-from typing import List, Dict
+from typing import Any, Dict, Optional
+
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 
-warnings.filterwarnings("ignore")
-
-from model_sta import SelectThenAnalyze
-from model import SpatioTemporalRCA
-from losses import info_nce_loss, asymmetric_gib_loss
-from augment import augment_positive
-from benchmark import (
-    count_parameters, get_ranking_metrics, stratified_split, get_anomalies,
-    EarlyStopping, aggregate_seeds, print_header, print_results_table,
-    train_v1_compact, eval_v1, train_sta_compact, eval_sta,
-    train_baseline_gcn, eval_gcn_baseline,
+from rca_pipeline.benchmark import (
+    aggregate_seeds,
+    count_parameters,
+    eval_gcn_baseline,
+    eval_sta,
+    eval_v1,
+    get_anomalies,
+    get_ranking_metrics,
+    print_header,
+    print_results_table,
+    train_baseline_gcn,
+    train_sta_compact,
+    train_v1_compact,
 )
+from rca_pipeline.common import stratified_split_shuffle
 
-import logging
+warnings.filterwarnings("ignore")
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
@@ -211,14 +218,13 @@ def eval_simple_model(model, test_anom, edge_index, name_to_idx, N, needs_ei=Tru
 # Main Ablation
 # =====================================================================
 
-def run_ablation():
-    from simulated_data_scalable import generate_scalable_dataset
+def run_ablation(output_json: Optional[str] = None) -> Dict[str, Any]:
+    from rca_pipeline.simulated_data_scalable import generate_scalable_dataset
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
     print(f"PyTorch: {torch.__version__}")
 
-    NUM_SEEDS = 3
     SEEDS = [42, 123, 7]
 
     # Run on N=20 (baseline) and N=100 (the interesting case)
@@ -243,7 +249,13 @@ def run_ablation():
             window_size=12, num_features=5, anomaly_ratio=0.4, seed=42,
         )
         name_to_idx = {n: i for i, n in enumerate(node_names)}
-        train_data, test_data = stratified_split(dataset, name_to_idx)
+        # Aligné sur benchmark.py : split stratifié mélangé (même graine que génération BA).
+        train_data, test_data = stratified_split_shuffle(
+            dataset,
+            train_ratio=0.8,
+            name_to_idx=name_to_idx,
+            seed=42,
+        )
         train_anom = get_anomalies(train_data, name_to_idx)
         test_anom = get_anomalies(test_data, name_to_idx)
         F_ = dataset[0].x.size(1)
@@ -259,9 +271,10 @@ def run_ablation():
 
         # A1: Full Late Bottleneck (reference)
         late_runs = []
-        for si, seed in enumerate(SEEDS):
+        for _si, seed in enumerate(SEEDS):
             print(f"\n  [A1] Late Bottleneck — seed {seed}")
-            torch.manual_seed(seed); np.random.seed(seed)
+            torch.manual_seed(seed)
+            np.random.seed(seed)
             m = train_v1_compact(train_data, node_names, edge_index, device,
                                  hidden_dim=hidden, contrastive_epochs=80,
                                  supervised_epochs=150, batch_size=256)
@@ -269,9 +282,10 @@ def run_ablation():
 
         # A2: Full-Graph GCN / STGCN no GIB (reference)
         gcn_runs = []
-        for si, seed in enumerate(SEEDS):
+        for _si, seed in enumerate(SEEDS):
             print(f"\n  [A2] STGCN no GIB (FullGraphGCN) — seed {seed}")
-            torch.manual_seed(seed); np.random.seed(seed)
+            torch.manual_seed(seed)
+            np.random.seed(seed)
             m = train_baseline_gcn(train_anom, edge_index, name_to_idx, N, F_,
                                    hidden_dim=hidden, epochs=150, seed=seed)
             m.eval()
@@ -279,9 +293,10 @@ def run_ablation():
 
         # A3: Spatial-only GCN (no temporal conv)
         spatial_runs = []
-        for si, seed in enumerate(SEEDS):
+        for _si, seed in enumerate(SEEDS):
             print(f"\n  [A3] Spatial-only GCN (no temporal) — seed {seed}")
-            torch.manual_seed(seed); np.random.seed(seed)
+            torch.manual_seed(seed)
+            np.random.seed(seed)
             m = SpatialOnlyGCN(F_, hidden, N)
             m = train_simple_model(m, train_anom, edge_index, name_to_idx, N,
                                    epochs=150, seed=seed, needs_ei=True)
@@ -290,9 +305,10 @@ def run_ablation():
 
         # A4: Temporal-only (no GCN)
         temporal_runs = []
-        for si, seed in enumerate(SEEDS):
+        for _si, seed in enumerate(SEEDS):
             print(f"\n  [A4] Temporal-only (no GCN) — seed {seed}")
-            torch.manual_seed(seed); np.random.seed(seed)
+            torch.manual_seed(seed)
+            np.random.seed(seed)
             m = TemporalOnlyModel(F_, hidden, N)
             m = train_simple_model(m, train_anom, edge_index, name_to_idx, N,
                                    epochs=150, seed=seed, needs_ei=False)
@@ -316,9 +332,10 @@ def run_ablation():
 
         # B2: Late BN supervised only (no contrastive pretraining)
         late_nosup_runs = []
-        for si, seed in enumerate(SEEDS):
+        for _si, seed in enumerate(SEEDS):
             print(f"\n  [B2] Late BN no contrastive — seed {seed}")
-            torch.manual_seed(seed); np.random.seed(seed)
+            torch.manual_seed(seed)
+            np.random.seed(seed)
             m = train_v1_compact(train_data, node_names, edge_index, device,
                                  hidden_dim=hidden, contrastive_epochs=0,
                                  supervised_epochs=150, batch_size=256)
@@ -343,9 +360,10 @@ def run_ablation():
 
             for k_val in k_values:
                 runs = []
-                for si, seed in enumerate(SEEDS):
+                for _si, seed in enumerate(SEEDS):
                     print(f"\n  [C] STA k={k_val} — seed {seed}")
-                    torch.manual_seed(seed); np.random.seed(seed)
+                    torch.manual_seed(seed)
+                    np.random.seed(seed)
                     m = train_sta_compact(
                         train_data, node_names, edge_index, device,
                         hidden_dim=hidden, k=k_val,
@@ -363,9 +381,10 @@ def run_ablation():
 
             # D1: reference (full STA k=10) — reuse from C
             sta_ref_runs = []
-            for si, seed in enumerate(SEEDS):
+            for _si, seed in enumerate(SEEDS):
                 print(f"\n  [D1] STA full (warmup + k-anneal) — seed {seed}")
-                torch.manual_seed(seed); np.random.seed(seed)
+                torch.manual_seed(seed)
+                np.random.seed(seed)
                 m = train_sta_compact(
                     train_data, node_names, edge_index, device,
                     hidden_dim=hidden, k=k,
@@ -376,9 +395,10 @@ def run_ablation():
 
             # D2: STA no contrastive warmup
             sta_nowarmup_runs = []
-            for si, seed in enumerate(SEEDS):
+            for _si, seed in enumerate(SEEDS):
                 print(f"\n  [D2] STA no warmup — seed {seed}")
-                torch.manual_seed(seed); np.random.seed(seed)
+                torch.manual_seed(seed)
+                np.random.seed(seed)
                 m = train_sta_compact(
                     train_data, node_names, edge_index, device,
                     hidden_dim=hidden, k=k,
@@ -389,9 +409,10 @@ def run_ablation():
 
             # D3: STA no k-annealing (start directly at target k)
             sta_noanneal_runs = []
-            for si, seed in enumerate(SEEDS):
+            for _si, seed in enumerate(SEEDS):
                 print(f"\n  [D3] STA no k-annealing — seed {seed}")
-                torch.manual_seed(seed); np.random.seed(seed)
+                torch.manual_seed(seed)
+                np.random.seed(seed)
                 m = train_sta_compact(
                     train_data, node_names, edge_index, device,
                     hidden_dim=hidden, k=k,
@@ -458,6 +479,20 @@ def run_ablation():
 
     print_header("ABLATION COMPLETE", char="*")
 
+    if output_json:
+        with open(output_json, "w", encoding="utf-8") as f:
+            json.dump(all_results, f, indent=2, default=float)
+        print(f"\nAblation JSON written to {output_json}")
+    return all_results
+
 
 if __name__ == "__main__":
-    run_ablation()
+    ap = argparse.ArgumentParser(description="Ablation study (simulated BA)")
+    ap.add_argument(
+        "--output-json",
+        type=str,
+        default=None,
+        help="Optional path to save all ablation tables as JSON (paper / reproducibility).",
+    )
+    args = ap.parse_args()
+    run_ablation(output_json=args.output_json)

@@ -1,10 +1,5 @@
 """Unit tests for k_selection helpers (pytest or `python tests/test_k_selection.py`)."""
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from k_selection import get_optimal_k, adaptive_gib_beta
+from rca_pipeline.k_selection import adaptive_gib_beta, get_optimal_k
 
 
 def test_get_optimal_k():

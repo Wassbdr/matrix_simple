@@ -2,9 +2,20 @@
 __pycache__/
 *.pyc
 *.pyo
+.pyd
+.python-version
 .venv/
 venv/
+env/
 
+# Packaging / build artifacts
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+
+matrix_simple_rca.egg-info/
 # PyTorch artifacts
 *.pt
 checkpoints/
@@ -34,13 +45,34 @@ rcaeval/**/.mm_cache/
 port_forward.log
 *.log
 
+# Local environment files
+.env
+.env.*
+!.env.example
+
 # IDE
 .vscode/
 .idea/
 
 # Test / tooling caches
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+.tox/
+.nox/
+.ipynb_checkpoints/
+
+# Coverage
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 
 # OS
 .DS_Store
 Thumbs.db
+
+*.zip
+*.tar.gz
+*.sha256

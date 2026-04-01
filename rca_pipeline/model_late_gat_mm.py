@@ -21,7 +21,11 @@ from torch_geometric.nn import GATv2Conv
 from typing import Optional, Tuple
 import logging
 
-from model_late_gat import TemporalConvBlock, GATv2SpatialBlock, compute_node_importance
+from rca_pipeline.model_late_gat import (
+    GATv2SpatialBlock,
+    TemporalConvBlock,
+    compute_node_importance,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

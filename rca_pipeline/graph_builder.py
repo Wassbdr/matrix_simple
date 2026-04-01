@@ -125,7 +125,8 @@ class GraphBuilder:
             ts_data = grouped[grouped['timestamp'] == ts]
             x = torch.zeros((len(self.node_mapping), len(active_features)), dtype=torch.float)
             idxs = ts_data['node_idx'].to_numpy(dtype=np.int64)
-            feats = ts_data[active_features].to_numpy(dtype=np.float32)
+            # copy: pandas may return a read-only buffer; PyTorch warns on from_numpy otherwise
+            feats = np.array(ts_data[active_features].to_numpy(dtype=np.float32), copy=True)
             if len(idxs) > 0:
                 x[idxs] = torch.from_numpy(feats)
             snapshot = Data(x=x, edge_index=self.edge_index)

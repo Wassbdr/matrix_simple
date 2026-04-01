@@ -45,6 +45,6 @@ echo ""
 kubectl get pods -n "${NAMESPACE}" -l 'app in (database,backend,frontend)'
 echo ""
 echo "🌐 Accès au Frontend :"
-echo "  kubectl port-forward svc/frontend -n ${NAMESPACE} 8000:80"
-echo "  Puis ouvrir http://localhost:8000"
+echo "  kubectl port-forward svc/frontend -n ${NAMESPACE} 8080:80"
+echo "  Puis ouvrir http://localhost:8080"
 echo ""

@@ -16,13 +16,12 @@ Prerequisites:
 
 from __future__ import annotations
 
-import os
 import logging
-import numpy as np
-import torch
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import numpy as np
+import torch
 from torch_geometric.data import Data
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -195,7 +194,7 @@ class RCAEvalLoader:
 
         ds = RCADataset(dataset_name, data_dir=str(self.data_dir))
         cases = ds.get_cases()
-        if max_cases:
+        if max_cases is not None and max_cases > 0:
             cases = cases[:max_cases]
 
         node_names = sorted(ds.get_services())
@@ -249,8 +248,9 @@ class RCAEvalLoader:
           - root_cause from the top-level `ts-<service>_<fault>` directory name
           - x from metrics.csv (or simple_metrics.csv) time-series numeric columns
         """
-        import pandas as pd
         import json
+
+        import pandas as pd
 
         # 1) Infer services from the top-level directory naming convention.
         #    The RCAEval layout differs by dataset:
@@ -614,7 +614,7 @@ class RCAEvalLoader:
                     d.x_traces = torch.zeros(N, 6, dtype=torch.float32)
                 data_list.append(d)
 
-                if max_cases is not None and len(data_list) >= max_cases:
+                if max_cases is not None and max_cases > 0 and len(data_list) >= max_cases:
                     logger.info("Loaded max_cases=%d, stopping.", max_cases)
                     return data_list, node_names, edge_index
 
@@ -641,7 +641,13 @@ class RCAEvalLoader:
 
     @staticmethod
     def _default_edge_index(n: int) -> torch.Tensor:
-        """Generate a simple chain graph as fallback."""
+        """
+        Fallback when ``get_graph()`` is empty or raises: **undirected chain** 0—1—…—(n-1).
+
+        This is a deliberate simplification: rankings from GNN/GAT can differ from the
+        true service dependency graph. JSON exports should record when this path was used
+        (e.g. compare ``edge_index`` shape to the dataset’s published topology).
+        """
         if n <= 1:
             return torch.zeros(2, 0, dtype=torch.long)
         src = list(range(n - 1))

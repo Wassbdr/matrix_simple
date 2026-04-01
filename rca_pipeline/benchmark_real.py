@@ -10,30 +10,39 @@ Usage:
     python3 benchmark_real.py --observit-csv path/to/dataset.csv   # ou répertoire dataset_*.csv
 """
 
-import torch
-import torch.nn.functional as F
-import numpy as np
 import argparse
 import json
-from typing import List, Dict, Optional, Tuple
-
-from model_sta import SelectThenAnalyze
-from model_late_gat import SpatioTemporalRCA_GAT
-from model_sta_mm import SelectThenAnalyze_MM
-from model_late_gat_mm import SpatioTemporalRCA_GAT_MM
-from common import set_all_seeds
-from k_selection import get_optimal_k
-from losses import info_nce_loss, variational_gib_loss
-from metrics_rcaeval import (
-    RCAEvalMetrics,
-    RCAEVAL_PUBLISHED_BASELINES,
-    compare_with_rcaeval_baselines,
-)
-from loaders.rcaeval_loader import RCAEvalLoader, SUPPORTED_DATASETS
-from drift_detector import make_k8s_drift_detector
-from graph_builder import GraphBuilder
-
 import logging
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+
+from rca_pipeline.common import (
+    runtime_env_info,
+    set_all_seeds,
+    set_torch_deterministic,
+    stratified_split_shuffle,
+)
+from rca_pipeline.drift_detector import make_k8s_drift_detector
+from rca_pipeline.graph_builder import GraphBuilder
+from rca_pipeline.k_selection import get_optimal_k
+from rca_pipeline.loaders.rcaeval_loader import SUPPORTED_DATASETS, RCAEvalLoader
+from rca_pipeline.losses import info_nce_loss, variational_gib_loss
+from rca_pipeline.metrics_rcaeval import (
+    RCAEVAL_PUBLISHED_BASELINES,
+    RCAEvalMetrics,
+    bootstrap_ci,
+    compare_with_rcaeval_baselines,
+    top1_per_service,
+    top1_per_service_detailed,
+)
+from rca_pipeline.model_late_gat import SpatioTemporalRCA_GAT
+from rca_pipeline.model_late_gat_mm import SpatioTemporalRCA_GAT_MM
+from rca_pipeline.model_sta import SelectThenAnalyze
+from rca_pipeline.model_sta_mm import SelectThenAnalyze_MM
+
 logging.basicConfig(level=logging.WARNING)
 
 
@@ -159,26 +168,84 @@ def _mm_coverage(data_list: List) -> Dict[str, float]:
     }
 
 
-def _split(data_list, name_to_idx, ratio=0.8, seed: int = 42):
-    import random
-    by_rc: Dict[str, list] = {}
-    for d in data_list:
-        rc = d.root_cause[0]
-        if rc in name_to_idx:
-            by_rc.setdefault(rc, []).append(d)
-    rng = random.Random(seed)
-    train, test = [], []
-    for rc, items in sorted(by_rc.items()):
-        rng.shuffle(items)
-        if len(items) <= 1:
-            s = 1
+def _compute_mm_dataset_status(args, requested_seeds: List[int], skipped_seeds: List[int], executed_seeds: int) -> Dict[str, object]:
+    if not bool(args.use_mm):
+        return {
+            "status": "not_applicable",
+            "reason": "Multimodal mode is disabled for this run.",
+            "requested_seeds": int(len(requested_seeds)),
+            "executed_seeds": int(executed_seeds),
+            "skipped_seeds": [int(s) for s in skipped_seeds],
+        }
+
+    if executed_seeds <= 0:
+        if bool(args.mm_strict):
+            reason = "MM strict required modality signal was missing on all requested seeds."
         else:
-            # Keep at least one sample in both splits for evaluable classes.
-            s = int(len(items) * ratio)
-            s = max(1, min(s, len(items) - 1))
-        train.extend(items[:s])
-        test.extend(items[s:])
-    return train, test
+            reason = "No multimodal seed produced evaluable predictions."
+        return {
+            "status": "skipped_with_reason",
+            "reason": reason,
+            "requested_seeds": int(len(requested_seeds)),
+            "executed_seeds": int(executed_seeds),
+            "skipped_seeds": [int(s) for s in skipped_seeds],
+        }
+
+    if skipped_seeds:
+        reason = (
+            "Some seeds were skipped because required modality signal was missing; "
+            "dataset remains comparable only on executed seeds."
+        )
+    else:
+        reason = "All requested seeds executed with required modalities."
+    return {
+        "status": "comparable",
+        "reason": reason,
+        "requested_seeds": int(len(requested_seeds)),
+        "executed_seeds": int(executed_seeds),
+        "skipped_seeds": [int(s) for s in skipped_seeds],
+    }
+
+
+def _build_mm_global_summary(all_results: Dict[str, Dict]) -> Dict[str, object]:
+    dataset_status: Dict[str, str] = {}
+    blocked: List[str] = []
+    for ds_name, ds_blob in all_results.items():
+        if not isinstance(ds_blob, dict):
+            continue
+        cfg = ds_blob.get("config", {})
+        if not isinstance(cfg, dict):
+            continue
+        status = cfg.get("mm_dataset_status")
+        if status is None:
+            continue
+        dataset_status[str(ds_name)] = str(status)
+        if status != "comparable":
+            blocked.append(str(ds_name))
+
+    allow = len(dataset_status) > 0 and len(blocked) == 0
+    reason = (
+        "All multimodal datasets are comparable."
+        if allow
+        else "Global MM aggregation blocked because at least one dataset is skipped or non-comparable."
+    )
+    return {
+        "allow_global_aggregation": bool(allow),
+        "reason": reason,
+        "dataset_status": dataset_status,
+        "blocked_by_datasets": blocked,
+    }
+
+
+def _enforce_real_warmup_guard(sta_contrastive_warmup: int, allow_real_warmup: bool) -> None:
+    if int(sta_contrastive_warmup) <= 0:
+        return
+    if bool(allow_real_warmup):
+        return
+    raise SystemExit(
+        "Refusing non-zero STA contrastive warmup on real datasets without explicit acknowledgement. "
+        "Re-run with --allow-real-warmup only for controlled A/B analysis."
+    )
 
 
 def _class_counts(data: List, name_to_idx: Dict[str, int]) -> Dict[str, int]:
@@ -205,6 +272,92 @@ def _warn_split_quality(train_data: List, test_data: List, name_to_idx: Dict[str
         print(f"  Seed {seed}: classes with train-only support: {only_train}")
     if only_test:
         print(f"  Seed {seed}: classes with test-only support: {only_test}")
+
+
+def _attach_per_root_metrics(
+    ds_results: Dict,
+    prefix: str,
+    model_key: str,
+    runs: List[Tuple[List[int], List[np.ndarray]]],
+    node_names: List[str],
+    rca_metrics: RCAEvalMetrics,
+    dataset_name: str,
+) -> None:
+    """
+    Attach per-root-cause Top-1 diagnostics and consistency checks.
+
+    This is exported for all real datasets (RCAEval + ObservIT) to make class
+    imbalance and per-service behavior auditable.
+    """
+    if not runs:
+        return
+
+    tol = 1e-6
+    out_simple: List[Dict[str, float]] = []
+    out_details: List[Dict[str, object]] = []
+    gaps: List[float] = []
+
+    mean_top1_sum: Dict[str, float] = {}
+    mean_top1_count: Dict[str, int] = {}
+    support_total: Dict[str, int] = {}
+
+    for yt, yp in runs:
+        simple = top1_per_service(yt, yp, node_names)
+        detailed = top1_per_service_detailed(yt, yp, node_names)
+        global_avg1 = float(rca_metrics.compute(yt, yp)["avg1"])
+        weighted = float(detailed["weighted_top1"])
+        gap = abs(global_avg1 - weighted)
+
+        out_simple.append(simple)
+        out_details.append(
+            {
+                "per_service_top1": detailed["per_service_top1"],
+                "per_service_counts": detailed["per_service_counts"],
+                "per_service_hits": detailed["per_service_hits"],
+                "weighted_top1": weighted,
+                "global_avg1": global_avg1,
+                "abs_gap_vs_global_avg1": gap,
+            }
+        )
+        gaps.append(gap)
+
+        for svc, val in detailed["per_service_top1"].items():
+            mean_top1_sum[svc] = mean_top1_sum.get(svc, 0.0) + float(val)
+            mean_top1_count[svc] = mean_top1_count.get(svc, 0) + 1
+        for svc, c in detailed["per_service_counts"].items():
+            support_total[svc] = support_total.get(svc, 0) + int(c)
+
+    max_gap = float(max(gaps)) if gaps else 0.0
+    if max_gap > tol:
+        raise RuntimeError(
+            f"Per-root-cause consistency check failed for {prefix} on {dataset_name}: "
+            f"max_abs_gap={max_gap:.8f} > {tol}."
+        )
+
+    support_sum = float(sum(support_total.values()))
+    mean_top1_by_service = {
+        svc: float(mean_top1_sum[svc] / max(mean_top1_count.get(svc, 1), 1))
+        for svc in sorted(mean_top1_sum.keys())
+    }
+    support_share_by_service = {
+        svc: float(support_total[svc] / support_sum) if support_sum > 0 else 0.0
+        for svc in sorted(support_total.keys())
+    }
+
+    ds_results[f"{prefix}_per_root_cause"] = out_simple
+    ds_results[f"{prefix}_per_root_cause_details"] = out_details
+    ds_results[f"{prefix}_per_root_cause_consistency"] = {
+        "tolerance": tol,
+        "max_abs_gap": max_gap,
+        "checked_runs": int(len(runs)),
+    }
+    ds_results[f"{prefix}_per_root_cause_summary"] = {
+        "source_model_key": model_key,
+        "mean_top1_by_service": mean_top1_by_service,
+        "total_support_by_service": {k: int(v) for k, v in sorted(support_total.items())},
+        "support_share_by_service": support_share_by_service,
+        "num_seeds_aggregated": int(len(runs)),
+    }
 
 
 def train_and_eval_sta(
@@ -433,19 +586,61 @@ def _run_single_dataset(
     sta_f_runs, gat_f_runs = [], []
     drift_train_stats = []
     drift_test_stats = []
+    mm_skipped_seeds: List[int] = []
+    mm_executed_seeds = 0
+    scaler_stats: Optional[Dict[str, object]] = None
+    split_trace: Dict[str, object] = {
+        "type": "stratified_split_shuffle",
+        "mode": "varying_split_by_run_seed",
+        "seed_source": "run_seed",
+        "train_ratio": 0.8,
+        "requested_seeds": [int(s) for s in seeds],
+        "executed_seeds": [],
+        "mm_skipped_seeds": [],
+    }
 
     for seed in seeds:
         if normalize_train_test:
             base = [_clone_pyg_data(d) for d in data_list]
         else:
             base = data_list
-        train_data, test_data = _split(base, name_to_idx, seed=seed)
+        # Unified stratified split with shuffle (order-independent).
+        train_data, test_data = stratified_split_shuffle(
+            base,
+            train_ratio=0.8,
+            name_to_idx=name_to_idx,
+            seed=seed,
+            keep_at_least_one_in_test=True,
+        )
         _warn_split_quality(train_data, test_data, name_to_idx, seed)
 
         if normalize_train_test:
             scaler = GraphBuilder.fit_scaler(train_data)
             train_data = GraphBuilder.apply_scaler(train_data, scaler)
             test_data = GraphBuilder.apply_scaler(test_data, scaler)
+            scaler_stats = {
+                "type": "StandardScaler",
+                "mean": [float(x) for x in scaler.mean_.tolist()],
+                "scale": [float(x) for x in scaler.scale_.tolist()],
+            }
+        elif bool(getattr(args, "normalize", False)):
+            # Optional, consistent train-only normalization for RCAEval as well.
+            base_cloned = [_clone_pyg_data(d) for d in base]
+            train_data, test_data = stratified_split_shuffle(
+                base_cloned,
+                train_ratio=0.8,
+                name_to_idx=name_to_idx,
+                seed=seed,
+                keep_at_least_one_in_test=True,
+            )
+            scaler = GraphBuilder.fit_scaler(train_data)
+            train_data = GraphBuilder.apply_scaler(train_data, scaler)
+            test_data = GraphBuilder.apply_scaler(test_data, scaler)
+            scaler_stats = {
+                "type": "StandardScaler",
+                "mean": [float(x) for x in scaler.mean_.tolist()],
+                "scale": [float(x) for x in scaler.scale_.tolist()],
+            }
 
         if args.use_mm and args.mm_strict:
             eps = 1e-8
@@ -466,7 +661,12 @@ def _run_single_dataset(
                 ok = ok and _has_signal_on_all(train_data, "x_traces") and _has_signal_on_all(test_data, "x_traces")
             if not ok:
                 print("  Seed %s: MM strict enabled but required modality signal missing; skipping this seed." % seed)
+                mm_skipped_seeds.append(int(seed))
+                split_trace["mm_skipped_seeds"].append(int(seed))
                 continue
+
+        mm_executed_seeds += 1
+        split_trace["executed_seeds"].append(int(seed))
 
         use_logs = bool(args.use_mm and not args.mm_traces_only)
         use_traces = bool(args.use_mm and not args.mm_logs_only)
@@ -476,8 +676,8 @@ def _run_single_dataset(
             def _has_any_trace_signal(dl: list) -> bool:
                 return any(
                     hasattr(d, "x_traces")
-                    and getattr(d, "x_traces") is not None
-                    and float(getattr(d, "x_traces").std().item()) > eps
+                    and d.x_traces is not None
+                    and float(d.x_traces.std().item()) > eps
                     for d in dl
                 )
             if _has_any_trace_signal(train_data) or _has_any_trace_signal(test_data):
@@ -548,6 +748,20 @@ def _run_single_dataset(
         compare_with_rcaeval_baselines(gat_m, dataset_name=ds_name, model_name=gat_name)
         ds_results[gat_name] = gat_m
 
+    # Bootstrap CI across seed-level aggregate metrics (CI on mean across seeds).
+    # With few seeds (e.g. 3), intervals are wide / unstable; see seed_level_bootstrap_reliable in JSON.
+    def _add_ci(model_key: str) -> None:
+        if model_key not in ds_results:
+            return
+        per_seed = [rca_metrics.compute(yt, yp) for (yt, yp) in (sta_runs if "STA" in model_key else gat_runs)]
+        ds_results[model_key]["ci95"] = {
+            k: bootstrap_ci([float(r[k]) for r in per_seed], n_boot=2000, alpha=0.05, seed=0)
+            for k in RCAEvalMetrics.METRIC_KEYS
+        }
+
+    _add_ci("STA-MM" if args.use_mm else "STA")
+    _add_ci("GATv2-MM" if args.use_mm else "GATv2")
+
     if args.enable_drift:
         if sta_raw_runs:
             ds_results["STA_raw"] = rca_metrics.compute_with_std(sta_raw_runs)
@@ -570,7 +784,18 @@ def _run_single_dataset(
             mm_effective = traces_ok
         else:
             mm_effective = logs_ok or traces_ok
+    mm_status = _compute_mm_dataset_status(
+        args=args,
+        requested_seeds=seeds,
+        skipped_seeds=mm_skipped_seeds,
+        executed_seeds=mm_executed_seeds,
+    )
     ds_results["config"] = {
+        "dataset": ds_name,
+        "seeds": [int(s) for s in seeds],
+        "n_cases_loaded": int(len(data_list)),
+        "n_nodes": int(N),
+        "max_cases": None if args.max_cases is None else int(args.max_cases),
         "use_mm": bool(args.use_mm),
         "mm_strict": bool(args.mm_strict),
         "mm_logs_only": bool(args.mm_logs_only),
@@ -578,20 +803,45 @@ def _run_single_dataset(
         "mm_trace_prior": bool(args.mm_trace_prior),
         "mm_effective": mm_effective,
         "mm_coverage": mm_cov,
+        "mm_dataset_status": mm_status["status"],
+        "mm_dataset_reason": mm_status["reason"],
+        "mm_requested_seeds": mm_status["requested_seeds"],
+        "mm_executed_seeds": mm_status["executed_seeds"],
+        "mm_skipped_seeds": mm_status["skipped_seeds"],
         "enable_drift": bool(args.enable_drift),
         "drift_delta": float(args.drift_delta),
         "drift_cooldown_steps": int(args.drift_cooldown_steps),
         "observit_normalized": bool(normalize_train_test),
+        "normalized": bool(normalize_train_test or bool(getattr(args, "normalize", False))),
+        "split_mode": str(split_trace.get("mode", "unknown")),
+        "hyperparams": {
+            "lr": 1e-3,
+            "weight_decay": 1e-4,
+            "batch_size": 64,
+            "hidden_dim": args.hidden_dim,
+            "epochs": args.epochs,
+            "sta_contrastive_warmup": args.sta_contrastive_warmup,
+            "allow_real_warmup": bool(getattr(args, "allow_real_warmup", False)),
+        },
+        "split": split_trace,
     }
+    if scaler_stats is not None:
+        ds_results["scaler"] = scaler_stats
     if args.enable_drift and drift_train_stats and drift_test_stats:
         ds_results["drift_filter"] = {
             "train_drop_ratio_mean": float(np.mean([s["drop_ratio"] for s in drift_train_stats])),
             "test_drop_ratio_mean": float(np.mean([s["drop_ratio"] for s in drift_test_stats])),
         }
 
-    print(f"\n  --- Published baselines (RCAEval paper) ---")
+    print("\n  --- Published baselines (RCAEval paper) ---")
     for method, ref in RCAEVAL_PUBLISHED_BASELINES.items():
         print(f"  {method:>15s}: Avg@1={ref['avg1']:.2f}  Avg@5={ref['avg5']:.2f}  MRR={ref['mrr']:.2f}")
+
+    # Per-root-cause Top-1 for all real datasets (RCAEval + ObservIT).
+    sta_model_key = "STA-MM" if args.use_mm else "STA"
+    gat_model_key = "GATv2-MM" if args.use_mm else "GATv2"
+    _attach_per_root_metrics(ds_results, "STA", sta_model_key, sta_runs, node_names, rca_metrics, ds_name)
+    _attach_per_root_metrics(ds_results, "GATv2", gat_model_key, gat_runs, node_names, rca_metrics, ds_name)
 
     return ds_results
 
@@ -605,6 +855,11 @@ def main():
     parser.add_argument("--hidden-dim", type=int, default=32)
     parser.add_argument("--sta-contrastive-warmup", type=int, default=0,
                         help="Contrastive warmup epochs for STA (default 0 for RCAEval real)")
+    parser.add_argument(
+        "--allow-real-warmup",
+        action="store_true",
+        help="Acknowledge real-data warmup risk and allow sta-contrastive-warmup > 0.",
+    )
     parser.add_argument("--rcaeval-root", type=str, default="rcaeval")
     parser.add_argument("--max-cases", type=int, default=None,
                         help="Limit number of failure cases loaded (speeds up MM extraction)")
@@ -626,6 +881,16 @@ def main():
                         help="Cooldown steps to skip RCA after drift event")
     parser.add_argument("--output-json", type=str, default=None)
     parser.add_argument(
+        "--normalize",
+        action="store_true",
+        help="Apply train-only z-score normalization (StandardScaler) for RCAEval datasets too.",
+    )
+    parser.add_argument(
+        "--deterministic",
+        action="store_true",
+        help="Best-effort deterministic mode for PyTorch (may reduce performance).",
+    )
+    parser.add_argument(
         "--observit-csv",
         type=str,
         default=None,
@@ -643,12 +908,15 @@ def main():
         raise SystemExit("--mm-logs-only and --mm-traces-only are mutually exclusive.")
     if args.mm_trace_prior and (args.mm_logs_only or args.mm_traces_only):
         raise SystemExit("--mm-trace-prior is incompatible with --mm-logs-only/--mm-traces-only.")
+    _enforce_real_warmup_guard(args.sta_contrastive_warmup, bool(getattr(args, "allow_real_warmup", False)))
 
     seeds = [int(s) for s in args.seeds.split(",")]
+    if bool(getattr(args, "deterministic", False)):
+        set_torch_deterministic(True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if args.observit_csv:
-        from loaders.observit_loader import load_observit
+        from rca_pipeline.loaders.observit_loader import load_observit
 
         print("\n" + "=" * 70)
         print("  DATASET: observ-it (cluster K8s)")
@@ -657,7 +925,7 @@ def main():
             data_list, node_names, edge_index = load_observit(
                 args.observit_csv, window_size=args.observit_window
             )
-        except Exception as e:
+        except (FileNotFoundError, OSError, ValueError, RuntimeError) as e:
             print(f"Failed to load observ-it export: {e}")
             return
 
@@ -676,6 +944,10 @@ def main():
         all_results = {}
         if ds_results:
             all_results["observit"] = ds_results
+            all_results["observit"]["env"] = runtime_env_info()
+            all_results["observit"]["deterministic"] = bool(getattr(args, "deterministic", False))
+        if bool(args.use_mm) and all_results:
+            all_results["_mm_global_summary"] = _build_mm_global_summary(all_results)
         if args.output_json:
             with open(args.output_json, "w") as f:
                 json.dump(all_results, f, indent=2, default=float)
@@ -723,6 +995,15 @@ def main():
         )
         if ds_results:
             all_results[ds_name] = ds_results
+            all_results[ds_name]["env"] = runtime_env_info()
+            all_results[ds_name]["deterministic"] = bool(getattr(args, "deterministic", False))
+
+    if bool(args.use_mm) and all_results:
+        mm_summary = _build_mm_global_summary(all_results)
+        all_results["_mm_global_summary"] = mm_summary
+        if not bool(mm_summary["allow_global_aggregation"]):
+            blocked = ", ".join(mm_summary["blocked_by_datasets"])
+            print(f"\nMM global aggregation blocked: {blocked}")
 
     if args.output_json:
         with open(args.output_json, "w") as f:

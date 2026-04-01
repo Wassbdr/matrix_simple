@@ -1,13 +1,9 @@
 """Unit tests for RCAEvalLoader dataset mapping/detection."""
 
-import os
-import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from loaders.rcaeval_loader import RCAEvalLoader
+from rca_pipeline.loaders.rcaeval_loader import RCAEvalLoader
 
 
 def test_available_datasets_detects_re2_tt_layout():

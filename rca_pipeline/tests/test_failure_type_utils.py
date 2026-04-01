@@ -1,11 +1,6 @@
 """Unit tests for failure_type_utils (pytest or python)."""
 
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from failure_type_utils import split_logits_by_failure_type
+from rca_pipeline.failure_type_utils import split_logits_by_failure_type
 
 
 class _D:

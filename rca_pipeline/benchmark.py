@@ -41,26 +41,31 @@ from torch_geometric.nn import GCNConv
 
 warnings.filterwarnings("ignore")
 
-# Local imports
-from model_sta import SelectThenAnalyze
-from model import SpatioTemporalRCA
-from model_late_gat import SpatioTemporalRCA_GAT
-from common import set_all_seeds
-from k_selection import get_optimal_k, adaptive_gib_beta
-from losses import info_nce_loss, asymmetric_gib_loss, variational_gib_loss
-from augment import augment_positive
-from causal_graph_builder import CausalGraphBuilder
-from cascade_aware_loss import CausalCascadeAwareLoss
-from drift_detector import make_k8s_drift_detector
-from failure_type_utils import split_logits_by_failure_type
-from sta_fusion_utils import gated_selector_scorer_fusion
-from training_utils import EarlyStopping
+# Local imports (package-safe for `python -m rca_pipeline.benchmark`)
+from rca_pipeline.model_sta import SelectThenAnalyze
+from rca_pipeline.model import SpatioTemporalRCA
+from rca_pipeline.model_late_gat import SpatioTemporalRCA_GAT
+from rca_pipeline.common import (
+    set_all_seeds,
+    stratified_split_shuffle,
+    set_torch_deterministic,
+    runtime_env_info,
+)
+from rca_pipeline.k_selection import get_optimal_k, adaptive_gib_beta
+from rca_pipeline.losses import info_nce_loss, asymmetric_gib_loss, variational_gib_loss
+from rca_pipeline.augment import augment_positive
+from rca_pipeline.causal_graph_builder import CausalGraphBuilder
+from rca_pipeline.cascade_aware_loss import CausalCascadeAwareLoss
+from rca_pipeline.drift_detector import make_k8s_drift_detector
+from rca_pipeline.failure_type_utils import split_logits_by_failure_type
+from rca_pipeline.sta_fusion_utils import gated_selector_scorer_fusion
+from rca_pipeline.training_utils import EarlyStopping
 
 import logging
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
-from metrics_rcaeval import RCAEvalMetrics
+from rca_pipeline.metrics_rcaeval import RCAEvalMetrics
 
 
 # =====================================================================
@@ -121,24 +126,6 @@ def get_ranking_metrics(y_true_list, y_pred_logits_list, top_ns=(1, 2, 5)):
     if count == 0:
         return {n: 0.0 for n in top_ns}, 0.0
     return {n: tops[n] / count for n in top_ns}, mrr / count
-
-
-def stratified_split(dataset, name_to_idx, train_ratio=0.8):
-    healthy = [d for d in dataset if d.y is None or d.y.item() == 0]
-    anomalous = [d for d in dataset
-                 if d.y is not None and d.y.item() == 1
-                 and hasattr(d, 'root_cause') and d.root_cause[0] in name_to_idx]
-    h_split = int(len(healthy) * train_ratio)
-    train = healthy[:h_split]
-    test = healthy[h_split:]
-    by_rc: Dict[str, list] = {}
-    for d in anomalous:
-        by_rc.setdefault(d.root_cause[0], []).append(d)
-    for rc, items in by_rc.items():
-        s = max(1, int(len(items) * train_ratio))
-        train.extend(items[:s])
-        test.extend(items[s:])
-    return train, test
 
 
 def get_anomalies(data_list, name_to_idx):
@@ -1264,7 +1251,10 @@ def build_configs(
 # =====================================================================
 
 def main(args):
-    from simulated_data_scalable import generate_scalable_dataset
+    from rca_pipeline.simulated_data_scalable import generate_scalable_dataset
+
+    if getattr(args, "deterministic", False):
+        set_torch_deterministic(True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
@@ -1303,25 +1293,39 @@ def main(args):
         )
         print(f"  Generated {len(dataset)} samples in {time.time()-t0:.1f}s")
 
-        # Causal / hybrid graph construction
+        name_to_idx = {n: i for i, n in enumerate(node_names)}
+        train_data, test_data = stratified_split_shuffle(
+            dataset,
+            train_ratio=0.8,
+            name_to_idx=name_to_idx,
+            seed=int(args.dataset_seed),
+        )
+        split_info = {
+            "type": "stratified_split_shuffle",
+            "mode": "fixed_split_by_dataset_seed",
+            "seed_source": "dataset_seed",
+            "seed": int(args.dataset_seed),
+            "train_ratio": 0.8,
+        }
+
+        # Causal / hybrid graph construction (TRAIN-ONLY to avoid leakage)
         graph_type = getattr(args, "graph_type", "structural")
         edge_weights = None
         if graph_type in ("causal", "hybrid"):
-            healthy_windows = [d for d in dataset if d.y.item() == 0]
+            healthy_windows = [d for d in train_data if d.y.item() == 0]
             if healthy_windows:
                 # Build [T, N] healthy matrix by concatenating temporal node means.
                 xh_blocks = [d.x.mean(dim=1).transpose(0, 1) for d in healthy_windows]  # [W, N]
                 X_h = torch.cat(xh_blocks, dim=0).cpu().numpy()
                 builder = CausalGraphBuilder(method=graph_type)
                 cg_result = builder.build(X_h, edge_index)
-                print(f"  Causal graph: method={cg_result.method_used}, "
-                      f"edges={cg_result.edge_index.size(1)}, "
-                      f"CS={cg_result.causal_sufficiency_score:.2f}")
+                print(
+                    f"  Causal graph (train-only): method={cg_result.method_used}, "
+                    f"edges={cg_result.edge_index.size(1)}, "
+                    f"CS={cg_result.causal_sufficiency_score:.2f}"
+                )
                 edge_index = cg_result.edge_index
                 edge_weights = cg_result.edge_weights
-
-        name_to_idx = {n: i for i, n in enumerate(node_names)}
-        train_data, test_data = stratified_split(dataset, name_to_idx)
         train_data_raw, test_data_raw = train_data, test_data
         train_data = _apply_drift_filter(
             train_data,
@@ -1338,11 +1342,27 @@ def main(args):
         if not train_data or not test_data:
             # Fallback to unfiltered split when drift cooldown removes too many windows.
             train_data, test_data = train_data_raw, test_data_raw
+        drift_info = {
+            "enabled": bool(args.enable_drift),
+            "delta": float(args.drift_delta),
+            "cooldown_steps": int(args.drift_cooldown_steps),
+            "n_train_raw": int(len(train_data_raw)),
+            "n_test_raw": int(len(test_data_raw)),
+            "n_train_kept": int(len(train_data)),
+            "n_test_kept": int(len(test_data)),
+            "train_drop_ratio": float(1.0 - (len(train_data) / max(len(train_data_raw), 1))),
+            "test_drop_ratio": float(1.0 - (len(test_data) / max(len(test_data_raw), 1))),
+        }
 
+        norm_stats = None
         if not args.no_normalize:
             mean, std = compute_norm_stats(train_data)
             normalize_dataset(train_data, mean, std)
             normalize_dataset(test_data, mean, std)
+            norm_stats = {
+                "mean": mean.detach().cpu().flatten().tolist(),
+                "std": std.detach().cpu().flatten().tolist(),
+            }
 
         train_anom = get_anomalies(train_data, name_to_idx)
         test_anom = get_anomalies(test_data, name_to_idx)
@@ -1495,7 +1515,35 @@ def main(args):
             "no_normalize": args.no_normalize,
             "skip_late_gat": args.skip_late_gat,
             "metrics": results,
+            "hyperparams": {
+                "lr": 1e-3,
+                "weight_decay": 1e-4,
+                "batch_size": args.batch_size,
+                "hidden_dim": hidden,
+                "sta_warmup_epochs": args.sta_warmup_epochs,
+                "sta_k_anneal_epochs": args.sta_k_anneal_epochs,
+                "supervised_epochs": args.supervised_epochs,
+                "late_contrastive_epochs": args.late_contrastive_epochs,
+                "nce_temperature": 0.07,
+                "gib_beta_max": 0.3,
+                "selector_type": args.selector_type,
+                "temporal_encoder": args.temporal_encoder,
+                "use_gib": not args.no_gib,
+                "mask_weighted_nce": not args.no_mask_weighted_nce,
+                "cascade_loss_weight": args.cascade_loss_weight,
+                "graph_type": getattr(args, "graph_type", "structural"),
+            },
             "reference_top1": {m: REFERENCE_TOP1[m].get(N) for m in REFERENCE_TOP1},
+            "normalization": {
+                "enabled": bool(not args.no_normalize),
+                "train_only": True,
+                "stats": norm_stats,
+            },
+            "split_mode": str(split_info.get("mode", "unknown")),
+            "split": split_info,
+            "drift": drift_info,
+            "env": runtime_env_info(),
+            "deterministic": bool(getattr(args, "deterministic", False)),
         })
 
         # ---- Collect latency for scaling plot ----
@@ -1539,7 +1587,7 @@ if __name__ == "__main__":
                         help="Seed used for dataset generation")
 
     # Training/eval settings
-    parser.add_argument("--seeds", type=str, default="42,123,7",
+    parser.add_argument("--seeds", type=str, default="42,123,7,1337,2025",
                         help="Comma-separated training seeds")
     parser.add_argument("--hidden-dim", type=int, default=32,
                         help="Hidden dimension for graph models")
@@ -1572,6 +1620,11 @@ if __name__ == "__main__":
                         help="Skip Late Bottleneck GATv2 training/eval (faster)")
     parser.add_argument("--output-json", type=str, default=None,
                         help="Write aggregated metrics to this JSON path")
+    parser.add_argument(
+        "--deterministic",
+        action="store_true",
+        help="Best-effort deterministic mode for PyTorch (may reduce performance).",
+    )
 
     # Ablation flags for STA
     parser.add_argument("--no-gib", action="store_true",

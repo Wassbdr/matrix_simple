@@ -22,7 +22,7 @@ import pandas as pd
 import torch
 from torch_geometric.data import Data
 
-from graph_builder import GraphBuilder
+from rca_pipeline.graph_builder import GraphBuilder
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

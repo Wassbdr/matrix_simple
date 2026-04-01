@@ -26,7 +26,7 @@ from torch_geometric.data import Data
 from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
 from model import SpatioTemporalRCA
 
-from common import load_dataset_payload
+from common import load_dataset_payload, stratified_split_shuffle
 from failure_type_utils import split_logits_by_failure_type
 from metrics_rcaeval import RCAEvalMetrics
 
@@ -66,6 +66,7 @@ def evaluate(
     dataset_path: str,
     train_ratio: float = 0.8,
     batch_size: int = 256,
+    seed: int = 42,
 ) -> None:
     """
     Evaluates the model on anomalous windows using stratified split.
@@ -87,16 +88,15 @@ def evaluate(
         logger.error("No anomalous windows with root cause labels found.")
         return
 
-    # Stratified split: ensure each root cause type appears in train and test
-    by_rc: Dict[str, List[Data]] = {}
-    for d in anomalies:
-        rc = d.root_cause[0]
-        by_rc.setdefault(rc, []).append(d)
-
-    test_anomalies: List[Data] = []
-    for rc, items in by_rc.items():
-        split = max(1, int(len(items) * train_ratio))
-        test_anomalies.extend(items[split:])
+    # Stratified split with shuffle (order-independent) — evaluate on the test split.
+    # We split over anomalous windows only for checkpoint evaluation.
+    _, test_anomalies = stratified_split_shuffle(
+        anomalies,
+        train_ratio=train_ratio,
+        name_to_idx=name_to_idx,
+        seed=seed,
+        keep_at_least_one_in_test=True,
+    )
 
     logger.info("Evaluating on %d test anomalous windows.", len(test_anomalies))
 
@@ -247,10 +247,12 @@ if __name__ == "__main__":
         help="Path to the windowed dataset .pt file.",
     )
     parser.add_argument("--batch-size", type=int, default=256)
+    parser.add_argument("--seed", type=int, default=42, help="Seed for the evaluation split shuffle.")
     args = parser.parse_args()
 
     evaluate(
         checkpoint_path=args.checkpoint,
         dataset_path=args.dataset,
         batch_size=args.batch_size,
+        seed=args.seed,
     )
