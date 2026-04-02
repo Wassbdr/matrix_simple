@@ -191,7 +191,6 @@ Artefacts canoniques (soutenance):
 - results_transmission/canonical_results_manifest.json.sha256
 - results_transmission/comparability_matrix.json
 - docs/COMPARABILITY_MATRIX.md
-- results_transmission/AUDIT_FINAL_SOUTENANCE_2026-04-01.md
 
 Regeneration des artefacts:
 
@@ -266,10 +265,8 @@ matrix_simple/
 ## 10. Documentation utile
 
 - docs/PAPER_BENCHMARKS.md
-- docs/BENCHMARK_ARTIFACTS.md
 - docs/ANALYSIS_SIM_VS_REAL.md
 - docs/ANALYSIS_MULTIMODAL.md
-- docs/AUDIT_CODE_RESULTS.md
 - docs/COMPARABILITY_MATRIX.md
 - docs/Week1.md
 - docs/Week2.md
