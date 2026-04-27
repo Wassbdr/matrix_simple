@@ -22,9 +22,10 @@ References:
 from __future__ import annotations
 
 import logging
+from typing import Dict, NamedTuple, Optional, Tuple
+
 import numpy as np
 import torch
-from typing import Dict, List, NamedTuple, Optional, Tuple
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

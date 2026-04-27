@@ -556,6 +556,117 @@ def train_and_eval_gat(
     return y_true, y_logits
 
 
+def train_and_eval_late_gib(
+    train_data, test_data, node_names, edge_index, device,
+    hidden_dim=32, epochs=100, seed=42,
+):
+    """Late-Bottleneck STGCN+GIB (Phase 2 supervisée seulement).
+
+    train_v1_compact nécessite des samples healthy pour Phase 1. Sur observ-it
+    (load_observit retourne uniquement les windows labellisées), on implémente
+    directement la Phase 2 : CE supervisée sur les logits GIB bruts.
+    Même interface (y_true, y_logits) que train_and_eval_sta/gat.
+    """
+    from rca_pipeline.model import SpatioTemporalRCA
+    from rca_pipeline.training_utils import EarlyStopping
+
+    set_all_seeds(seed)
+    name_to_idx = {n: i for i, n in enumerate(node_names)}
+    N = len(node_names)
+
+    anomalous = [d for d in train_data if d.root_cause[0] in name_to_idx]
+    if len(anomalous) < 2:
+        return None
+
+    x_sup = torch.stack([d.x for d in anomalous]).to(device)  # [B, N, F, W]
+    y_sup = torch.tensor([name_to_idx[d.root_cause[0]] for d in anomalous],
+                         dtype=torch.long, device=device)
+    ei = edge_index.to(device)
+    F_ = x_sup.size(2)  # num_features (not N)
+
+    model = SpatioTemporalRCA(
+        num_features=F_, hidden_dim=hidden_dim,
+        num_nodes=N, gib_temperature=1.0,
+    ).to(device)
+
+    n_sup = x_sup.size(0)
+    perm_split = torch.randperm(n_sup, device=device)
+    n_val = max(1, int(n_sup * 0.1))
+    val_idx = perm_split[:n_val]
+    train_idx = perm_split[n_val:]
+    x_val, y_val = x_sup[val_idx], y_sup[val_idx]
+    x_tr, y_tr = x_sup[train_idx], y_sup[train_idx]
+    n_tr = x_tr.size(0)
+
+    opt = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
+    sch = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(opt, T_0=50, T_mult=2, eta_min=1e-5)
+    es = EarlyStopping(patience=30)
+
+    for ep in range(epochs):
+        model.train()
+        perm = torch.randperm(n_tr, device=device)
+        for s in range(0, n_tr, 64):
+            idx = perm[s:s + 64]
+            B = idx.size(0)
+            opt.zero_grad()
+            x_flat = x_tr[idx].view(B * N, F_, -1)
+            h_t = model.temporal_block(x_flat)
+            if B > 1:
+                offsets = torch.arange(B, device=device) * N
+                batch_ei = ei.unsqueeze(0).expand(B, -1, -1) + offsets.view(-1, 1, 1)
+                batch_ei = batch_ei.reshape(2, -1)
+            else:
+                batch_ei = ei
+            h_s = model.spatial_block(h_t, batch_ei)
+            logits = model.gib.mlp(h_s).squeeze(-1).view(B, N)
+            loss = F.cross_entropy(logits, y_tr[idx])
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            opt.step()
+        sch.step()
+
+        # Early stopping on val MRR
+        model.eval()
+        with torch.no_grad():
+            B_v = x_val.size(0)
+            x_flat_v = x_val.view(B_v * N, F_, -1)
+            h_tv = model.temporal_block(x_flat_v)
+            if B_v > 1:
+                offsets_v = torch.arange(B_v, device=device) * N
+                bei_v = ei.unsqueeze(0).expand(B_v, -1, -1) + offsets_v.view(-1, 1, 1)
+                bei_v = bei_v.reshape(2, -1)
+            else:
+                bei_v = ei
+            h_sv = model.spatial_block(h_tv, bei_v)
+            logits_v = model.gib.mlp(h_sv).squeeze(-1).view(B_v, N)
+        mrr_v = 0.0
+        for i in range(B_v):
+            ranked = logits_v[i].cpu().numpy().argsort()[::-1]
+            rank = int(np.where(ranked == y_val[i].item())[0][0]) + 1
+            mrr_v += 1.0 / rank
+        if es.step(mrr_v / B_v, model):
+            break
+
+    es.restore(model)
+    model.eval()
+
+    test_anom = [d for d in test_data if d.root_cause[0] in name_to_idx]
+    if not test_anom:
+        return None
+
+    y_true, y_logits = [], []
+    with torch.no_grad():
+        for d in test_anom:
+            x = d.x.unsqueeze(0).to(device)
+            x_flat = x.view(N, F_, -1)
+            h_t = model.temporal_block(x_flat)
+            h_s = model.spatial_block(h_t, ei)
+            gib_logits = model.gib.mlp(h_s).squeeze(-1)
+            y_true.append(name_to_idx[d.root_cause[0]])
+            y_logits.append(gib_logits.cpu().numpy())
+    return y_true, y_logits
+
+
 def _run_single_dataset(
     ds_name: str,
     data_list: List,
@@ -581,7 +692,7 @@ def _run_single_dataset(
         print(f"  Too few cases ({len(data_list)}), skipping.")
         return {}
 
-    sta_runs, gat_runs = [], []
+    sta_runs, gat_runs, late_gib_runs = [], [], []
     sta_raw_runs, gat_raw_runs = [], []
     sta_f_runs, gat_f_runs = [], []
     drift_train_stats = []
@@ -699,6 +810,14 @@ def _run_single_dataset(
         if r_gat_raw:
             gat_raw_runs.append(r_gat_raw)
 
+        if getattr(args, "include_late_gib", False):
+            r_lgib = train_and_eval_late_gib(
+                train_data, test_data, node_names, edge_index, device,
+                hidden_dim=args.hidden_dim, epochs=args.epochs, seed=seed,
+            )
+            if r_lgib:
+                late_gib_runs.append(r_lgib)
+
         if args.enable_drift:
             train_f, drift_train = _maybe_apply_drift_filter(
                 train_data, True, args.drift_delta, args.drift_cooldown_steps
@@ -747,6 +866,22 @@ def _run_single_dataset(
                                   reference=RCAEVAL_PUBLISHED_BASELINES.get("BARO"))
         compare_with_rcaeval_baselines(gat_m, dataset_name=ds_name, model_name=gat_name)
         ds_results[gat_name] = gat_m
+
+    if late_gib_runs:
+        lgib_m = rca_metrics.compute_with_std(late_gib_runs)
+        rca_metrics.print_summary(lgib_m, model_name=f"Late-STGCN+GIB ({ds_name})",
+                                  reference=RCAEVAL_PUBLISHED_BASELINES.get("BARO"))
+        compare_with_rcaeval_baselines(lgib_m, dataset_name=ds_name, model_name="Late-STGCN+GIB")
+        ds_results["Late-STGCN+GIB"] = lgib_m
+        per_seed_lgib = [rca_metrics.compute(yt, yp) for (yt, yp) in late_gib_runs]
+        ds_results["Late-STGCN+GIB"]["ci95"] = {
+            k: bootstrap_ci([float(r[k]) for r in per_seed_lgib], n_boot=2000, alpha=0.05, seed=0)
+            for k in RCAEvalMetrics.METRIC_KEYS
+        }
+        _attach_per_root_metrics(
+            ds_results, "Late-STGCN+GIB", "Late-STGCN+GIB",
+            late_gib_runs, node_names, rca_metrics, ds_name,
+        )
 
     # Bootstrap CI across seed-level aggregate metrics (CI on mean across seeds).
     # With few seeds (e.g. 3), intervals are wide / unstable; see seed_level_bootstrap_reliable in JSON.
@@ -902,6 +1037,30 @@ def main():
         default=12,
         help="Longueur de fenêtre temporelle pour l'export observ-it (défaut: 12).",
     )
+    parser.add_argument(
+        "--observit-topology",
+        type=str,
+        default="custom_app",
+        choices=["custom_app", "sock_shop"],
+        help="Topologie de services pour GraphBuilder (défaut: custom_app).",
+    )
+    parser.add_argument(
+        "--include-late-gib",
+        action="store_true",
+        help="Inclure Late-Bottleneck STGCN+GIB dans le benchmark (plus lent, deux phases).",
+    )
+    parser.add_argument(
+        "--loki-url",
+        type=str,
+        default=None,
+        help="URL Loki pour enrichir les fenêtres observit avec .x_logs (ex: http://localhost:3100).",
+    )
+    parser.add_argument(
+        "--loki-namespace",
+        type=str,
+        default="sock-shop",
+        help="Namespace Kubernetes à interroger dans Loki (défaut: sock-shop).",
+    )
     args = parser.parse_args()
 
     if args.mm_logs_only and args.mm_traces_only:
@@ -923,7 +1082,11 @@ def main():
         print("=" * 70)
         try:
             data_list, node_names, edge_index = load_observit(
-                args.observit_csv, window_size=args.observit_window
+                args.observit_csv,
+                window_size=args.observit_window,
+                topology_name=args.observit_topology,
+                loki_url=getattr(args, "loki_url", None),
+                loki_namespace=getattr(args, "loki_namespace", "sock-shop"),
             )
         except (FileNotFoundError, OSError, ValueError, RuntimeError) as e:
             print(f"Failed to load observ-it export: {e}")

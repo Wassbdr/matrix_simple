@@ -12,10 +12,10 @@ GIB Sparsity (Asymmetric):
         U=0 → M≈0, ||U||_0=1 → M is one-hot.
 """
 
+import logging
+
 import torch
 import torch.nn.functional as F
-import logging
-from typing import Optional
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

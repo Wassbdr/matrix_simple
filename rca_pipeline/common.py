@@ -4,9 +4,10 @@ Single source of truth for node names, indices, and dataset splitting.
 """
 
 import random
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
 import torch
-from typing import Dict, List, Tuple, Optional
 from torch_geometric.data import Data
 
 # Default 5-node K8S topology (used by legacy scripts: train.py, benchmark.py)

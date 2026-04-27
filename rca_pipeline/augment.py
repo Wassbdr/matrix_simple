@@ -12,10 +12,10 @@ Augmentation strategies:
     4. Edge dropout (temporarily remove edges for spatial diversity)
 """
 
-import torch
 import logging
 from typing import Optional
-from torch_geometric.data import Data
+
+import torch
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

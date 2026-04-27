@@ -1,15 +1,16 @@
-import subprocess
-import time
-import requests
-import csv
-import logging
 import argparse
-import os
-import sys
-import math
+import csv
 import json
-from typing import List, Dict, Any, Optional
+import logging
+import math
+import os
+import subprocess
+import sys
+import time
 import uuid
+from typing import Any, Dict, List, Optional
+
+import requests
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -53,7 +54,12 @@ class ExperimentRunner:
                  anomaly_duration: int = 300,
                  root_cause: str = "unknown",
                  failure_type: str = "hard",
-                 scenario: str = "default") -> None:
+                 scenario: str = "default",
+                 namespace: str = "rca-sandbox",
+                 pod_regex: str = r"(frontend|auth|backend|cache|database).*",
+                 prom_port_forward_ns: Optional[str] = None,
+                 prom_port_forward_svc: Optional[str] = None,
+                 prom_port_forward_ports: str = "9090:80") -> None:
         self.prometheus = PrometheusClient(prometheus_url)
         self.chaos_file = chaos_file
         self.locust_file = locust_file
@@ -65,21 +71,31 @@ class ExperimentRunner:
         self.root_cause = root_cause
         self.failure_type = failure_type
         self.scenario = scenario
+        self.namespace = namespace
         self.run_id = str(uuid.uuid4())[:8]
         self.chaos_start_ts: float = 0.0
         self.chaos_end_ts: float = 0.0
         self._pf_proc: Optional[subprocess.Popen] = None
-        # Keep only application pods to avoid control-plane/chaos noise.
-        self._app_pod_regex = r"(frontend|auth|backend|cache|database).*"
+        self._app_pod_regex = pod_regex
+        # Defaults keep existing rca-sandbox behavior; override for sock-shop etc.
+        self._pf_ns = prom_port_forward_ns or "rca-sandbox"
+        self._pf_svc = prom_port_forward_svc or "svc/rca-prometheus-server"
+        self._pf_ports = prom_port_forward_ports
 
     def _ensure_prometheus_port_forward(self) -> None:
-        """Si l'URL pointe sur localhost:9090 et rien n'écoute, relance kubectl port-forward."""
+        """Si l'URL pointe sur localhost et rien n'écoute, relance kubectl port-forward.
+
+        - Vérifie d'abord la santé (skip si déjà accessible).
+        - Capture stderr pour diag si le port-forward meurt.
+        - Poll /-/healthy jusqu'à 15s au lieu d'attendre 2s aveuglément.
+        """
         ep = self.prometheus.endpoint.lower()
-        if "127.0.0.1:9090" not in ep and "localhost:9090" not in ep:
+        if "127.0.0.1" not in ep and "localhost" not in ep:
             return
         try:
-            requests.get(f"{self.prometheus.endpoint}/-/healthy", timeout=3)
-            return
+            r = requests.get(f"{self.prometheus.endpoint}/-/healthy", timeout=3)
+            if r.ok:
+                return
         except Exception:
             pass
         if self._pf_proc is not None and self._pf_proc.poll() is None:
@@ -88,22 +104,45 @@ class ExperimentRunner:
                 self._pf_proc.wait(timeout=5)
             except Exception:
                 pass
-        logger.info("Démarrage kubectl port-forward vers rca-prometheus-server:9090...")
+        logger.info("Démarrage kubectl port-forward vers %s/%s %s...",
+                    self._pf_ns, self._pf_svc, self._pf_ports)
+        self._pf_stderr = open(os.path.join(self.output_dir, f"pf_prometheus_{self.run_id}.log"), "w")
         self._pf_proc = subprocess.Popen(
             [
-                "kubectl", "port-forward", "-n", "rca-sandbox",
-                "svc/rca-prometheus-server", "9090:80",
+                "kubectl", "port-forward", "-n", self._pf_ns,
+                self._pf_svc, self._pf_ports,
                 "--address=127.0.0.1",
             ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=self._pf_stderr,
+            stderr=subprocess.STDOUT,
             start_new_session=True,
         )
-        time.sleep(2)
+        # Poll up to ~15s (port-forward + endpoint resolution peut prendre du temps)
+        deadline = time.time() + 15.0
+        last_err: Optional[Exception] = None
+        while time.time() < deadline:
+            if self._pf_proc.poll() is not None:
+                break  # process died; show log below
+            try:
+                r = requests.get(f"{self.prometheus.endpoint}/-/healthy", timeout=2)
+                if r.ok:
+                    logger.info("Prometheus accessible via port-forward.")
+                    return
+            except Exception as e:
+                last_err = e
+            time.sleep(1.0)
+        # Diag: read stderr log
         try:
-            requests.get(f"{self.prometheus.endpoint}/-/healthy", timeout=5)
-        except Exception as e:
-            logger.warning("Prometheus toujours injoignable après port-forward: %s", e)
+            self._pf_stderr.flush()
+            with open(self._pf_stderr.name) as f:
+                tail = f.read()[-500:]
+        except Exception:
+            tail = "(no stderr captured)"
+        logger.error(
+            "Prometheus injoignable après port-forward (%s/%s %s). "
+            "Dernière erreur curl: %s. kubectl stderr: %s",
+            self._pf_ns, self._pf_svc, self._pf_ports, last_err, tail.strip() or "(vide)",
+        )
 
     def _run_cmd(self, cmd: List[str]) -> None:
         """Helper to run a shell command."""
@@ -113,7 +152,21 @@ class ExperimentRunner:
     def run_experiment(self) -> None:
         """Runs the whole loop: Locust -> Wait -> Chaos -> Wait -> Stop -> Extract."""
         logger.info(f"Starting experiment run_id={self.run_id}")
-        
+
+        # 0. Fail-fast: on lève le port-forward Prom AVANT le baseline pour éviter
+        # de perdre ~10 min d'expérience si Prometheus est injoignable.
+        os.makedirs(self.output_dir, exist_ok=True)
+        self._ensure_prometheus_port_forward()
+        try:
+            r = requests.get(f"{self.prometheus.endpoint}/-/healthy", timeout=3)
+            if not r.ok:
+                raise RuntimeError(f"Prometheus /-/healthy returned {r.status_code}")
+        except Exception as e:
+            raise RuntimeError(
+                f"Prometheus inaccessible avant expérience: {e}. "
+                f"Vérifie --prom-pf-ns/--prom-pf-svc ou lance un port-forward manuel."
+            ) from e
+
         # 1. Start Locust in background
         locust_cmd = [
             sys.executable, "-m", "locust", "-f", self.locust_file,
@@ -172,7 +225,7 @@ class ExperimentRunner:
         """Fetches metrics from Prometheus and saves them to a CSV file."""
         logger.info("Extracting metrics from Prometheus (10s step)...")
         self._ensure_prometheus_port_forward()
-        namespace = "rca-sandbox"
+        namespace = self.namespace
         
         queries = {
             "cpu_usage": f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}", container!="", pod=~"{self._app_pod_regex}"}}[1m])) by (pod)',
@@ -332,6 +385,28 @@ if __name__ == '__main__':
         "--scenario", type=str, default="default",
         help="Human-readable scenario label (e.g. stress-cpu-db)."
     )
+    parser.add_argument(
+        "--namespace", type=str, default="rca-sandbox",
+        help="K8s namespace where the target app runs (used in PromQL filters)."
+    )
+    parser.add_argument(
+        "--pod-regex", type=str,
+        default=r"(frontend|auth|backend|cache|database).*",
+        help="Regex of application pods to include (excludes control-plane/chaos noise)."
+    )
+    parser.add_argument(
+        "--prom-pf-ns", type=str, default=None,
+        help="Namespace of the Prometheus service for auto port-forward (default: rca-sandbox)."
+    )
+    parser.add_argument(
+        "--prom-pf-svc", type=str, default=None,
+        help="Service ref for port-forward, e.g. svc/rca-prometheus-server (default) "
+             "or svc/rancher-monitoring-prometheus-nodeport for sock-shop on this cluster."
+    )
+    parser.add_argument(
+        "--prom-pf-ports", type=str, default="9090:80",
+        help="port-forward ports in 'local:remote' form (default 9090:80)."
+    )
     args = parser.parse_args()
 
     runner = ExperimentRunner(
@@ -346,6 +421,11 @@ if __name__ == '__main__':
         root_cause=args.root_cause,
         failure_type=args.failure_type,
         scenario=args.scenario,
+        namespace=args.namespace,
+        pod_regex=args.pod_regex,
+        prom_port_forward_ns=args.prom_pf_ns,
+        prom_port_forward_svc=args.prom_pf_svc,
+        prom_port_forward_ports=args.prom_pf_ports,
     )
     runner.run_experiment()
 

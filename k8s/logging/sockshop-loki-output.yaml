@@ -1,0 +1,23 @@
+apiVersion: logging.banzaicloud.io/v1beta1
+kind: ClusterOutput
+metadata:
+  name: sockshop-loki
+  namespace: cattle-logging-system
+spec:
+  loki:
+    url: http://loki.monitoring-logs.svc.cluster.local:3100
+    configure_kubernetes_labels: false
+    extra_labels:
+      cluster: observit-cluster1
+      job: sockshop
+    labels:
+      namespace: "$.kubernetes.namespace_name"
+      pod: "$.kubernetes.pod_name"
+      container: "$.kubernetes.container_name"
+      app: "$.kubernetes.labels.name"
+    buffer:
+      timekey: 1m
+      timekey_wait: 30s
+      timekey_use_utc: true
+      flush_mode: interval
+      flush_interval: 10s

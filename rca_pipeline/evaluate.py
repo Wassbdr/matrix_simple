@@ -13,22 +13,20 @@ Usage:
         --dataset ../dataset_windows.pt
 """
 
-import torch
-import json
-import time
 import argparse
+import json
 import logging
-import numpy as np
-from typing import List, Dict, Tuple
+import time
 from collections import Counter
+from typing import Tuple
 
-from torch_geometric.data import Data
-from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
-from model import SpatioTemporalRCA
-
+import numpy as np
+import torch
 from common import load_dataset_payload, stratified_split_shuffle
 from failure_type_utils import split_logits_by_failure_type
 from metrics_rcaeval import RCAEvalMetrics
+from model import SpatioTemporalRCA
+from sklearn.metrics import classification_report, f1_score, precision_score, recall_score
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

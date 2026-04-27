@@ -22,17 +22,17 @@ Architecture:
 forward(x_m, x_l, x_t, edge_index) → (logits_full, M_soft, top_k, sel_logits)
 """
 
+import logging
+from typing import Optional, Tuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GCNConv
-from typing import Optional, Tuple
-import logging
 
 from rca_pipeline.model_sta import (
-    STESelector,
-    DeepTemporalBlock,
     DeepSpatialBlock,
+    DeepTemporalBlock,
+    STESelector,
     SubgraphScorer,
     extract_subgraph_vectorized,
 )

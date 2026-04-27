@@ -7,13 +7,13 @@ Extracts common patterns from benchmark.py, train_sta.py, and benchmark_real.py:
     - TwoPhaseTrainer (contrastive warmup + supervised fine-tuning protocol)
 """
 
+import logging
+from typing import Dict, Optional
+
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
-from typing import Optional, Dict
-import logging
-import copy
+import torch.optim as optim
 
 logger = logging.getLogger(__name__)
 
@@ -118,8 +118,8 @@ class TwoPhaseTrainer:
         Phase 1: Contrastive warmup with mask-weighted InfoNCE + variational GIB.
         Returns final loss value.
         """
-        from losses import info_nce_loss, variational_gib_loss
         from augment import augment_positive
+        from losses import info_nce_loss, variational_gib_loss
 
         optimizer = optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         target_rate = k / num_nodes

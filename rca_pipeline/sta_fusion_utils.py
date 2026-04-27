@@ -2,10 +2,9 @@
 Fusion helpers for STA selector/scorer calibration.
 """
 
-from typing import Optional, List
 
-import torch
 import numpy as np
+import torch
 
 
 def _safe_std(x: torch.Tensor) -> torch.Tensor:

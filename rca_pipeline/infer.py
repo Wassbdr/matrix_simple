@@ -10,18 +10,19 @@ likely root cause -- the GIB has learned to isolate the causal
 sub-graph during training.
 """
 
-import torch
 import argparse
 import logging
-from typing import List, Dict, Tuple
+from typing import Dict, List, Tuple
 
-from torch_geometric.data import Data
+import torch
 from model import SpatioTemporalRCA
+from torch_geometric.data import Data
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-from common import NODE_NAMES as _DEFAULT_NODE_NAMES, NAME_TO_IDX as _DEFAULT_NAME_TO_IDX, load_dataset_payload
+from common import NODE_NAMES as _DEFAULT_NODE_NAMES
+from common import load_dataset_payload
 
 # Default int->str mapping for 5-node K8s topology (overridden at runtime by dataset payload)
 _DEFAULT_NODE_IDX_NAMES: Dict[int, str] = {i: name for i, name in enumerate(_DEFAULT_NODE_NAMES)}

@@ -1,0 +1,23 @@
+##############################################
+# PodChaos -- Kill périodique du pod user
+# Simule une indisponibilité du service user (auth/login)
+##############################################
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: pod-kill-user
+  namespace: sock-shop
+  labels:
+    experiment: pod-kill-user
+    project: rca-research
+spec:
+  action: pod-kill
+  mode: one
+  selector:
+    namespaces:
+      - sock-shop
+    labelSelectors:
+      name: user
+  scheduler:
+    cron: "@every 90s"
+  duration: "5m"

@@ -1,8 +1,9 @@
-import torch
-from torch_geometric.data import Data
 import logging
 import sys
 from typing import List
+
+import torch
+from torch_geometric.data import Data
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -66,7 +67,7 @@ def verify_tensors(filepath: str) -> None:
     mean_val = float(torch.mean(cpu_feature))
     var_val = float(torch.var(cpu_feature))
     
-    logger.info(f"Statistics for Feature 0 (CPU Usage) in this window:")
+    logger.info("Statistics for Feature 0 (CPU Usage) in this window:")
     logger.info(f" - Mean: {mean_val:.4f}")
     logger.info(f" - Variance: {var_val:.4f}")
     

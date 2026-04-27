@@ -1,10 +1,13 @@
-import pandas as pd
-import numpy as np
-import torch
-from torch_geometric.data import Data
-from sklearn.preprocessing import StandardScaler
 import logging
-from typing import List, Dict
+from typing import Dict, List, Optional
+
+import numpy as np
+import pandas as pd
+import torch
+from sklearn.preprocessing import StandardScaler
+from torch_geometric.data import Data
+
+from rca_pipeline.topologies import ServiceTopology, get_topology
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -12,28 +15,23 @@ logger = logging.getLogger(__name__)
 class GraphBuilder:
     """
     Transforms Prometheus CSV metrics into PyTorch Geometric spatial-temporal graphs.
+
+    Topologie paramétrable via `topology` (ServiceTopology) ou `topology_name`
+    ("custom_app", "sock_shop"). Par défaut: custom_app (5 nodes historique).
     """
-    def __init__(self, csv_path: str) -> None:
+    def __init__(
+        self,
+        csv_path: str,
+        topology: Optional[ServiceTopology] = None,
+        topology_name: Optional[str] = None,
+    ) -> None:
         self.csv_path = csv_path
-        
-        # 5 microservices mapping to node indices
-        self.node_mapping: Dict[str, int] = {
-            "frontend": 0,
-            "auth": 1,
-            "backend": 2,
-            "cache": 3,
-            "database": 4
-        }
-        
-        # Directed Dependencies: 
-        # Frontend(0) -> Auth(1)
-        # Frontend(0) -> Backend(2)
-        # Backend(2) -> Cache(3)
-        # Backend(2) -> Database(4)
-        self.edge_index = torch.tensor([
-            [0, 0, 2, 2],
-            [1, 2, 3, 4]
-        ], dtype=torch.long)
+
+        if topology is None:
+            topology = get_topology(topology_name or "custom_app")
+        self.topology = topology
+        self.node_mapping: Dict[str, int] = dict(topology.node_mapping)
+        self.edge_index = topology.edge_index()
         
         self.features: List[str] = [
             "cpu_usage", "ram_usage", "network_tx", "network_rx", "error_rate"
@@ -46,22 +44,32 @@ class GraphBuilder:
 
     def _map_pod_to_node(self, pod_name: str) -> int:
         """Map a pod name to a graph node index.
-        
-        Uses segment-based matching: splits on '-' and checks if any segment
-        starts with the node key. Resolves ambiguity by preferring the longest
-        matching key (e.g. 'database' over 'data').
+
+        Stratégie: prefix-match avec la clé la plus longue d'abord. Gère les
+        clés contenant des hyphens (e.g. 'carts-db', 'front-end'), en évitant
+        que 'carts-db-xxx' ne matche 'carts'. Fallback: segment-match (utile
+        pour les clés mono-mot comme 'database').
         """
-        pod_name_lower = str(pod_name).lower()
-        segments = pod_name_lower.replace('_', '-').split('-')
-        
+        pod_name_lower = str(pod_name).lower().replace('_', '-')
+
+        # 1) Prefix match, longest key first
+        keys_by_len = sorted(self.node_mapping.keys(), key=lambda k: -len(k))
+        for key in keys_by_len:
+            if pod_name_lower == key or pod_name_lower.startswith(key + "-"):
+                return self.node_mapping[key]
+
+        # 2) Segment fallback (compat historique sur pods sans hyphen dans le service name)
+        segments = pod_name_lower.split('-')
         best_match_idx = -1
         best_match_len = 0
-        for key, idx in self.node_mapping.items():
+        for key in keys_by_len:
+            if "-" in key:
+                continue  # already covered by prefix match
             for seg in segments:
                 if seg == key or seg.startswith(key):
                     if len(key) > best_match_len:
                         best_match_len = len(key)
-                        best_match_idx = idx
+                        best_match_idx = self.node_mapping[key]
                     break
         return best_match_idx
 

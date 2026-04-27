@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this software or results, please cite as below."
+title: "GNN-RCA: Spatio-Temporal Graph Neural Networks for Root Cause Analysis in Kubernetes Microservices"
+type: software
+authors:
+  - family-names: Badraoui
+    given-names: Wassim
+    email: wassim.badraoui@epita.fr
+    affiliation: EPITA
+date-released: 2026-04-27
+version: "0.1.0"
+license: MIT
+keywords:
+  - root-cause-analysis
+  - graph-neural-networks
+  - kubernetes
+  - observability
+  - graph-information-bottleneck
+  - spatio-temporal
+repository-code: "https://github.com/YOUR_USERNAME/YOUR_REPO"
+preferred-citation:
+  type: article
+  authors:
+    - family-names: Badraoui
+      given-names: Wassim
+  title: "GNN-RCA: Spatio-Temporal Graph Neural Networks for Root Cause Analysis in Kubernetes Microservices"
+  year: 2026
+  notes: "Preprint. Replace with arXiv ID once available."

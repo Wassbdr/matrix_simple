@@ -16,16 +16,15 @@ Verified equation:
     where beta is annealed from 0.0 to 1.0 over 50 epochs.
 """
 
-import torch
-import torch.optim as optim
 import logging
 import sys
-from typing import List, Dict, Tuple
+from typing import Dict, List, Tuple
 
-from torch_geometric.data import Data
-
-from model import SpatioTemporalRCA
+import torch
+import torch.optim as optim
 from losses import info_nce_loss
+from model import SpatioTemporalRCA
+from torch_geometric.data import Data
 
 logging.basicConfig(
     level=logging.INFO,

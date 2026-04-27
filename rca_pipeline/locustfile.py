@@ -1,5 +1,6 @@
 import logging
-from locust import HttpUser, task, between
+
+from locust import HttpUser, between, task
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

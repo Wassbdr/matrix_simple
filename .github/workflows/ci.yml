@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.11"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch==2.0.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install torch_geometric==2.4.0
+          pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: python -m ruff check rca_pipeline
+
+      - name: Unit tests
+        run: python -m pytest -q rca_pipeline/tests
+
+      - name: Smoke benchmark (simulated, N=20, 2 seeds)
+        run: |
+          python -m rca_pipeline.benchmark \
+            --sizes 20 \
+            --seeds 42,123 \
+            --supervised-epochs 5 \
+            --late-contrastive-epochs 3 \
+            --sta-warmup-epochs 2 \
+            --sta-k-anneal-epochs 3 \
+            --baseline-epochs 5 \
+            --output-json /tmp/smoke_sim.json
+
+      # validation_protocol (smoke/long/paper) requires RCAEval data not available in CI.
+      # Run locally: RCA_VAL_PRESET=smoke RCA_VAL_STA_WARMUP=0 python -m rca_pipeline.validation_protocol

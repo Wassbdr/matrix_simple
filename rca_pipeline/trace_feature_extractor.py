@@ -14,8 +14,9 @@ Fallback: np.zeros(6) when traces unavailable.
 
 from __future__ import annotations
 
+from typing import List, NamedTuple, Optional
+
 import numpy as np
-from typing import Dict, List, NamedTuple, Optional
 
 N_TRACE_FEATURES = 6
 

@@ -19,7 +19,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-
 ROOT = Path(__file__).resolve().parent
 OUT_DIR = ROOT / "validation_runs"
 

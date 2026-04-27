@@ -17,8 +17,9 @@ Fallback: np.zeros(8) when logs unavailable.
 from __future__ import annotations
 
 import re
-import numpy as np
 from typing import List, Optional
+
+import numpy as np
 
 N_LOG_FEATURES = 8
 

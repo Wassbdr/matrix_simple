@@ -16,10 +16,11 @@ Key properties vs the 5-node dataset:
     - Multi-path propagation: same root cause can cascade via different routes
 """
 
+from typing import List
+
+import numpy as np
 import torch
 from torch_geometric.data import Data
-from typing import List
-import numpy as np
 
 # ── 20-node topology ──────────────────────────────────────────────────
 NODE_NAMES_LARGE = [

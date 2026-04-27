@@ -33,12 +33,18 @@ Usage:
     # X shape: [30, n_services, 6]
 """
 
-import time
-import math
+from __future__ import annotations
+
 import logging
+import math
+import time
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
 import numpy as np
 import requests
-from typing import Dict, List, Optional, Tuple, Any
+
+if TYPE_CHECKING:
+    import torch
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -287,7 +293,7 @@ class PrometheusConnector:
 
     def to_graph_builder_format(
         self, X: np.ndarray
-    ) -> "torch.Tensor":
+    ) -> torch.Tensor:
         """
         Convert the numpy array to the PyTorch format expected by SelectThenAnalyze:
         [N, F, W] (nodes × features × time).

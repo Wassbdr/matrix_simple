@@ -1,13 +1,13 @@
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GCNConv
-from sklearn.ensemble import RandomForestClassifier
-import numpy as np
-from typing import List, Tuple, Dict, Optional
-from torch_geometric.data import Data
-
 from common import NAME_TO_IDX
+from sklearn.ensemble import RandomForestClassifier
+from torch_geometric.data import Data
+from torch_geometric.nn import GCNConv
 
 
 def get_ranking_metrics(y_true_list: List[int], y_pred_logits_list: np.ndarray) -> Tuple[float, float, float]:

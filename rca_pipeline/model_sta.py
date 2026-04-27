@@ -22,13 +22,14 @@ Key design principles (aligned with formalization):
     - Single vectorized pyg_subgraph call for the entire batch.
 """
 
+import logging
+from typing import Tuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 from torch_geometric.utils import subgraph as pyg_subgraph
-from typing import Tuple
-import logging
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

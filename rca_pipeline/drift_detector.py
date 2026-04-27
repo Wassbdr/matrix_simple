@@ -39,10 +39,10 @@ Usage:
             rca_result = run_rca(metrics)
 """
 
-import math
 import logging
-from typing import Dict, List, Optional, Tuple
+import math
 from collections import deque
+from typing import Dict, List
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -394,7 +394,7 @@ if __name__ == "__main__":
     summary = detector.get_drift_summary()
     print(f"  Test 3: drift_events={summary['total_drift_events']}, "
           f"in_cooldown={in_cooldown}")
-    print(f"  Test 3 PASS: Multi-metric detector works")
+    print("  Test 3 PASS: Multi-metric detector works")
 
     print("\n=== All tests passed ===")
 
@@ -428,8 +428,6 @@ class TestTimeAdaptation:
         adapt_steps: int = 5,
         window_size: int = 20,
     ):
-        import torch
-        import copy
 
         self.model = model
         self.drift_detector = drift_detector

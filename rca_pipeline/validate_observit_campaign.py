@@ -14,7 +14,6 @@ from typing import Dict, List
 
 import pandas as pd
 
-
 REQUIRED_COLUMNS = {
     "timestamp",
     "pod",

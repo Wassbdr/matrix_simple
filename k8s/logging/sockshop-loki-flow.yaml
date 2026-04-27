@@ -1,0 +1,21 @@
+apiVersion: logging.banzaicloud.io/v1beta1
+kind: ClusterFlow
+metadata:
+  name: sockshop-to-loki
+  namespace: cattle-logging-system
+spec:
+  match:
+    - select:
+        namespaces:
+          - sock-shop
+  filters:
+    - record_transformer:
+        records:
+          - loggingref: rancher-logging-root
+    - parser:
+        remove_key_name_field: false
+        reserve_data: true
+        parse:
+          type: none
+  globalOutputRefs:
+    - sockshop-loki

@@ -28,13 +28,14 @@ Usage:
     python simulated_data_scalable.py --num-nodes 100 --num-samples 5000
 """
 
-import torch
-import numpy as np
-import networkx as nx
-from torch_geometric.data import Data
-from typing import List, Tuple, Optional
 import argparse
 import logging
+from typing import List, Tuple
+
+import networkx as nx
+import numpy as np
+import torch
+from torch_geometric.data import Data
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

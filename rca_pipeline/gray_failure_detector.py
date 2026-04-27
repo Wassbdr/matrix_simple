@@ -18,8 +18,9 @@ References:
 
 from __future__ import annotations
 
+from typing import List, NamedTuple, Optional, Tuple
+
 import numpy as np
-from typing import Dict, List, NamedTuple, Optional, Tuple
 
 
 class GrayScore(NamedTuple):

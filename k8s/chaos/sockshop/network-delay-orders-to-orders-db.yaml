@@ -1,0 +1,33 @@
+##############################################
+# NetworkChaos -- Latence orders -> orders-db
+# Cascade attendue : orders-db ralenti -> orders -> front-end
+##############################################
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: network-delay-orders-to-orders-db
+  namespace: sock-shop
+  labels:
+    experiment: network-delay-orders-to-orders-db
+    project: rca-research
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces:
+      - sock-shop
+    labelSelectors:
+      name: orders
+  delay:
+    latency: "400ms"
+    correlation: "100"
+    jitter: "80ms"
+  direction: to
+  target:
+    selector:
+      namespaces:
+        - sock-shop
+      labelSelectors:
+        name: orders-db
+    mode: all
+  duration: "5m"

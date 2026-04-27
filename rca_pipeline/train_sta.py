@@ -25,21 +25,20 @@ Usage:
     python train_sta.py --dataset scalable_dataset_N100.pt --num-nodes 100 --k 10
 """
 
-import torch
-import torch.optim as optim
-import torch.nn.functional as F
-from torch_geometric.data import Data
-from typing import List, Dict, Optional
-import logging
 import argparse
+import logging
 import os
-import time
+from typing import Dict, List, Optional
 
-from model_sta import SelectThenAnalyze
+import torch
+import torch.nn.functional as F
+import torch.optim as optim
+from augment import augment_positive
 from common import set_all_seeds
 from k_selection import get_optimal_k
 from losses import info_nce_loss, variational_gib_loss
-from augment import augment_positive
+from model_sta import SelectThenAnalyze
+from torch_geometric.data import Data
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

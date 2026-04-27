@@ -1,5 +1,5 @@
-from locust import HttpUser, task, between
-import random
+
+from locust import HttpUser, between, task
 
 # Target up to 10 edge nodes randomly as entrypoints
 ENTRYPOINTS = ['core-000']

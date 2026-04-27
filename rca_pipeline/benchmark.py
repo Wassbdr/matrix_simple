@@ -23,50 +23,47 @@ Pipeline:
     5. Latency scaling analysis: O(k²) vs O(N²)
 """
 
+import argparse
+import json
+import time
+import warnings
+from collections import Counter
+from typing import Dict, List
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-import time
-import argparse
-import os
-import sys
-import json
-import random
-import warnings
-from collections import Counter
-from typing import List, Dict, Tuple
-from torch_geometric.data import Data
 from torch_geometric.nn import GCNConv
 
 warnings.filterwarnings("ignore")
 
 # Local imports (package-safe for `python -m rca_pipeline.benchmark`)
-from rca_pipeline.model_sta import SelectThenAnalyze
-from rca_pipeline.model import SpatioTemporalRCA
-from rca_pipeline.model_late_gat import SpatioTemporalRCA_GAT
-from rca_pipeline.common import (
-    set_all_seeds,
-    stratified_split_shuffle,
-    set_torch_deterministic,
-    runtime_env_info,
-)
-from rca_pipeline.k_selection import get_optimal_k, adaptive_gib_beta
-from rca_pipeline.losses import info_nce_loss, asymmetric_gib_loss, variational_gib_loss
+import logging
+
 from rca_pipeline.augment import augment_positive
-from rca_pipeline.causal_graph_builder import CausalGraphBuilder
 from rca_pipeline.cascade_aware_loss import CausalCascadeAwareLoss
+from rca_pipeline.causal_graph_builder import CausalGraphBuilder
+from rca_pipeline.common import (
+    runtime_env_info,
+    set_all_seeds,
+    set_torch_deterministic,
+    stratified_split_shuffle,
+)
 from rca_pipeline.drift_detector import make_k8s_drift_detector
 from rca_pipeline.failure_type_utils import split_logits_by_failure_type
+from rca_pipeline.k_selection import adaptive_gib_beta, get_optimal_k
+from rca_pipeline.losses import asymmetric_gib_loss, info_nce_loss, variational_gib_loss
+from rca_pipeline.model import SpatioTemporalRCA
+from rca_pipeline.model_late_gat import SpatioTemporalRCA_GAT
+from rca_pipeline.model_sta import SelectThenAnalyze
 from rca_pipeline.sta_fusion_utils import gated_selector_scorer_fusion
 from rca_pipeline.training_utils import EarlyStopping
 
-import logging
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 from rca_pipeline.metrics_rcaeval import RCAEvalMetrics
-
 
 # =====================================================================
 # Reference Top-1 (multi-seed means) for regression alerts
@@ -1400,7 +1397,7 @@ def main(args):
             sta_runs.append(eval_sta(sta_model, test_anom, edge_index, name_to_idx, device))
 
             # ---- Late Bottleneck (parallel approach) ----
-            print(f"\n  -- Training STGCN+GIB (Late Bottleneck) --")
+            print("\n  -- Training STGCN+GIB (Late Bottleneck) --")
             t0 = time.time()
             try:
                 late_model = train_v1_compact(
@@ -1419,7 +1416,7 @@ def main(args):
 
             # ---- Late Bottleneck GATv2 ----
             if not args.skip_late_gat:
-                print(f"\n  -- Training Late Bottleneck (GATv2, no GIB) --")
+                print("\n  -- Training Late Bottleneck (GATv2, no GIB) --")
                 t0 = time.time()
                 try:
                     gat_model = train_gat_compact(
@@ -1437,7 +1434,7 @@ def main(args):
                     print(f"  ⚠️  Late GAT failed: {e}")
 
             # ---- Baselines ----
-            print(f"\n  -- Training Full-Graph GCN baseline --")
+            print("\n  -- Training Full-Graph GCN baseline --")
             gcn_model = train_baseline_gcn(train_anom, edge_index, name_to_idx, N, F_,
                                            hidden_dim=hidden,
                                            epochs=args.baseline_epochs,
@@ -1446,14 +1443,14 @@ def main(args):
             gcn_model.eval()
             gcn_runs.append(eval_gcn_baseline(gcn_model, test_anom, edge_index, name_to_idx, N))
 
-            print(f"  -- Training MLP baseline --")
+            print("  -- Training MLP baseline --")
             mlp_model = train_baseline_mlp(train_anom, name_to_idx, N, hidden_dim=64,
                                            epochs=args.baseline_epochs,
                                            batch_size=args.batch_size,
                                            seed=seed)
             mlp_runs.append(eval_mlp_baseline(mlp_model, test_anom, name_to_idx, N))
 
-            print(f"  -- Training RF baseline --")
+            print("  -- Training RF baseline --")
             rf_model = train_baseline_rf(train_anom, name_to_idx, N, seed=seed)
             rf_runs.append(eval_rf_baseline(rf_model, test_anom, name_to_idx, N))
 
@@ -1478,10 +1475,10 @@ def main(args):
         results[f"Full-Graph GCN (N={N})"] = r_gcn
 
         r_mlp = aggregate_seeds(mlp_runs)
-        results[f"MLP Baseline"] = r_mlp
+        results["MLP Baseline"] = r_mlp
 
         r_rf = aggregate_seeds(rf_runs)
-        results[f"Random Forest"] = r_rf
+        results["Random Forest"] = r_rf
 
         # ---- Print results ----
         print_results_table(results, f"RESULTS FOR N={N} (mean over {NUM_SEEDS} seeds)")

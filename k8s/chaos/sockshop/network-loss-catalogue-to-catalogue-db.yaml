@@ -1,0 +1,32 @@
+##############################################
+# NetworkChaos -- Perte paquets catalogue -> catalogue-db
+# Simule un lien réseau dégradé (gray failure)
+##############################################
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: network-loss-catalogue-to-catalogue-db
+  namespace: sock-shop
+  labels:
+    experiment: network-loss-catalogue-to-catalogue-db
+    project: rca-research
+spec:
+  action: loss
+  mode: all
+  selector:
+    namespaces:
+      - sock-shop
+    labelSelectors:
+      name: catalogue
+  loss:
+    loss: "15"
+    correlation: "60"
+  direction: to
+  target:
+    selector:
+      namespaces:
+        - sock-shop
+      labelSelectors:
+        name: catalogue-db
+    mode: all
+  duration: "5m"

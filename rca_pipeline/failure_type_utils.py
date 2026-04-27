@@ -2,8 +2,8 @@
 Helpers for splitting RCA predictions by failure type.
 """
 
-from typing import Dict, List, Sequence, Tuple
-
+from collections.abc import Sequence
+from typing import Dict, List
 
 KNOWN_FAILURE_TYPES = ("hard", "gray", "cascade")
 

@@ -22,7 +22,7 @@ import torch.nn.functional as F
 from rca_pipeline.benchmark_ablation import TemporalOnlyModel
 from rca_pipeline.benchmark_real import train_and_eval_sta
 from rca_pipeline.common import set_all_seeds, stratified_split_shuffle
-from rca_pipeline.loaders.rcaeval_loader import RCAEvalLoader, SUPPORTED_DATASETS
+from rca_pipeline.loaders.rcaeval_loader import SUPPORTED_DATASETS, RCAEvalLoader
 from rca_pipeline.metrics_rcaeval import RCAEvalMetrics
 
 

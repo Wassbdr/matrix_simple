@@ -26,10 +26,11 @@ References:
     Chain-of-Event (FSE 2024), CKG (§4.3), PC/FCI (§6.2)
 """
 
+import logging
+from typing import Optional
+
 import torch
 import torch.nn.functional as F
-from typing import Optional
-import logging
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)

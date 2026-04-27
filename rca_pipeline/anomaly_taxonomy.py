@@ -13,8 +13,9 @@ in simulated_data_scalable.py.
 
 from __future__ import annotations
 
+from typing import NamedTuple, Optional
+
 import numpy as np
-from typing import Dict, List, NamedTuple, Optional
 
 
 class ChandolaLabel(NamedTuple):

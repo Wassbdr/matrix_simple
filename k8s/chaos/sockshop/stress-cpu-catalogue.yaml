@@ -1,0 +1,24 @@
+##############################################
+# StressChaos -- Saturation CPU sur catalogue
+# Target: sock-shop/catalogue
+##############################################
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: stress-cpu-catalogue
+  namespace: sock-shop
+  labels:
+    experiment: stress-cpu-catalogue
+    project: rca-research
+spec:
+  mode: all
+  selector:
+    namespaces:
+      - sock-shop
+    labelSelectors:
+      name: catalogue
+  stressors:
+    cpu:
+      workers: 2
+      load: 80
+  duration: "5m"

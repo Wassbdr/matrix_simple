@@ -1,9 +1,9 @@
-import sys
 import logging
+
 logging.basicConfig(level=logging.INFO)
 print("Starting build...", flush=True)
+from common import NODE_NAMES, stratified_split
 from graph_builder import GraphBuilder
-from common import stratified_split, NODE_NAMES
 
 builder = GraphBuilder('../datasets/dataset_merged.csv')
 snap = builder.build_snapshots()
@@ -21,6 +21,7 @@ train_win = GraphBuilder.apply_scaler(train_win, scaler)
 test_win  = GraphBuilder.apply_scaler(test_win,  scaler)
 
 import torch
+
 torch.save(
     {"train": train_win, "test": test_win, "scaler": scaler, "node_names": NODE_NAMES},
     '../dataset_windows.pt'

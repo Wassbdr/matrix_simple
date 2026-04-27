@@ -10,8 +10,7 @@ import argparse
 import json
 import re
 from pathlib import Path
-from typing import Dict, Tuple, Any
-
+from typing import Any, Dict, Tuple
 
 PLUS_MINUS_RE = re.compile(r"^\s*([+-]?\d*\.?\d+)(?:\s*[±\+/-]\s*([+-]?\d*\.?\d+))?\s*$")
 

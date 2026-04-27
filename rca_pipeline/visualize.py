@@ -19,14 +19,15 @@ Usage:
 """
 
 import argparse
+
+import matplotlib
+import networkx as nx
 import torch
 import torch.nn.functional as F
-import networkx as nx
-import matplotlib
+
 matplotlib.use("Agg")  # non-interactive backend
 import matplotlib.pyplot as plt
 import numpy as np
-
 
 # ── Helpers ──────────────────────────────────────────────────────────
 

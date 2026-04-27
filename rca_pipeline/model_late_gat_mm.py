@@ -14,12 +14,11 @@ Compatibility: if x_logs=None or x_traces=None → zero-pad (mono-modal fallback
 This is a SEPARATE variant — does not modify model_late_gat.py.
 """
 
+import logging
+from typing import Optional, Tuple
+
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch_geometric.nn import GATv2Conv
-from typing import Optional, Tuple
-import logging
 
 from rca_pipeline.model_late_gat import (
     GATv2SpatialBlock,

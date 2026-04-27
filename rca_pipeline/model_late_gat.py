@@ -33,12 +33,13 @@ Inference:
     - The predicted root cause is argmax(logits).
 """
 
+import logging
+from typing import Tuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GATv2Conv
-from typing import Tuple
-import logging
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
