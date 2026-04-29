@@ -1,9 +1,9 @@
 {
   "manifest_version": "1.0",
-  "generated_at_utc": "2026-04-01T12:36:27.724287+00:00",
+  "generated_at_utc": "2026-04-29T14:35:35.511489+00:00",
   "canonical_source": "rca_pipeline/benchmark_full_prepublish.json",
   "git": {
-    "commit": "f22a6ce3cb12afb8e04d296fa5e9d80ddf6a1747",
+    "commit": "c6c2bfa88f51d57285e2af97cf688743404d38fb",
     "dirty_worktree": true
   },
   "artifacts": [

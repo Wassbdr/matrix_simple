@@ -1,0 +1,927 @@
+{
+  "observit": {
+    "STA": {
+      "avg1": 0.7956947996589939,
+      "avg1_std": 0.04252390030610112,
+      "avg3": 0.9214265416311452,
+      "avg3_std": 0.07476715961332911,
+      "avg5": 0.9423131571469167,
+      "avg5_std": 0.0622229966292473,
+      "mrr": 0.8679131668038316,
+      "mrr_std": 0.032983514343068086,
+      "ndcg3": 0.8727140319007047,
+      "ndcg3_std": 0.04985676864232315,
+      "ndcg5": 0.8812424025633753,
+      "ndcg5_std": 0.044261038493815116,
+      "ci95": {
+        "avg1": {
+          "mean": 0.7956947996589939,
+          "ci_low": 0.7618641659562376,
+          "ci_high": 0.8338306337027565,
+          "n": 5,
+          "seed_level_bootstrap_reliable": false
+        },
+        "avg3": {
+          "mean": 0.9214265416311452,
+          "ci_low": 0.8614897698209719,
+          "ci_high": 0.9804063654447285,
+          "n": 5,
+          "seed_level_bootstrap_reliable": false
+        },
+        "avg5": {
+          "mean": 0.9423131571469167,
+          "ci_low": 0.8918677181017334,
+          "ci_high": 0.992597328786587,
+          "n": 5,
+          "seed_level_bootstrap_reliable": false
+        },
+        "mrr": {
+          "mean": 0.8679131668038316,
+          "ci_low": 0.83508041534576,
+          "ci_high": 0.8889547927207776,
+          "n": 5,
+          "seed_level_bootstrap_reliable": false
+        },
+        "ndcg3": {
+          "mean": 0.8727140319007047,
+          "ci_low": 0.8245761663280982,
+          "ci_high": 0.9068546770038199,
+          "n": 5,
+          "seed_level_bootstrap_reliable": false
+        },
+        "ndcg5": {
+          "mean": 0.8812424025633753,
+          "ci_low": 0.8399475271218882,
+          "ci_high": 0.9118302780673737,
+          "n": 5,
+          "seed_level_bootstrap_reliable": false
+        }
+      }
+    },
+    "GATv2": {
+      "avg1": 0.7620630861040067,
+      "avg1_std": 0.03418309618845067,
+      "avg3": 0.9782466609832339,
+      "avg3_std": 0.010241460736492618,
+      "avg5": 0.9881074168797953,
+      "avg5_std": 0.0056787420256121145,
+      "mrr": 0.8600000461317603,
+      "mrr_std": 0.03048058166166931,
+      "ndcg3": 0.8873108011855061,
+      "ndcg3_std": 0.026629797250590597,
+      "ndcg5": 0.8914336855970719,
+      "ndcg5_std": 0.02490889304357914,
+      "ci95": {
+        "avg1": {
+          "mean": 0.7620630861040067,
+          "ci_low": 0.7358340437624327,
+          "ci_high": 0.7971298664393294,
+          "n": 5,
+          "seed_level_bootstrap_reliable": false
+        },
+        "avg3": {
+          "mean": 0.9782466609832339,
+          "ci_low": 0.9686132423984087,
+          "ci_high": 0.9859512645637964,
+          "n": 5,
+          "seed_level_bootstrap_reliable": false
+        },
+        "avg5": {
+          "mean": 0.9881074168797953,
+          "ci_low": 0.9836743393009376,
+          "ci_high": 0.9933219664677464,
+          "n": 5,
+          "seed_level_bootstrap_reliable": false
+        },
+        "mrr": {
+          "mean": 0.8600000461317603,
+          "ci_low": 0.835581380114629,
+          "ci_high": 0.8855118641659565,
+          "n": 5,
+          "seed_level_bootstrap_reliable": false
+        },
+        "ndcg3": {
+          "mean": 0.8873108011855061,
+          "ci_low": 0.8657377408041059,
+          "ci_high": 0.9097684085355041,
+          "n": 5,
+          "seed_level_bootstrap_reliable": false
+        },
+        "ndcg5": {
+          "mean": 0.8914336855970719,
+          "ci_low": 0.87113839975581,
+          "ci_high": 0.9123618332601519,
+          "n": 5,
+          "seed_level_bootstrap_reliable": false
+        }
+      }
+    },
+    "Late-STGCN+GIB": {
+      "avg1": 0.7359477124183007,
+      "avg1_std": 0.0676210047392291,
+      "avg3": 0.9490196078431372,
+      "avg3_std": 0.03462201996901707,
+      "avg5": 0.9784313725490197,
+      "avg5_std": 0.008420979559951063,
+      "mrr": 0.8438930223734149,
+      "mrr_std": 0.03690639085995416,
+      "ndcg3": 0.8637918357119551,
+      "ndcg3_std": 0.036289064675026614,
+      "ndcg5": 0.8761723635583044,
+      "ndcg5_std": 0.029611312375619567,
+      "ci95": {
+        "avg1": {
+          "mean": 0.7359477124183007,
+          "ci_low": 0.6679738562091504,
+          "ci_high": 0.7738562091503268,
+          "n": 5,
+          "seed_level_bootstrap_reliable": false
+        },
+        "avg3": {
+          "mean": 0.9490196078431372,
+          "ci_low": 0.9169934640522875,
+          "ci_high": 0.9738562091503267,
+          "n": 5,
+          "seed_level_bootstrap_reliable": false
+        },
+        "avg5": {
+          "mean": 0.9784313725490197,
+          "ci_low": 0.9712418300653594,
+          "ci_high": 0.9856209150326798,
+          "n": 5,
+          "seed_level_bootstrap_reliable": false
+        },
+        "mrr": {
+          "mean": 0.8438930223734149,
+          "ci_low": 0.8072131046150657,
+          "ci_high": 0.869444930523362,
+          "n": 5,
+          "seed_level_bootstrap_reliable": false
+        },
+        "ndcg3": {
+          "mean": 0.8637918357119551,
+          "ci_low": 0.830658857612283,
+          "ci_high": 0.8934677661648033,
+          "n": 5,
+          "seed_level_bootstrap_reliable": false
+        },
+        "ndcg5": {
+          "mean": 0.8761723635583044,
+          "ci_low": 0.846808779924066,
+          "ci_high": 0.8974609415663654,
+          "n": 5,
+          "seed_level_bootstrap_reliable": false
+        }
+      }
+    },
+    "Late-STGCN+GIB_per_root_cause": [
+      {
+        "catalogue": 0.9508196721311475,
+        "catalogue-db": 1.0,
+        "carts": 0.9836065573770492,
+        "orders-db": 0.0,
+        "user": 0.9180327868852459
+      },
+      {
+        "catalogue": 1.0,
+        "catalogue-db": 0.9838709677419355,
+        "carts": 0.9672131147540983,
+        "orders-db": 0.0,
+        "user": 0.9344262295081968
+      },
+      {
+        "catalogue": 0.9672131147540983,
+        "catalogue-db": 1.0,
+        "carts": 1.0,
+        "orders-db": 0.01639344262295082,
+        "user": 0.8688524590163934
+      },
+      {
+        "catalogue": 0.9180327868852459,
+        "catalogue-db": 1.0,
+        "carts": 0.9836065573770492,
+        "orders-db": 0.0,
+        "user": 0.8852459016393442
+      },
+      {
+        "catalogue": 0.9180327868852459,
+        "catalogue-db": 1.0,
+        "carts": 0.9836065573770492,
+        "orders-db": 0.0,
+        "user": 0.09836065573770492
+      }
+    ],
+    "Late-STGCN+GIB_per_root_cause_details": [
+      {
+        "per_service_top1": {
+          "catalogue": 0.9508196721311475,
+          "catalogue-db": 1.0,
+          "carts": 0.9836065573770492,
+          "orders-db": 0.0,
+          "user": 0.9180327868852459
+        },
+        "per_service_counts": {
+          "catalogue": 61,
+          "catalogue-db": 62,
+          "carts": 61,
+          "orders-db": 61,
+          "user": 61
+        },
+        "per_service_hits": {
+          "catalogue": 58,
+          "catalogue-db": 62,
+          "carts": 60,
+          "orders-db": 0,
+          "user": 56
+        },
+        "weighted_top1": 0.7712418300653595,
+        "global_avg1": 0.7712418300653595,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "catalogue": 1.0,
+          "catalogue-db": 0.9838709677419355,
+          "carts": 0.9672131147540983,
+          "orders-db": 0.0,
+          "user": 0.9344262295081968
+        },
+        "per_service_counts": {
+          "catalogue": 61,
+          "catalogue-db": 62,
+          "carts": 61,
+          "orders-db": 61,
+          "user": 61
+        },
+        "per_service_hits": {
+          "catalogue": 61,
+          "catalogue-db": 61,
+          "carts": 59,
+          "orders-db": 0,
+          "user": 57
+        },
+        "weighted_top1": 0.7777777777777778,
+        "global_avg1": 0.7777777777777778,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "catalogue": 0.9672131147540983,
+          "catalogue-db": 1.0,
+          "carts": 1.0,
+          "orders-db": 0.01639344262295082,
+          "user": 0.8688524590163934
+        },
+        "per_service_counts": {
+          "catalogue": 61,
+          "catalogue-db": 62,
+          "carts": 61,
+          "orders-db": 61,
+          "user": 61
+        },
+        "per_service_hits": {
+          "catalogue": 59,
+          "catalogue-db": 62,
+          "carts": 61,
+          "orders-db": 1,
+          "user": 53
+        },
+        "weighted_top1": 0.7712418300653595,
+        "global_avg1": 0.7712418300653595,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "catalogue": 0.9180327868852459,
+          "catalogue-db": 1.0,
+          "carts": 0.9836065573770492,
+          "orders-db": 0.0,
+          "user": 0.8852459016393442
+        },
+        "per_service_counts": {
+          "catalogue": 61,
+          "catalogue-db": 62,
+          "carts": 61,
+          "orders-db": 61,
+          "user": 61
+        },
+        "per_service_hits": {
+          "catalogue": 56,
+          "catalogue-db": 62,
+          "carts": 60,
+          "orders-db": 0,
+          "user": 54
+        },
+        "weighted_top1": 0.7581699346405228,
+        "global_avg1": 0.7581699346405228,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "catalogue": 0.9180327868852459,
+          "catalogue-db": 1.0,
+          "carts": 0.9836065573770492,
+          "orders-db": 0.0,
+          "user": 0.09836065573770492
+        },
+        "per_service_counts": {
+          "catalogue": 61,
+          "catalogue-db": 62,
+          "carts": 61,
+          "orders-db": 61,
+          "user": 61
+        },
+        "per_service_hits": {
+          "catalogue": 56,
+          "catalogue-db": 62,
+          "carts": 60,
+          "orders-db": 0,
+          "user": 6
+        },
+        "weighted_top1": 0.6013071895424836,
+        "global_avg1": 0.6013071895424836,
+        "abs_gap_vs_global_avg1": 0.0
+      }
+    ],
+    "Late-STGCN+GIB_per_root_cause_consistency": {
+      "tolerance": 1e-06,
+      "max_abs_gap": 0.0,
+      "checked_runs": 5
+    },
+    "Late-STGCN+GIB_per_root_cause_summary": {
+      "source_model_key": "Late-STGCN+GIB",
+      "mean_top1_by_service": {
+        "carts": 0.9836065573770492,
+        "catalogue": 0.9508196721311476,
+        "catalogue-db": 0.9967741935483871,
+        "orders-db": 0.003278688524590164,
+        "user": 0.740983606557377
+      },
+      "total_support_by_service": {
+        "carts": 305,
+        "catalogue": 305,
+        "catalogue-db": 310,
+        "orders-db": 305,
+        "user": 305
+      },
+      "support_share_by_service": {
+        "carts": 0.19934640522875818,
+        "catalogue": 0.19934640522875818,
+        "catalogue-db": 0.20261437908496732,
+        "orders-db": 0.19934640522875818,
+        "user": 0.19934640522875818
+      },
+      "num_seeds_aggregated": 5
+    },
+    "STA_raw": {
+      "avg1": 0.776470588235294,
+      "avg1_std": 0.009380849734906743,
+      "avg3": 0.9405228758169935,
+      "avg3_std": 0.07654038488390798,
+      "avg5": 0.9542483660130718,
+      "avg5_std": 0.078513029387949,
+      "mrr": 0.8602271258153612,
+      "mrr_std": 0.031974099297310966,
+      "ndcg3": 0.8756117324930001,
+      "ndcg3_std": 0.047787475595663244,
+      "ndcg5": 0.8813224785476859,
+      "ndcg5_std": 0.0486406765397544
+    },
+    "STA_drift_filtered": {
+      "avg1": 0.7956947996589939,
+      "avg1_std": 0.04252390030610112,
+      "avg3": 0.9214265416311452,
+      "avg3_std": 0.07476715961332911,
+      "avg5": 0.9423131571469167,
+      "avg5_std": 0.0622229966292473,
+      "mrr": 0.8679131668038316,
+      "mrr_std": 0.032983514343068086,
+      "ndcg3": 0.8727140319007047,
+      "ndcg3_std": 0.04985676864232315,
+      "ndcg5": 0.8812424025633753,
+      "ndcg5_std": 0.044261038493815116
+    },
+    "GATv2_raw": {
+      "avg1": 0.738562091503268,
+      "avg1_std": 0.04044901554710014,
+      "avg3": 0.9803921568627452,
+      "avg3_std": 0.004621612948931698,
+      "avg5": 0.9901960784313726,
+      "avg5_std": 0.006854959791961793,
+      "mrr": 0.8567494270435452,
+      "mrr_std": 0.022749190088757545,
+      "ndcg3": 0.8862620999136368,
+      "ndcg3_std": 0.01756974767430802,
+      "ndcg5": 0.89019798936639,
+      "ndcg5_std": 0.018060431522468424
+    },
+    "GATv2_drift_filtered": {
+      "avg1": 0.7620630861040067,
+      "avg1_std": 0.03418309618845067,
+      "avg3": 0.9782466609832339,
+      "avg3_std": 0.010241460736492618,
+      "avg5": 0.9881074168797953,
+      "avg5_std": 0.0056787420256121145,
+      "mrr": 0.8600000461317603,
+      "mrr_std": 0.03048058166166931,
+      "ndcg3": 0.8873108011855061,
+      "ndcg3_std": 0.026629797250590597,
+      "ndcg5": 0.8914336855970719,
+      "ndcg5_std": 0.02490889304357914
+    },
+    "config": {
+      "dataset": "observit",
+      "seeds": [
+        42,
+        123,
+        7,
+        1337,
+        2025
+      ],
+      "n_cases_loaded": 1520,
+      "n_nodes": 14,
+      "max_cases": null,
+      "use_mm": false,
+      "mm_strict": false,
+      "mm_logs_only": false,
+      "mm_traces_only": false,
+      "mm_trace_prior": false,
+      "mm_effective": false,
+      "mm_coverage": {
+        "n": 1520,
+        "logs_ratio": 0.0,
+        "traces_ratio": 0.0,
+        "both_ratio": 0.0
+      },
+      "mm_dataset_status": "not_applicable",
+      "mm_dataset_reason": "Multimodal mode is disabled for this run.",
+      "mm_requested_seeds": 5,
+      "mm_executed_seeds": 5,
+      "mm_skipped_seeds": [],
+      "enable_drift": true,
+      "drift_delta": 0.002,
+      "drift_cooldown_steps": 30,
+      "observit_normalized": true,
+      "normalized": true,
+      "split_mode": "varying_split_by_run_seed",
+      "hyperparams": {
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "batch_size": 64,
+        "hidden_dim": 32,
+        "epochs": 100,
+        "sta_contrastive_warmup": 0,
+        "allow_real_warmup": false
+      },
+      "split": {
+        "type": "stratified_split_shuffle",
+        "mode": "varying_split_by_run_seed",
+        "seed_source": "run_seed",
+        "train_ratio": 0.8,
+        "requested_seeds": [
+          42,
+          123,
+          7,
+          1337,
+          2025
+        ],
+        "executed_seeds": [
+          42,
+          123,
+          7,
+          1337,
+          2025
+        ],
+        "mm_skipped_seeds": []
+      }
+    },
+    "scaler": {
+      "type": "StandardScaler",
+      "mean": [
+        0.011481751994754893,
+        185819243.72605318,
+        2072.5190823531148,
+        315.20020318876726,
+        0.00013772160869266807,
+        0.0
+      ],
+      "scale": [
+        0.03682240621385338,
+        151085432.61367822,
+        2772.0920528071897,
+        269.9780108526854,
+        0.0028751520514727884,
+        1.0
+      ]
+    },
+    "drift_filter": {
+      "train_drop_ratio_mean": 0.19802306425041186,
+      "test_drop_ratio_mean": 0.058823529411764705
+    },
+    "STA_per_root_cause": [
+      {
+        "catalogue": 0.9508196721311475,
+        "catalogue-db": 0.96875,
+        "carts": 0.9836065573770492,
+        "orders-db": 0.0,
+        "user": 0.9508196721311475
+      },
+      {
+        "catalogue": 1.0,
+        "catalogue-db": 1.0,
+        "carts": 0.9672131147540983,
+        "orders-db": 0.0,
+        "user": 0.9508196721311475
+      },
+      {
+        "catalogue": 0.9836065573770492,
+        "catalogue-db": 1.0,
+        "carts": 1.0,
+        "orders-db": 0.0,
+        "user": 0.9508196721311475
+      },
+      {
+        "catalogue": 0.9607843137254902,
+        "catalogue-db": 1.0,
+        "carts": 1.0,
+        "orders-db": 0.0,
+        "user": 0.9508196721311475
+      },
+      {
+        "catalogue": 0.9344262295081968,
+        "catalogue-db": 0.967741935483871,
+        "carts": 0.9836065573770492,
+        "orders-db": 0.21311475409836064,
+        "user": 0.9508196721311475
+      }
+    ],
+    "STA_per_root_cause_details": [
+      {
+        "per_service_top1": {
+          "catalogue": 0.9508196721311475,
+          "catalogue-db": 0.96875,
+          "carts": 0.9836065573770492,
+          "orders-db": 0.0,
+          "user": 0.9508196721311475
+        },
+        "per_service_counts": {
+          "catalogue": 61,
+          "catalogue-db": 32,
+          "carts": 61,
+          "orders-db": 61,
+          "user": 61
+        },
+        "per_service_hits": {
+          "catalogue": 58,
+          "catalogue-db": 31,
+          "carts": 60,
+          "orders-db": 0,
+          "user": 58
+        },
+        "weighted_top1": 0.75,
+        "global_avg1": 0.75,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "catalogue": 1.0,
+          "catalogue-db": 1.0,
+          "carts": 0.9672131147540983,
+          "orders-db": 0.0,
+          "user": 0.9508196721311475
+        },
+        "per_service_counts": {
+          "catalogue": 61,
+          "catalogue-db": 62,
+          "carts": 61,
+          "orders-db": 31,
+          "user": 61
+        },
+        "per_service_hits": {
+          "catalogue": 61,
+          "catalogue-db": 62,
+          "carts": 59,
+          "orders-db": 0,
+          "user": 58
+        },
+        "weighted_top1": 0.8695652173913043,
+        "global_avg1": 0.8695652173913043,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "catalogue": 0.9836065573770492,
+          "catalogue-db": 1.0,
+          "carts": 1.0,
+          "orders-db": 0.0,
+          "user": 0.9508196721311475
+        },
+        "per_service_counts": {
+          "catalogue": 61,
+          "catalogue-db": 62,
+          "carts": 61,
+          "orders-db": 61,
+          "user": 61
+        },
+        "per_service_hits": {
+          "catalogue": 60,
+          "catalogue-db": 62,
+          "carts": 61,
+          "orders-db": 0,
+          "user": 58
+        },
+        "weighted_top1": 0.7875816993464052,
+        "global_avg1": 0.7875816993464052,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "catalogue": 0.9607843137254902,
+          "catalogue-db": 1.0,
+          "carts": 1.0,
+          "orders-db": 0.0,
+          "user": 0.9508196721311475
+        },
+        "per_service_counts": {
+          "catalogue": 51,
+          "catalogue-db": 62,
+          "carts": 41,
+          "orders-db": 61,
+          "user": 61
+        },
+        "per_service_hits": {
+          "catalogue": 49,
+          "catalogue-db": 62,
+          "carts": 41,
+          "orders-db": 0,
+          "user": 58
+        },
+        "weighted_top1": 0.7608695652173914,
+        "global_avg1": 0.7608695652173914,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "catalogue": 0.9344262295081968,
+          "catalogue-db": 0.967741935483871,
+          "carts": 0.9836065573770492,
+          "orders-db": 0.21311475409836064,
+          "user": 0.9508196721311475
+        },
+        "per_service_counts": {
+          "catalogue": 61,
+          "catalogue-db": 62,
+          "carts": 61,
+          "orders-db": 61,
+          "user": 61
+        },
+        "per_service_hits": {
+          "catalogue": 57,
+          "catalogue-db": 60,
+          "carts": 60,
+          "orders-db": 13,
+          "user": 58
+        },
+        "weighted_top1": 0.8104575163398693,
+        "global_avg1": 0.8104575163398693,
+        "abs_gap_vs_global_avg1": 0.0
+      }
+    ],
+    "STA_per_root_cause_consistency": {
+      "tolerance": 1e-06,
+      "max_abs_gap": 0.0,
+      "checked_runs": 5
+    },
+    "STA_per_root_cause_summary": {
+      "source_model_key": "STA",
+      "mean_top1_by_service": {
+        "carts": 0.9868852459016393,
+        "catalogue": 0.9659273545483767,
+        "catalogue-db": 0.9872983870967742,
+        "orders-db": 0.04262295081967213,
+        "user": 0.9508196721311475
+      },
+      "total_support_by_service": {
+        "carts": 285,
+        "catalogue": 295,
+        "catalogue-db": 280,
+        "orders-db": 275,
+        "user": 305
+      },
+      "support_share_by_service": {
+        "carts": 0.19791666666666666,
+        "catalogue": 0.2048611111111111,
+        "catalogue-db": 0.19444444444444445,
+        "orders-db": 0.1909722222222222,
+        "user": 0.21180555555555555
+      },
+      "num_seeds_aggregated": 5
+    },
+    "GATv2_per_root_cause": [
+      {
+        "catalogue": 0.9508196721311475,
+        "catalogue-db": 0.75,
+        "carts": 0.9836065573770492,
+        "orders-db": 0.0,
+        "user": 0.9508196721311475
+      },
+      {
+        "catalogue": 0.9836065573770492,
+        "catalogue-db": 0.0,
+        "carts": 0.9672131147540983,
+        "orders-db": 1.0,
+        "user": 0.9508196721311475
+      },
+      {
+        "catalogue": 0.9836065573770492,
+        "catalogue-db": 0.6129032258064516,
+        "carts": 1.0,
+        "orders-db": 0.5901639344262295,
+        "user": 0.9508196721311475
+      },
+      {
+        "catalogue": 0.9411764705882353,
+        "catalogue-db": 0.9838709677419355,
+        "carts": 1.0,
+        "orders-db": 0.0,
+        "user": 0.9508196721311475
+      },
+      {
+        "catalogue": 0.9344262295081968,
+        "catalogue-db": 0.1935483870967742,
+        "carts": 0.9836065573770492,
+        "orders-db": 0.7049180327868853,
+        "user": 0.9508196721311475
+      }
+    ],
+    "GATv2_per_root_cause_details": [
+      {
+        "per_service_top1": {
+          "catalogue": 0.9508196721311475,
+          "catalogue-db": 0.75,
+          "carts": 0.9836065573770492,
+          "orders-db": 0.0,
+          "user": 0.9508196721311475
+        },
+        "per_service_counts": {
+          "catalogue": 61,
+          "catalogue-db": 32,
+          "carts": 61,
+          "orders-db": 61,
+          "user": 61
+        },
+        "per_service_hits": {
+          "catalogue": 58,
+          "catalogue-db": 24,
+          "carts": 60,
+          "orders-db": 0,
+          "user": 58
+        },
+        "weighted_top1": 0.7246376811594203,
+        "global_avg1": 0.7246376811594203,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "catalogue": 0.9836065573770492,
+          "catalogue-db": 0.0,
+          "carts": 0.9672131147540983,
+          "orders-db": 1.0,
+          "user": 0.9508196721311475
+        },
+        "per_service_counts": {
+          "catalogue": 61,
+          "catalogue-db": 62,
+          "carts": 61,
+          "orders-db": 31,
+          "user": 61
+        },
+        "per_service_hits": {
+          "catalogue": 60,
+          "catalogue-db": 0,
+          "carts": 59,
+          "orders-db": 31,
+          "user": 58
+        },
+        "weighted_top1": 0.7536231884057971,
+        "global_avg1": 0.7536231884057971,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "catalogue": 0.9836065573770492,
+          "catalogue-db": 0.6129032258064516,
+          "carts": 1.0,
+          "orders-db": 0.5901639344262295,
+          "user": 0.9508196721311475
+        },
+        "per_service_counts": {
+          "catalogue": 61,
+          "catalogue-db": 62,
+          "carts": 61,
+          "orders-db": 61,
+          "user": 61
+        },
+        "per_service_hits": {
+          "catalogue": 60,
+          "catalogue-db": 38,
+          "carts": 61,
+          "orders-db": 36,
+          "user": 58
+        },
+        "weighted_top1": 0.826797385620915,
+        "global_avg1": 0.826797385620915,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "catalogue": 0.9411764705882353,
+          "catalogue-db": 0.9838709677419355,
+          "carts": 1.0,
+          "orders-db": 0.0,
+          "user": 0.9508196721311475
+        },
+        "per_service_counts": {
+          "catalogue": 51,
+          "catalogue-db": 62,
+          "carts": 41,
+          "orders-db": 61,
+          "user": 61
+        },
+        "per_service_hits": {
+          "catalogue": 48,
+          "catalogue-db": 61,
+          "carts": 41,
+          "orders-db": 0,
+          "user": 58
+        },
+        "weighted_top1": 0.7536231884057971,
+        "global_avg1": 0.7536231884057971,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "catalogue": 0.9344262295081968,
+          "catalogue-db": 0.1935483870967742,
+          "carts": 0.9836065573770492,
+          "orders-db": 0.7049180327868853,
+          "user": 0.9508196721311475
+        },
+        "per_service_counts": {
+          "catalogue": 61,
+          "catalogue-db": 62,
+          "carts": 61,
+          "orders-db": 61,
+          "user": 61
+        },
+        "per_service_hits": {
+          "catalogue": 57,
+          "catalogue-db": 12,
+          "carts": 60,
+          "orders-db": 43,
+          "user": 58
+        },
+        "weighted_top1": 0.7516339869281046,
+        "global_avg1": 0.7516339869281046,
+        "abs_gap_vs_global_avg1": 0.0
+      }
+    ],
+    "GATv2_per_root_cause_consistency": {
+      "tolerance": 1e-06,
+      "max_abs_gap": 0.0,
+      "checked_runs": 5
+    },
+    "GATv2_per_root_cause_summary": {
+      "source_model_key": "GATv2",
+      "mean_top1_by_service": {
+        "carts": 0.9868852459016393,
+        "catalogue": 0.9587270973963357,
+        "catalogue-db": 0.5080645161290323,
+        "orders-db": 0.4590163934426229,
+        "user": 0.9508196721311475
+      },
+      "total_support_by_service": {
+        "carts": 285,
+        "catalogue": 295,
+        "catalogue-db": 280,
+        "orders-db": 275,
+        "user": 305
+      },
+      "support_share_by_service": {
+        "carts": 0.19791666666666666,
+        "catalogue": 0.2048611111111111,
+        "catalogue-db": 0.19444444444444445,
+        "orders-db": 0.1909722222222222,
+        "user": 0.21180555555555555
+      },
+      "num_seeds_aggregated": 5
+    },
+    "env": {
+      "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+      "torch": "2.11.0+cu130",
+      "cuda_available": false,
+      "device_count": 0
+    },
+    "deterministic": true
+  }
+}

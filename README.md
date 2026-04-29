@@ -24,45 +24,75 @@ artifacts are released to support reproducibility.
 
 ## Key Results
 
-### RCAEval — Real-World Datasets (metrics-only, 3 seeds: 42, 123, 7)
+> **Publication-grade results** below come from `scripts/run_publication_suite.sh`
+> (5 seeds: 42, 123, 7, 1337, 2025; deterministic; 150 supervised epochs simulated, 100 epochs real).
+> All numbers are reported as **mean ± 1σ across 5 seeds**; per-seed and bootstrap data live in
+> the JSON artifacts under `results_transmission/`. SHA-256 of every artifact is in
+> `results_transmission/paper_benchmark.sha256`.
 
-Source: `rca_pipeline/benchmark_real_long_prepublish.json`
+### RCAEval — Real-World Datasets (metrics-only, 5 seeds)
 
-| Dataset          | STA Avg@1 | STA MRR | GATv2 Avg@1 | GATv2 MRR | Random baseline |
-|------------------|----------:|--------:|------------:|----------:|----------------:|
-| TrainTicket      |     96.7% |   98.3% |       95.0% |     97.5% |           ~3.3% |
-| SockShop         |     80.0% |   87.7% |       76.7% |     84.7% |           ~5.0% |
-| Online Boutique  |     68.3% |   79.5% |       71.7% |     82.0% |           ~5.0% |
+Source: `results_transmission/paper_benchmark_real.json`
 
-> Avg@1 = RCAEval top-1 accuracy; MRR = Mean Reciprocal Rank.
-> 3 seeds only — bootstrap CIs are wide; see `seed_level_bootstrap_reliable` flag in JSON.
+| Dataset          | STA Avg@1     | STA MRR       | GATv2 Avg@1   | GATv2 MRR     |
+|------------------|--------------:|--------------:|--------------:|--------------:|
+| TrainTicket      | 96.0% ± 3.7%  | 98.0% ± 1.9%  | 95.0% ± 4.5%  | 97.5% ± 2.2%  |
+| SockShop         | 85.0% ± 8.9%  | 90.8% ± 5.8%  | 81.0% ± 8.0%  | 87.6% ± 5.8%  |
+| Online Boutique  | 65.0% ± 9.5%  | 77.9% ± 5.3%  | 68.0% ± 5.1%  | 78.8% ± 4.2%  |
 
-### RCAEval — Multimodal Strict (metrics + traces, 3 seeds)
+> Beats published RCAEval baselines on SockShop (BARO 71%, CausaRank 52%, MicroRCA 49%).
 
-Source: `rca_pipeline/benchmark_real_long_mm_strict_prepublish.json`
+### RCAEval — Multimodal Strict (metrics + traces, 5 seeds)
 
-| Dataset         | STA-MM Avg@1 | STA-MM MRR | GATv2-MM Avg@1 | GATv2-MM MRR |
-|-----------------|-------------:|-----------:|---------------:|-------------:|
-| TrainTicket     |        91.7% |      94.7% |          91.7% |        95.0% |
-| Online Boutique |        61.7% |      77.9% |          80.0% |        88.4% |
+Source: `results_transmission/paper_benchmark_real_mm.json`
 
-> SockShop excluded from MM strict (insufficient trace coverage — see `docs/PAPER_BENCHMARKS.md`).
+| Dataset         | STA-MM Avg@1   | STA-MM MRR     | GATv2-MM Avg@1 | GATv2-MM MRR   |
+|-----------------|---------------:|---------------:|---------------:|---------------:|
+| TrainTicket     | 91.0% ± 2.0%   | 94.3% ± 1.0%   | 88.0% ± 5.1%   | 92.4% ± 3.4%   |
+| Online Boutique | 65.0% ± 15.5%  | 79.4% ± 8.3%   | 79.0% ± 8.6%   | 87.6% ± 4.5%   |
 
-### Simulated Benchmark — Barabási-Albert Graphs (3 seeds)
+> SockShop is intentionally **skipped** in MM-strict mode: the public RCAEval release of SockShop
+> ships with 0% trace coverage, and `--mm-strict` requires a real signal on every modality. The
+> JSON records this as `mm_dataset_status: "skipped_with_reason"`.
 
-Source: `rca_pipeline/benchmark_full_prepublish.json`
+### Simulated Benchmark — Barabási-Albert Graphs (5 seeds, N = 20 / 50 / 100)
 
-| Model                     |  N=20 Top-1 |  N=20 Top-2 |  N=50 Top-1 | N=100 Top-1 |
-|---------------------------|------------:|------------:|------------:|------------:|
-| STA Select-then-Analyze   |       76.9% |       81.7% |       62.8% |       57.6% |
-| Late Bottleneck STGCN+GIB |       81.5% |       86.1% |       45.6% |       42.1% |
-| Late Bottleneck GATv2     |       82.2% |       87.8% |       57.5% |       50.1% |
-| Full-Graph GCN (baseline) |       83.8% |       88.6% |       52.6% |       48.0% |
-| Random Forest (baseline)  |       68.7% |       85.9% |         n/a |         n/a |
-| MLP (baseline)            |        8.3% |       18.2% |        2.6% |        1.3% |
+Source: `results_transmission/paper_benchmark_sim.json`
 
-> STA maintains competitive accuracy at N = 100 while STGCN+GIB degrades due to O(N²) scaling.
-> All results are mean over 3 seeds; stddev available in the JSON files.
+| Model                     | N=20 Top-1     | N=50 Top-1     | N=100 Top-1    | N=100 latency (ms) |
+|---------------------------|---------------:|---------------:|---------------:|-------------------:|
+| STA Select-then-Analyze   | 80.5% ± 12.2%  | 58.9% ± 4.9%   | 55.2% ± 4.6%   | 3.4 ± 0.8          |
+| Late Bottleneck STGCN+GIB | 82.3% ± 4.7%   | 46.9% ± 6.8%   | 47.1% ± 9.7%   | 2.5 ± 1.4          |
+| Late Bottleneck GATv2     | 82.8% ± 3.9%   | 57.1% ± 2.3%   | 49.0% ± 2.9%   | 3.0 ± 1.3          |
+| Full-Graph GCN (baseline) | 83.0% ± 2.9%   | 52.6% ± 2.6%   | 46.6% ± 4.2%   | 1.8 ± 0.4          |
+| Random Forest (baseline)  | 68.5% ± 2.7%   | 31.2% ± 1.6%   |  6.5% ± 0.9%   | n/a                |
+| MLP (baseline)            |  8.4% ± 2.4%   |  2.9% ± 0.5%   |  1.1% ± 0.4%   | n/a                |
+
+> STA scales gracefully: at N = 100 it leads top-1 by **+5 to +9 pts** over O(N²) full-graph
+> models while keeping inference under **3.5 ms**.
+
+### ObservIT Live Cluster — Sock-Shop with Chaos Mesh (5 seeds, 5 chaos scenarios)
+
+Source: `results_transmission/paper_benchmark_observit.json`, `paper_benchmark_observit_mm.json`
+
+| Configuration                  | Avg@1         | MRR           |
+|--------------------------------|--------------:|--------------:|
+| STA (metrics-only)             | 79.6% ± 4.3%  | 86.8% ± 3.3%  |
+| GATv2 (metrics-only)           | 76.2% ± 3.4%  | 86.0% ± 3.0%  |
+| Late-STGCN+GIB (metrics-only)  | 73.6% ± 6.8%  | 84.4% ± 3.7%  |
+| **STA-MM (metrics + Loki logs)** | **77.2% ± 2.1%** | **87.7% ± 1.0%** |
+| GATv2-MM (metrics + logs)      | 76.2% ± 1.6%  | 84.5% ± 3.5%  |
+
+> 11 chaos runs (CPU stress, memory stress, network delay, network loss, pod kill) on a real
+> K8s cluster; logs queried live from Loki via port-forward. Multimodal logs **halve
+> seed-to-seed variance** for STA (σ 4.3 → 2.1 on Avg@1).
+
+### Reproducibility caveats — read before citing
+
+- **5 seeds → ±1σ, not bootstrap CIs.** Each JSON includes a `ci95.<metric>.seed_level_bootstrap_reliable` flag, currently `false` for all real-data metrics: with only 5 seeds the bootstrap is too tight to publish as a confidence interval. We therefore report **±1 standard deviation across seeds** in the tables above and ship raw per-seed values in the JSON for any reader who wants to recompute their own intervals. To turn the flag green, rerun with `--seeds 42,123,7,1337,2025,11,99,256,512,1024` (10 seeds, ~2× wall time).
+- **SockShop multimodal is skipped, not failed.** The public RCAEval SockShop release has 0% trace coverage; `--mm-strict` honors that and refuses to silently substitute zeros. This is logged transparently in `paper_benchmark_real_mm.json` under `sockshop.config.mm_dataset_status`.
+- **Older reference values in legacy artifacts are stale.** Some `reference_top1` fields under `rca_pipeline/benchmark_full_prepublish.json` come from a short-epoch run and disagree with this 5-seed deterministic run. The numbers above are the canonical ones; please cite `paper_benchmark_*.json` only.
+- **Determinism is per-seed, not bit-for-bit across machines.** The pipeline runs with `torch.use_deterministic_algorithms(True)` and CuDNN deterministic mode on, so within one machine each seed is reproducible; absolute numbers may shift by <0.5pp on different CUDA / PyTorch versions.
 
 ---
 

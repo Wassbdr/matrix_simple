@@ -45,6 +45,16 @@ benchmark-smoke:
 benchmark-paper:
 	bash scripts/run_paper_benchmark.sh
 
+# Full publication suite: simulated + RCAEval + ObservIT cluster + manifest + SHA256
+publication:
+	bash scripts/run_publication_suite.sh
+
+publication-dry-run:
+	bash scripts/run_publication_suite.sh --dry-run
+
+publication-local:
+	bash scripts/run_publication_suite.sh --skip-observit
+
 clean:
 	rm -rf .pytest_cache .ruff_cache .mypy_cache build dist *.egg-info
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +
