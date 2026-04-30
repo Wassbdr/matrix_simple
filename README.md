@@ -1,6 +1,6 @@
 # GNN-RCA: Graph Neural Network Root Cause Analysis for Kubernetes
 
-[![CI](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci.yml)
+[![CI](https://github.com/Wassbdr/matrix_simple/actions/workflows/ci.yml/badge.svg)](https://github.com/Wassbdr/matrix_simple/actions/workflows/ci.yml)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Paper: coming soon](https://img.shields.io/badge/paper-coming%20soon-lightgrey.svg)](#citation)
@@ -14,7 +14,7 @@ Graph Information Bottleneck (GIB) for full-graph analysis, and a complementary
 Select-Then-Analyze (STA) architecture for sublinear inference on large topologies.
 Evaluated on three RCAEval real-world datasets (TrainTicket, SockShop, Online Boutique)
 and on multi-scale Barabási-Albert simulations (N = 20–100), our models reach
-**Top-1 Avg@1 96.7%** on TrainTicket (3 seeds, 90 test cases), with STA inference
+**Top-1 Avg@1 96.0% ± 3.7%** on TrainTicket (5 seeds, 90 test cases), with STA inference
 latency under **4 ms** at N = 20 and competitive accuracy at N = 100 where
 O(N²) full-graph models degrade.
 The full pipeline, benchmark scripts, chaos manifests, and SHA-256-verified result
@@ -153,8 +153,8 @@ Load generation:     Locust
 ### Install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git
-cd YOUR_REPO
+git clone https://github.com/Wassbdr/matrix_simple.git
+cd matrix_simple
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 ```
@@ -351,7 +351,7 @@ If you use this code or results, please cite:
              Analysis in Kubernetes Microservices},
   author = {Badraoui, Wassim},
   year   = {2026},
-  note   = {Preprint. Code: https://github.com/YOUR_USERNAME/YOUR_REPO}
+  note   = {Preprint. Code: https://github.com/Wassbdr/matrix_simple}
 }
 ```
 
