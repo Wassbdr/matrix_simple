@@ -1,0 +1,34 @@
+
+================================================================
+RELIABILITY SUMMARY (5 seeds → bootstrap CIs should be reliable)
+================================================================
+
+── results_transmission/paper_benchmark_sim.json
+  N= 20 seeds=5
+     best Top-1: Full-Graph GCN (N=20)                    0.8296
+  N= 50 seeds=5
+     best Top-1: STA Selector-only (k=8)                  0.5940
+  N=100 seeds=5
+     best Top-1: STA Select-then-Analyze (k=10)           0.5525
+
+── results_transmission/paper_benchmark_real.json
+  trainticket          STA        Avg@1=0.9600 [0.9300,0.9900] n=5 reliable=✗
+  trainticket          GATv2      Avg@1=0.9500 [0.9100,0.9900] n=5 reliable=✗
+  sockshop             STA        Avg@1=0.8500 [0.7800,0.9200] n=5 reliable=✗
+  sockshop             GATv2      Avg@1=0.8100 [0.7400,0.8900] n=5 reliable=✗
+  online-boutique      STA        Avg@1=0.6500 [0.5700,0.7302] n=5 reliable=✗
+  online-boutique      GATv2      Avg@1=0.6800 [0.6400,0.7200] n=5 reliable=✗
+
+── results_transmission/paper_benchmark_real_mm.json
+  trainticket          STA-MM     Avg@1=0.9100 [0.9000,0.9300] n=5 reliable=✗
+  trainticket          GATv2-MM   Avg@1=0.8800 [0.8400,0.9200] n=5 reliable=✗
+  online-boutique      STA-MM     Avg@1=0.6500 [0.4900,0.7500] n=5 reliable=✗
+  online-boutique      GATv2-MM   Avg@1=0.7900 [0.7198,0.8600] n=5 reliable=✗
+
+── results_transmission/paper_benchmark_observit.json
+  observit             STA        Avg@1=0.7957 [0.7619,0.8338] n=5 reliable=✗
+  observit             GATv2      Avg@1=0.7621 [0.7358,0.7971] n=5 reliable=✗
+
+── results_transmission/paper_benchmark_observit_mm.json
+  observit             STA-MM     Avg@1=0.7723 [0.7564,0.7941] n=5 reliable=✗
+  observit             GATv2-MM   Avg@1=0.7618 [0.7478,0.7757] n=5 reliable=✗

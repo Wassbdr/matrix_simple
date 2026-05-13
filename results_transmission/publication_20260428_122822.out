@@ -1,0 +1,1455 @@
+[34m[12:28:22][0m ============================================================
+[34m[12:28:22][0m GNN-RCA — Publication Result Suite
+[34m[12:28:22][0m   timestamp     : 20260428_122822
+[34m[12:28:22][0m   seeds         : 42,123,7,1337,2025
+[34m[12:28:22][0m   output dir    : results_transmission/
+[34m[12:28:22][0m   logs          : results_transmission/logs_publication_20260428_122822/
+[34m[12:28:22][0m   dry-run       : 0
+[34m[12:28:22][0m   force         : 0
+[34m[12:28:22][0m   skip-observit : 0
+[34m[12:28:22][0m   only          : all
+[34m[12:28:22][0m ============================================================
+[34m[12:28:22][0m 
+[34m[12:28:22][0m ── PHASE 0/6: Pre-flight checks ──
+[32mOK[0m    Python deps importable
+[32mOK[0m    ruff: clean
+[32mOK[0m    pytest: 
+[32mOK[0m    pre-publish audit: passed
+[32mOK[0m    env captured: results_transmission/logs_publication_20260428_122822/00_env.json
+[34m[12:28:41][0m 
+[34m[12:28:41][0m ── PHASE 1/6: Simulated benchmark (BA N=20/50/100 × 5 seeds) ──
+[34m[12:28:41][0m [34mCMD[0m (01_simulated): python -m rca_pipeline.benchmark --sizes 20,50,100 --seeds 42,123,7,1337,2025 --num-samples 3000 --supervised-epochs 150 --late-contrastive-epochs 80 --sta-warmup-epochs 20 --sta-k-anneal-epochs 60 --baseline-epochs 150 --deterministic --output-json results_transmission/paper_benchmark_sim.json
+2026-04-28 12:28:44,202 - INFO - Topology: N=20, E=36 (directed), m=2, avg_degree=3.6
+2026-04-28 12:28:46,722 - INFO - Dataset: 3000 total (1235 anomalies, 1765 healthy), 20 root-cause classes (multimodal: logs+traces)
+2026-04-28 12:28:46,871 - INFO - SelectThenAnalyze: N=20, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-28 12:29:39,473 - INFO - SpatioTemporalRCA initialized: features=5, hidden=32, nodes=20
+2026-04-28 12:30:35,191 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=20, heads=4
+2026-04-28 12:32:31,870 - INFO - SelectThenAnalyze: N=20, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-28 12:33:28,018 - INFO - SpatioTemporalRCA initialized: features=5, hidden=32, nodes=20
+2026-04-28 12:34:32,992 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=20, heads=4
+2026-04-28 12:36:32,482 - INFO - SelectThenAnalyze: N=20, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-28 12:37:12,718 - INFO - SpatioTemporalRCA initialized: features=5, hidden=32, nodes=20
+2026-04-28 12:38:23,422 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=20, heads=4
+2026-04-28 12:40:12,915 - INFO - SelectThenAnalyze: N=20, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-28 12:41:07,477 - INFO - SpatioTemporalRCA initialized: features=5, hidden=32, nodes=20
+2026-04-28 12:42:20,810 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=20, heads=4
+2026-04-28 12:44:13,820 - INFO - SelectThenAnalyze: N=20, k=5, features=5, hidden=32, temporal=conv, selector=ste
+Device: cpu
+PyTorch: 2.11.0+cu130
+
+##############################################################################################################
+  GRAPH SIZE N=20, k=5, samples=3000, seeds=5
+##############################################################################################################
+
+  Generating BA(20, m=2) dataset...
+  Generated 3000 samples in 2.5s
+  Train: 2390 (978 anomalies, 20 RC classes)
+  Test:  610 (257 anomalies)
+
+  === Seed 1/5 (seed=42) ===
+
+  -- Training SelectThenAnalyze (k=5, auto from get_optimal_k) --
+    [STA] N=20, k=5 (empirical optimal=5)
+    [Phase1] 20 warmup epochs done | last_nce=0.0142
+    [Phase2] Ep 000/150 | loss=5.2917 | acc=0.5333 | RC-in-top-10=0.4989 | k=10
+    [Phase2] Ep 030/150 | loss=2.2998 | acc=0.7495 | RC-in-top-8=0.7968 | k=8
+    [Phase2] Ep 060/150 | loss=1.3080 | acc=0.8527 | RC-in-top-5=0.8323 | k=5
+    [Phase2] Ep 090/150 | loss=0.5135 | acc=0.9355 | RC-in-top-5=0.9613 | k=5
+    [Phase2] Ep 120/150 | loss=0.3135 | acc=0.9634 | RC-in-top-5=0.9925 | k=5
+    [Phase2] Ep 149/150 | loss=0.2404 | acc=0.9667 | RC-in-top-5=0.9892 | k=5
+  STA training completed in 51.7s
+
+  -- Training STGCN+GIB (Late Bottleneck) --
+    [V1-Phase1] 80 epochs done | beta_eff=0.5000 | last_loss=0.1451
+    [V1-Phase2] Ep 000/150 | loss=3.6953 | acc=0.2882
+    [V1-Phase2] Ep 030/150 | loss=1.5399 | acc=0.6462
+    [V1-Phase2] Ep 060/150 | loss=1.1471 | acc=0.7505
+    [V1-Phase2] Ep 090/150 | loss=0.7166 | acc=0.8484
+    [V1-Phase2] Ep 120/150 | loss=0.4888 | acc=0.8892
+    [V1-Phase2] Ep 149/150 | loss=0.4246 | acc=0.9022
+  Late Bottleneck training completed in 55.3s
+
+  -- Training Late Bottleneck (GATv2, no GIB) --
+    [GAT-Phase1] 80 contrastive epochs done | last_nce=0.0008
+    [GAT-Phase2] Ep 000/150 | loss=3.0083 | acc=0.0441
+    [GAT-Phase2] Ep 030/150 | loss=2.1317 | acc=0.5301
+    [GAT-Phase2] Ep 060/150 | loss=1.7068 | acc=0.5376
+    [GAT-Phase2] Ep 090/150 | loss=1.3202 | acc=0.6419
+    [GAT-Phase2] Ep 120/150 | loss=0.9227 | acc=0.7634
+    [GAT-Phase2] Ep 149/150 | loss=0.8236 | acc=0.7849
+  Late GAT training completed in 87.8s
+
+  -- Training Full-Graph GCN baseline --
+  -- Training MLP baseline --
+  -- Training RF baseline --
+
+  === Seed 2/5 (seed=123) ===
+
+  -- Training SelectThenAnalyze (k=5, auto from get_optimal_k) --
+    [STA] N=20, k=5 (empirical optimal=5)
+    [Phase1] 20 warmup epochs done | last_nce=0.0145
+    [Phase2] Ep 000/150 | loss=5.3279 | acc=0.2409 | RC-in-top-10=0.5366 | k=10
+    [Phase2] Ep 030/150 | loss=1.8849 | acc=0.8032 | RC-in-top-8=0.8505 | k=8
+    [Phase2] Ep 060/150 | loss=1.2221 | acc=0.8366 | RC-in-top-5=0.8505 | k=5
+    [Phase2] Ep 090/150 | loss=1.1876 | acc=0.8172 | RC-in-top-5=0.9000 | k=5
+    [Phase2] Ep 120/150 | loss=0.7518 | acc=0.8946 | RC-in-top-5=0.9387 | k=5
+    [Phase2] Ep 149/150 | loss=0.6574 | acc=0.9075 | RC-in-top-5=0.9419 | k=5
+  STA training completed in 55.2s
+
+  -- Training STGCN+GIB (Late Bottleneck) --
+    [V1-Phase1] 80 epochs done | beta_eff=0.5000 | last_loss=0.1501
+    [V1-Phase2] Ep 000/150 | loss=3.4167 | acc=0.0409
+    [V1-Phase2] Ep 030/150 | loss=1.7333 | acc=0.6409
+    [V1-Phase2] Ep 060/150 | loss=1.1710 | acc=0.7366
+    [V1-Phase2] Ep 090/150 | loss=0.6953 | acc=0.8344
+    [V1-Phase2] Ep 120/150 | loss=0.5372 | acc=0.8720
+    [V1-Phase2] Ep 149/150 | loss=0.4829 | acc=0.8871
+  Late Bottleneck training completed in 64.0s
+
+  -- Training Late Bottleneck (GATv2, no GIB) --
+    [GAT-Phase1] 80 contrastive epochs done | last_nce=0.0005
+    [GAT-Phase2] Ep 000/150 | loss=3.0146 | acc=0.0376
+    [GAT-Phase2] Ep 030/150 | loss=2.4483 | acc=0.4043
+    [GAT-Phase2] Ep 060/150 | loss=2.1118 | acc=0.4860
+    [GAT-Phase2] Ep 090/150 | loss=1.4885 | acc=0.5613
+    [GAT-Phase2] Ep 120/150 | loss=1.1160 | acc=0.6903
+    [GAT-Phase2] Ep 149/150 | loss=0.9410 | acc=0.7484
+  Late GAT training completed in 92.1s
+
+  -- Training Full-Graph GCN baseline --
+  -- Training MLP baseline --
+  -- Training RF baseline --
+
+  === Seed 3/5 (seed=7) ===
+
+  -- Training SelectThenAnalyze (k=5, auto from get_optimal_k) --
+    [STA] N=20, k=5 (empirical optimal=5)
+    [Phase1] 20 warmup epochs done | last_nce=0.0143
+    [Phase2] Ep 000/150 | loss=5.2611 | acc=0.5161 | RC-in-top-10=0.4742 | k=10
+    [Phase2] Ep 030/150 | loss=2.5682 | acc=0.6538 | RC-in-top-8=0.7301 | k=8
+    [Phase2] Ep 060/150 | loss=4.2707 | acc=0.5473 | RC-in-top-5=0.2817 | k=5
+    [Phase2] Ep 090/150 | loss=3.8652 | acc=0.5613 | RC-in-top-5=0.2441 | k=5
+    [Phase2] Ep 120/150 | loss=3.4895 | acc=0.5828 | RC-in-top-5=0.2677 | k=5
+    [Phase2] Ep 149/150 | loss=3.1334 | acc=0.5860 | RC-in-top-5=0.3387 | k=5
+    [Phase2] Early stop at epoch 149 (patience=75, best_mrr=0.7396)
+  STA training completed in 39.4s
+
+  -- Training STGCN+GIB (Late Bottleneck) --
+    [V1-Phase1] 80 epochs done | beta_eff=0.5000 | last_loss=0.1340
+    [V1-Phase2] Ep 000/150 | loss=3.9576 | acc=0.0290
+    [V1-Phase2] Ep 030/150 | loss=2.0608 | acc=0.5419
+    [V1-Phase2] Ep 060/150 | loss=1.4752 | acc=0.6462
+    [V1-Phase2] Ep 090/150 | loss=1.0595 | acc=0.7355
+    [V1-Phase2] Ep 120/150 | loss=0.8402 | acc=0.7774
+    [V1-Phase2] Ep 149/150 | loss=0.8183 | acc=0.8011
+  Late Bottleneck training completed in 70.1s
+
+  -- Training Late Bottleneck (GATv2, no GIB) --
+    [GAT-Phase1] 80 contrastive epochs done | last_nce=0.0008
+    [GAT-Phase2] Ep 000/150 | loss=3.0041 | acc=0.0452
+    [GAT-Phase2] Ep 030/150 | loss=1.7811 | acc=0.5108
+    [GAT-Phase2] Ep 060/150 | loss=1.4448 | acc=0.5978
+    [GAT-Phase2] Ep 090/150 | loss=0.5287 | acc=0.8634
+    [GAT-Phase2] Ep 120/150 | loss=0.3103 | acc=0.9204
+    [GAT-Phase2] Ep 149/150 | loss=0.2704 | acc=0.9323
+  Late GAT training completed in 80.7s
+
+  -- Training Full-Graph GCN baseline --
+  -- Training MLP baseline --
+  -- Training RF baseline --
+
+  === Seed 4/5 (seed=1337) ===
+
+  -- Training SelectThenAnalyze (k=5, auto from get_optimal_k) --
+    [STA] N=20, k=5 (empirical optimal=5)
+    [Phase1] 20 warmup epochs done | last_nce=0.0149
+    [Phase2] Ep 000/150 | loss=5.2964 | acc=0.4237 | RC-in-top-10=0.5043 | k=10
+    [Phase2] Ep 030/150 | loss=2.3395 | acc=0.6602 | RC-in-top-8=0.7495 | k=8
+    [Phase2] Ep 060/150 | loss=2.1327 | acc=0.6828 | RC-in-top-5=0.6839 | k=5
+    [Phase2] Ep 090/150 | loss=1.0819 | acc=0.8204 | RC-in-top-5=0.8989 | k=5
+    [Phase2] Ep 120/150 | loss=0.7833 | acc=0.8699 | RC-in-top-5=0.9387 | k=5
+    [Phase2] Ep 149/150 | loss=0.7543 | acc=0.8753 | RC-in-top-5=0.9398 | k=5
+  STA training completed in 53.0s
+
+  -- Training STGCN+GIB (Late Bottleneck) --
+    [V1-Phase1] 80 epochs done | beta_eff=0.5000 | last_loss=0.1592
+    [V1-Phase2] Ep 000/150 | loss=3.2122 | acc=0.1022
+    [V1-Phase2] Ep 030/150 | loss=1.7639 | acc=0.5677
+    [V1-Phase2] Ep 060/150 | loss=1.3375 | acc=0.6989
+    [V1-Phase2] Ep 090/150 | loss=0.7003 | acc=0.8495
+    [V1-Phase2] Ep 120/150 | loss=0.4823 | acc=0.8882
+    [V1-Phase2] Ep 149/150 | loss=0.4268 | acc=0.8978
+  Late Bottleneck training completed in 73.0s
+
+  -- Training Late Bottleneck (GATv2, no GIB) --
+    [GAT-Phase1] 80 contrastive epochs done | last_nce=0.0010
+    [GAT-Phase2] Ep 000/150 | loss=3.0015 | acc=0.0785
+    [GAT-Phase2] Ep 030/150 | loss=2.3044 | acc=0.4161
+    [GAT-Phase2] Ep 060/150 | loss=2.0378 | acc=0.4570
+    [GAT-Phase2] Ep 090/150 | loss=1.4263 | acc=0.6011
+    [GAT-Phase2] Ep 120/150 | loss=0.8468 | acc=0.7871
+    [GAT-Phase2] Ep 149/150 | loss=0.6734 | acc=0.8527
+  Late GAT training completed in 76.3s
+
+  -- Training Full-Graph GCN baseline --
+  -- Training MLP baseline --
+  -- Training RF baseline --
+
+  === Seed 5/5 (seed=2025) ===
+
+  -- Training SelectThenAnalyze (k=5, auto from get_optimal_k) --
+    [STA] N=20, k=5 (empirical optimal=5)
+    [Phase1] 20 warmup epochs done | last_nce=0.0136
+    [Phase2] Ep 000/150 | loss=5.2729 | acc=0.6032 | RC-in-top-10=0.5054 | k=10
+    [Phase2] Ep 030/150 | loss=2.2503 | acc=0.7602 | RC-in-top-8=0.7968 | k=8
+    [Phase2] Ep 060/150 | loss=1.8441 | acc=0.7452 | RC-in-top-5=0.7344 | k=5
+    [Phase2] Ep 090/150 | loss=0.8658 | acc=0.8753 | RC-in-top-5=0.9495 | k=5
+    [Phase2] Ep 120/150 | loss=0.4648 | acc=0.9430 | RC-in-top-5=0.9731 | k=5
+2026-04-28 12:45:13,039 - INFO - SpatioTemporalRCA initialized: features=5, hidden=32, nodes=20
+2026-04-28 12:46:09,805 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=20, heads=4
+2026-04-28 12:48:21,696 - INFO - Topology: N=50, E=141 (directed), m=3, avg_degree=5.6
+2026-04-28 12:48:25,808 - INFO - Dataset: 3000 total (1236 anomalies, 1764 healthy), 50 root-cause classes (multimodal: logs+traces)
+2026-04-28 12:48:25,947 - INFO - SelectThenAnalyze: N=50, k=8, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-28 12:50:18,464 - INFO - SpatioTemporalRCA initialized: features=5, hidden=32, nodes=50
+2026-04-28 12:53:13,188 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=50, heads=4
+2026-04-28 12:58:13,270 - INFO - SelectThenAnalyze: N=50, k=8, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-28 13:00:11,701 - INFO - SpatioTemporalRCA initialized: features=5, hidden=32, nodes=50
+2026-04-28 13:03:17,759 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=50, heads=4
+2026-04-28 13:08:45,454 - INFO - SelectThenAnalyze: N=50, k=8, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-28 13:10:44,334 - INFO - SpatioTemporalRCA initialized: features=5, hidden=32, nodes=50
+    [Phase2] Ep 149/150 | loss=0.3844 | acc=0.9505 | RC-in-top-5=0.9839 | k=5
+  STA training completed in 58.3s
+
+  -- Training STGCN+GIB (Late Bottleneck) --
+    [V1-Phase1] 80 epochs done | beta_eff=0.5000 | last_loss=0.1440
+    [V1-Phase2] Ep 000/150 | loss=3.6412 | acc=0.0602
+    [V1-Phase2] Ep 030/150 | loss=2.1689 | acc=0.4183
+    [V1-Phase2] Ep 060/150 | loss=1.7370 | acc=0.5882
+    [V1-Phase2] Ep 090/150 | loss=0.9475 | acc=0.7871
+    [V1-Phase2] Ep 120/150 | loss=0.7643 | acc=0.8344
+    [V1-Phase2] Ep 149/150 | loss=0.6857 | acc=0.8366
+  Late Bottleneck training completed in 56.2s
+
+  -- Training Late Bottleneck (GATv2, no GIB) --
+    [GAT-Phase1] 80 contrastive epochs done | last_nce=0.0015
+    [GAT-Phase2] Ep 000/150 | loss=3.0012 | acc=0.0570
+    [GAT-Phase2] Ep 030/150 | loss=1.9990 | acc=0.5140
+    [GAT-Phase2] Ep 060/150 | loss=1.4771 | acc=0.6011
+    [GAT-Phase2] Ep 090/150 | loss=0.6219 | acc=0.8409
+    [GAT-Phase2] Ep 120/150 | loss=0.4128 | acc=0.9065
+    [GAT-Phase2] Ep 149/150 | loss=0.3096 | acc=0.9204
+  Late GAT training completed in 101.5s
+
+  -- Training Full-Graph GCN baseline --
+  -- Training MLP baseline --
+  -- Training RF baseline --
+
+==============================================================================================================
+  RESULTS FOR N=20 (mean over 5 seeds)
+==============================================================================================================
+  MODEL                                  |   TOP-1 |   TOP-2 |   TOP-5 |     MRR |    SEL% |   LAT(ms) |    PARAMS
+  ---------------------------------------+---------+---------+---------+---------+---------+-----------+----------
+  STA Select-then-Analyze (k=5)          | 0.8054±0.122 | 0.8521±0.115 | 0.9105±0.088 | 0.8540±0.103 |  0.9097 |      3.65 |    15,494
+  STA Selector-only (k=5)                | 0.8023±0.124 | 0.8521±0.116 | 0.9097±0.089 | 0.8517±0.105 |  0.0000 |      0.00 |         0
+  Late Bottleneck STGCN+GIB (N=20)       | 0.8226±0.047 | 0.8700±0.041 | 0.9237±0.023 | 0.8682±0.036 |  0.0000 |      2.17 |     8,579
+  Late Bottleneck GATv2 (N=20)           | 0.8280±0.039 | 0.8833±0.040 | 0.9401±0.029 | 0.8784±0.032 |  0.0000 |      1.96 |     9,794
+  Full-Graph GCN (N=20)                  | 0.8296±0.029 | 0.8802±0.025 | 0.9331±0.018 | 0.8765±0.022 |  0.0000 |      1.72 |     7,490
+  MLP Baseline                           | 0.0840±0.024 | 0.1774±0.047 | 0.3735±0.039 | 0.2422±0.030 |  0.0000 |      0.00 |    22,132
+  Random Forest                          | 0.6848±0.027 | 0.8545±0.016 | 0.9339±0.008 | 0.7996±0.017 |  0.0000 |      0.00 |         0
+  ---------------------------------------+---------+---------+---------+--------
+
+  --- Regression check (vs reference Top-1, Δ>0.5% triggers ⚠️) ---
+  OK STA Select-then-Analyze (k=5): Top-1=0.8054 ref=0.3000
+  OK Late Bottleneck STGCN+GIB (N=20): Top-1=0.8226 ref=0.7020
+  OK Late Bottleneck GATv2 (N=20): Top-1=0.8280 ref=0.6760
+  OK Full-Graph GCN (N=20): Top-1=0.8296 ref=0.7310
+
+##############################################################################################################
+  GRAPH SIZE N=50, k=8, samples=3000, seeds=5
+##############################################################################################################
+
+  Generating BA(50, m=3) dataset...
+  Generated 3000 samples in 4.1s
+  Train: 2381 (970 anomalies, 50 RC classes)
+  Test:  619 (266 anomalies)
+
+  === Seed 1/5 (seed=42) ===
+
+  -- Training SelectThenAnalyze (k=8, auto from get_optimal_k) --
+    [STA] N=50, k=8 (empirical optimal=8)
+    [Phase1] 20 warmup epochs done | last_nce=0.0150
+    [Phase2] Ep 000/150 | loss=7.1908 | acc=0.2473 | RC-in-top-25=0.4913 | k=25
+    [Phase2] Ep 030/150 | loss=6.2650 | acc=0.6074 | RC-in-top-17=0.4631 | k=17
+    [Phase2] Ep 060/150 | loss=5.1756 | acc=0.6052 | RC-in-top-8=0.2516 | k=8
+    [Phase2] Ep 090/150 | loss=4.5660 | acc=0.6193 | RC-in-top-8=0.3720 | k=8
+    [Phase2] Ep 120/150 | loss=4.1473 | acc=0.5944 | RC-in-top-8=0.4447 | k=8
+    [Phase2] Early stop at epoch 148 (patience=75, best_mrr=0.6365)
+  STA training completed in 111.1s
+
+  -- Training STGCN+GIB (Late Bottleneck) --
+    [V1-Phase1] 80 epochs done | beta_eff=0.2124 | last_loss=0.0526
+    [V1-Phase2] Ep 000/150 | loss=4.0760 | acc=0.0325
+    [V1-Phase2] Ep 030/150 | loss=3.8790 | acc=0.3362
+    [V1-Phase2] Ep 060/150 | loss=3.8616 | acc=0.2907
+    [V1-Phase2] Ep 090/150 | loss=3.5989 | acc=0.3547
+    [V1-Phase2] Ep 120/150 | loss=3.3757 | acc=0.4078
+    [V1-Phase2] Ep 149/150 | loss=3.2473 | acc=0.4208
+  Late Bottleneck training completed in 174.2s
+
+  -- Training Late Bottleneck (GATv2, no GIB) --
+    [GAT-Phase1] 80 contrastive epochs done | last_nce=0.0005
+    [GAT-Phase2] Ep 000/150 | loss=3.9232 | acc=0.0184
+    [GAT-Phase2] Ep 030/150 | loss=3.8886 | acc=0.0434
+    [GAT-Phase2] ⚠️  Epoch 50 acc=0.034 < 0.100 — slow/degenerate-looking convergence (no restart).
+    [GAT-Phase2] Ep 060/150 | loss=3.8541 | acc=0.0401
+    [GAT-Phase2] Ep 090/150 | loss=3.7779 | acc=0.0662
+    [GAT-Phase2] Ep 120/150 | loss=3.6926 | acc=0.1095
+    [GAT-Phase2] Ep 149/150 | loss=3.6783 | acc=0.1258
+  Late GAT training completed in 232.8s
+
+  -- Training Full-Graph GCN baseline --
+  -- Training MLP baseline --
+  -- Training RF baseline --
+
+  === Seed 2/5 (seed=123) ===
+
+  -- Training SelectThenAnalyze (k=8, auto from get_optimal_k) --
+    [STA] N=50, k=8 (empirical optimal=8)
+    [Phase1] 20 warmup epochs done | last_nce=0.0157
+    [Phase2] Ep 000/150 | loss=7.2171 | acc=0.1909 | RC-in-top-25=0.5119 | k=25
+    [Phase2] Ep 030/150 | loss=6.3595 | acc=0.5846 | RC-in-top-17=0.4252 | k=17
+    [Phase2] Ep 060/150 | loss=5.3770 | acc=0.5835 | RC-in-top-8=0.2527 | k=8
+    [Phase2] Ep 090/150 | loss=5.6100 | acc=0.6030 | RC-in-top-8=0.2017 | k=8
+    [Phase2] Ep 120/150 | loss=4.1740 | acc=0.6518 | RC-in-top-8=0.4393 | k=8
+    [Phase2] Ep 149/150 | loss=3.7593 | acc=0.6443 | RC-in-top-8=0.5174 | k=8
+  STA training completed in 117.5s
+
+  -- Training STGCN+GIB (Late Bottleneck) --
+    [V1-Phase1] 80 epochs done | beta_eff=0.2124 | last_loss=0.0545
+    [V1-Phase2] Ep 000/150 | loss=3.9585 | acc=0.1887
+    [V1-Phase2] Ep 030/150 | loss=3.8705 | acc=0.2603
+    [V1-Phase2] Ep 060/150 | loss=3.8424 | acc=0.3113
+    [V1-Phase2] Ep 090/150 | loss=3.6531 | acc=0.3427
+    [V1-Phase2] Ep 120/150 | loss=3.2788 | acc=0.3872
+    [V1-Phase2] Ep 149/150 | loss=3.2188 | acc=0.4024
+  Late Bottleneck training completed in 185.7s
+
+  -- Training Late Bottleneck (GATv2, no GIB) --
+    [GAT-Phase1] 80 contrastive epochs done | last_nce=0.0004
+    [GAT-Phase2] Ep 000/150 | loss=3.9193 | acc=0.0152
+    [GAT-Phase2] Ep 030/150 | loss=3.8784 | acc=0.0477
+    [GAT-Phase2] ⚠️  Epoch 50 acc=0.043 < 0.100 — slow/degenerate-looking convergence (no restart).
+    [GAT-Phase2] Ep 060/150 | loss=3.7830 | acc=0.0954
+    [GAT-Phase2] Ep 090/150 | loss=3.4567 | acc=0.2701
+    [GAT-Phase2] Ep 120/150 | loss=3.2963 | acc=0.2993
+    [GAT-Phase2] Ep 149/150 | loss=3.1818 | acc=0.3373
+  Late GAT training completed in 253.1s
+
+  -- Training Full-Graph GCN baseline --
+  -- Training MLP baseline --
+  -- Training RF baseline --
+
+  === Seed 3/5 (seed=7) ===
+
+  -- Training SelectThenAnalyze (k=8, auto from get_optimal_k) --
+    [STA] N=50, k=8 (empirical optimal=8)
+    [Phase1] 20 warmup epochs done | last_nce=0.0149
+    [Phase2] Ep 000/150 | loss=7.2142 | acc=0.4707 | RC-in-top-25=0.5076 | k=25
+    [Phase2] Ep 030/150 | loss=6.4443 | acc=0.5521 | RC-in-top-17=0.4100 | k=17
+    [Phase2] Ep 060/150 | loss=5.5688 | acc=0.6052 | RC-in-top-8=0.2278 | k=8
+    [Phase2] Ep 090/150 | loss=4.4984 | acc=0.6584 | RC-in-top-8=0.3568 | k=8
+    [Phase2] Ep 120/150 | loss=3.1166 | acc=0.6714 | RC-in-top-8=0.5944 | k=8
+    [Phase2] Ep 149/150 | loss=3.1012 | acc=0.6432 | RC-in-top-8=0.5933 | k=8
+  STA training completed in 118.0s
+
+  -- Training STGCN+GIB (Late Bottleneck) --
+    [V1-Phase1] 80 epochs done | beta_eff=0.2124 | last_loss=0.0540
+    [V1-Phase2] Ep 000/150 | loss=4.0633 | acc=0.1670
+    [V1-Phase2] Ep 030/150 | loss=3.8818 | acc=0.3156
+    [V1-Phase2] Ep 060/150 | loss=3.8538 | acc=0.3568
+2026-04-28 13:13:30,843 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=50, heads=4
+2026-04-28 13:18:46,485 - INFO - SelectThenAnalyze: N=50, k=8, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-28 13:20:20,152 - INFO - SpatioTemporalRCA initialized: features=5, hidden=32, nodes=50
+2026-04-28 13:24:13,931 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=50, heads=4
+2026-04-28 13:28:27,257 - INFO - SelectThenAnalyze: N=50, k=8, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-28 13:30:04,668 - INFO - SpatioTemporalRCA initialized: features=5, hidden=32, nodes=50
+2026-04-28 13:32:55,284 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=50, heads=4
+2026-04-28 13:38:09,380 - INFO - Topology: N=100, E=291 (directed), m=3, avg_degree=5.8
+2026-04-28 13:38:15,547 - INFO - Dataset: 3000 total (1220 anomalies, 1780 healthy), 100 root-cause classes (multimodal: logs+traces)
+2026-04-28 13:38:15,787 - INFO - SelectThenAnalyze: N=100, k=15, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-28 13:42:28,736 - INFO - SpatioTemporalRCA initialized: features=5, hidden=32, nodes=100
+2026-04-28 13:50:14,031 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=100, heads=4
+    [V1-Phase2] Ep 090/150 | loss=3.6108 | acc=0.3156
+    [V1-Phase2] Ep 120/150 | loss=3.4811 | acc=0.3395
+    [V1-Phase2] Ep 149/150 | loss=3.4538 | acc=0.3178
+  Late Bottleneck training completed in 166.2s
+
+  -- Training Late Bottleneck (GATv2, no GIB) --
+    [GAT-Phase1] 80 contrastive epochs done | last_nce=0.0006
+    [GAT-Phase2] Ep 000/150 | loss=3.9246 | acc=0.0184
+    [GAT-Phase2] Ep 030/150 | loss=3.8683 | acc=0.0358
+    [GAT-Phase2] ⚠️  Epoch 50 acc=0.039 < 0.100 — slow/degenerate-looking convergence (no restart).
+    [GAT-Phase2] Ep 060/150 | loss=3.8074 | acc=0.0564
+    [GAT-Phase2] Ep 090/150 | loss=3.6125 | acc=0.1486
+    [GAT-Phase2] Ep 120/150 | loss=3.4239 | acc=0.2495
+    [GAT-Phase2] Ep 149/150 | loss=3.3119 | acc=0.2787
+  Late GAT training completed in 238.6s
+
+  -- Training Full-Graph GCN baseline --
+  -- Training MLP baseline --
+  -- Training RF baseline --
+
+  === Seed 4/5 (seed=1337) ===
+
+  -- Training SelectThenAnalyze (k=8, auto from get_optimal_k) --
+    [STA] N=50, k=8 (empirical optimal=8)
+    [Phase1] 20 warmup epochs done | last_nce=0.0150
+    [Phase2] Ep 000/150 | loss=7.2167 | acc=0.1985 | RC-in-top-25=0.5098 | k=25
+    [Phase2] Ep 030/150 | loss=6.5177 | acc=0.5466 | RC-in-top-17=0.3872 | k=17
+    [Phase2] Ep 060/150 | loss=5.7543 | acc=0.5456 | RC-in-top-8=0.1974 | k=8
+    [Phase2] Ep 090/150 | loss=5.8394 | acc=0.5206 | RC-in-top-8=0.2180 | k=8
+    [Phase2] Ep 120/150 | loss=5.5139 | acc=0.3460 | RC-in-top-8=0.2386 | k=8
+    [Phase2] Ep 149/150 | loss=5.4824 | acc=0.4642 | RC-in-top-8=0.2364 | k=8
+  STA training completed in 92.7s
+
+  -- Training STGCN+GIB (Late Bottleneck) --
+    [V1-Phase1] 80 epochs done | beta_eff=0.2124 | last_loss=0.0545
+    [V1-Phase2] Ep 000/150 | loss=3.9583 | acc=0.1106
+    [V1-Phase2] Ep 030/150 | loss=3.8829 | acc=0.3265
+    [V1-Phase2] Ep 060/150 | loss=3.8662 | acc=0.3666
+    [V1-Phase2] Ep 090/150 | loss=3.7005 | acc=0.3330
+    [V1-Phase2] Ep 120/150 | loss=3.5283 | acc=0.4143
+    [V1-Phase2] Ep 149/150 | loss=3.4438 | acc=0.4078
+  Late Bottleneck training completed in 233.5s
+
+  -- Training Late Bottleneck (GATv2, no GIB) --
+    [GAT-Phase1] 80 contrastive epochs done | last_nce=0.0006
+    [GAT-Phase2] Ep 000/150 | loss=3.9198 | acc=0.0163
+    [GAT-Phase2] Ep 030/150 | loss=3.8632 | acc=0.0531
+    [GAT-Phase2] ⚠️  Epoch 50 acc=0.069 < 0.100 — slow/degenerate-looking convergence (no restart).
+    [GAT-Phase2] Ep 060/150 | loss=3.7458 | acc=0.0868
+    [GAT-Phase2] Ep 090/150 | loss=3.7363 | acc=0.1215
+    [GAT-Phase2] Early stop at epoch 109 (patience=75, best_mrr=0.5377)
+  Late GAT training completed in 187.7s
+
+  -- Training Full-Graph GCN baseline --
+  -- Training MLP baseline --
+  -- Training RF baseline --
+
+  === Seed 5/5 (seed=2025) ===
+
+  -- Training SelectThenAnalyze (k=8, auto from get_optimal_k) --
+    [STA] N=50, k=8 (empirical optimal=8)
+    [Phase1] 20 warmup epochs done | last_nce=0.0138
+    [Phase2] Ep 000/150 | loss=7.1839 | acc=0.4349 | RC-in-top-25=0.5000 | k=25
+    [Phase2] Ep 030/150 | loss=6.4404 | acc=0.5889 | RC-in-top-17=0.4176 | k=17
+    [Phase2] Ep 060/150 | loss=5.8099 | acc=0.5260 | RC-in-top-8=0.1920 | k=8
+    [Phase2] Ep 090/150 | loss=4.9212 | acc=0.5152 | RC-in-top-8=0.3026 | k=8
+    [Phase2] Ep 120/150 | loss=4.2105 | acc=0.5423 | RC-in-top-8=0.4002 | k=8
+    [Phase2] Ep 149/150 | loss=4.0802 | acc=0.5239 | RC-in-top-8=0.4132 | k=8
+  STA training completed in 96.5s
+
+  -- Training STGCN+GIB (Late Bottleneck) --
+    [V1-Phase1] 80 epochs done | beta_eff=0.2124 | last_loss=0.0538
+    [V1-Phase2] Ep 000/150 | loss=3.9777 | acc=0.1855
+    [V1-Phase2] Ep 030/150 | loss=3.8697 | acc=0.2950
+    [V1-Phase2] Ep 060/150 | loss=3.8567 | acc=0.3232
+    [V1-Phase2] Ep 090/150 | loss=3.6495 | acc=0.3460
+    [V1-Phase2] Ep 120/150 | loss=3.1875 | acc=0.4284
+    [V1-Phase2] Ep 149/150 | loss=2.8058 | acc=0.4208
+  Late Bottleneck training completed in 170.3s
+
+  -- Training Late Bottleneck (GATv2, no GIB) --
+    [GAT-Phase1] 80 contrastive epochs done | last_nce=0.0006
+    [GAT-Phase2] Ep 000/150 | loss=3.9177 | acc=0.0206
+    [GAT-Phase2] Ep 030/150 | loss=3.8872 | acc=0.0336
+    [GAT-Phase2] ⚠️  Epoch 50 acc=0.040 < 0.100 — slow/degenerate-looking convergence (no restart).
+    [GAT-Phase2] Ep 060/150 | loss=3.8490 | acc=0.0531
+    [GAT-Phase2] Ep 090/150 | loss=3.7108 | acc=0.1920
+    [GAT-Phase2] Ep 120/150 | loss=3.5842 | acc=0.2148
+    [GAT-Phase2] Ep 149/150 | loss=3.5687 | acc=0.2017
+  Late GAT training completed in 238.5s
+
+  -- Training Full-Graph GCN baseline --
+  -- Training MLP baseline --
+  -- Training RF baseline --
+
+==============================================================================================================
+  RESULTS FOR N=50 (mean over 5 seeds)
+==============================================================================================================
+  MODEL                                  |   TOP-1 |   TOP-2 |   TOP-5 |     MRR |    SEL% |   LAT(ms) |    PARAMS
+  ---------------------------------------+---------+---------+---------+---------+---------+-----------+----------
+  STA Select-then-Analyze (k=8)          | 0.5895±0.049 | 0.6534±0.038 | 0.6955±0.025 | 0.6506±0.033 |  0.7256 |      3.41 |    15,494
+  STA Selector-only (k=8)                | 0.5940±0.049 | 0.6534±0.036 | 0.6925±0.022 | 0.6526±0.032 |  0.0000 |      0.00 |         0
+  Late Bottleneck STGCN+GIB (N=50)       | 0.4692±0.068 | 0.5053±0.073 | 0.5586±0.079 | 0.5238±0.069 |  0.0000 |      1.31 |     8,579
+  Late Bottleneck GATv2 (N=50)           | 0.5714±0.023 | 0.6045±0.024 | 0.6504±0.039 | 0.6191±0.026 |  0.0000 |      2.33 |     9,794
+  Full-Graph GCN (N=50)                  | 0.5263±0.026 | 0.5602±0.020 | 0.6015±0.023 | 0.5746±0.022 |  0.0000 |      1.30 |     7,490
+  MLP Baseline                           | 0.0293±0.005 | 0.0534±0.008 | 0.1226±0.008 | 0.1056±0.004 |  0.0000 |      0.00 |    51,922
+  Random Forest                          | 0.3120±0.016 | 0.4000±0.039 | 0.5241±0.024 | 0.4208±0.021 |  0.0000 |      0.00 |         0
+  ---------------------------------------+---------+---------+---------+--------
+
+  --- Regression check (vs reference Top-1, Δ>0.5% triggers ⚠️) ---
+  OK STA Select-then-Analyze (k=8): Top-1=0.5895 ref=0.1830
+  OK Late Bottleneck STGCN+GIB (N=50): Top-1=0.4692 ref=0.2730
+  OK Late Bottleneck GATv2 (N=50): Top-1=0.5714 ref=0.0830
+  OK Full-Graph GCN (N=50): Top-1=0.5263 ref=0.2600
+
+##############################################################################################################
+  GRAPH SIZE N=100, k=10, samples=3000, seeds=5
+##############################################################################################################
+
+  Generating BA(100, m=3) dataset...
+  Generated 3000 samples in 6.2s
+  Train: 2362 (938 anomalies, 100 RC classes)
+  Test:  638 (282 anomalies)
+
+  === Seed 1/5 (seed=42) ===
+
+  -- Training SelectThenAnalyze (k=15, auto from get_optimal_k) --
+    [STA] N=100, k=15 (empirical optimal=15)
+    [Phase1] 20 warmup epochs done | last_nce=0.0176
+    [Phase2] Ep 000/150 | loss=8.5360 | acc=0.3700 | RC-in-top-50=0.4832 | k=50
+    [Phase2] Ep 030/150 | loss=7.7569 | acc=0.5392 | RC-in-top-33=0.4204 | k=33
+    [Phase2] Ep 060/150 | loss=6.8816 | acc=0.6065 | RC-in-top-15=0.2298 | k=15
+    [Phase2] Ep 090/150 | loss=6.1538 | acc=0.6300 | RC-in-top-15=0.3307 | k=15
+    [Phase2] Ep 120/150 | loss=4.8798 | acc=0.6581 | RC-in-top-15=0.5448 | k=15
+    [Phase2] Ep 149/150 | loss=5.0360 | acc=0.6502 | RC-in-top-15=0.5123 | k=15
+  STA training completed in 252.2s
+
+  -- Training STGCN+GIB (Late Bottleneck) --
+    [V1-Phase1] 80 epochs done | beta_eff=0.1111 | last_loss=0.0241
+    [V1-Phase2] Ep 000/150 | loss=4.6489 | acc=0.1502
+    [V1-Phase2] Ep 030/150 | loss=4.5814 | acc=0.2556
+    [V1-Phase2] Ep 060/150 | loss=4.5564 | acc=0.2769
+    [V1-Phase2] Ep 090/150 | loss=4.4136 | acc=0.2612
+    [V1-Phase2] Ep 120/150 | loss=3.9148 | acc=0.3307
+    [V1-Phase2] Ep 149/150 | loss=3.8863 | acc=0.3352
+  Late Bottleneck training completed in 464.7s
+
+  -- Training Late Bottleneck (GATv2, no GIB) --
+    [GAT-Phase1] 80 contrastive epochs done | last_nce=0.0004
+2026-04-28 14:03:03,804 - INFO - SelectThenAnalyze: N=100, k=15, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-28 14:07:49,811 - INFO - SpatioTemporalRCA initialized: features=5, hidden=32, nodes=100
+2026-04-28 14:16:06,955 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=100, heads=4
+2026-04-28 14:30:36,686 - INFO - SelectThenAnalyze: N=100, k=15, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-28 14:36:21,076 - INFO - SpatioTemporalRCA initialized: features=5, hidden=32, nodes=100
+2026-04-28 15:37:29,178 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=100, heads=4
+2026-04-28 15:47:10,511 - INFO - SelectThenAnalyze: N=100, k=15, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-28 15:51:42,848 - INFO - SpatioTemporalRCA initialized: features=5, hidden=32, nodes=100
+2026-04-28 15:59:35,982 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=100, heads=4
+2026-04-28 16:10:24,440 - INFO - SelectThenAnalyze: N=100, k=15, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-28 16:15:34,632 - INFO - SpatioTemporalRCA initialized: features=5, hidden=32, nodes=100
+2026-04-29 15:34:50,764 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=100, heads=4
+    [GAT-Phase2] Ep 000/150 | loss=4.6135 | acc=0.0101
+    [GAT-Phase2] Ep 030/150 | loss=4.5955 | acc=0.0101
+    [GAT-Phase2] ⚠️  Epoch 50 acc=0.024 < 0.050 — slow/degenerate-looking convergence (no restart).
+    [GAT-Phase2] Ep 060/150 | loss=4.5686 | acc=0.0224
+    [GAT-Phase2] Ep 090/150 | loss=4.4393 | acc=0.0740
+    [GAT-Phase2] Ep 120/150 | loss=4.0519 | acc=0.3251
+    [GAT-Phase2] Ep 149/150 | loss=4.0270 | acc=0.3161
+  Late GAT training completed in 591.0s
+
+  -- Training Full-Graph GCN baseline --
+  -- Training MLP baseline --
+  -- Training RF baseline --
+
+  === Seed 2/5 (seed=123) ===
+
+  -- Training SelectThenAnalyze (k=15, auto from get_optimal_k) --
+    [STA] N=100, k=15 (empirical optimal=15)
+    [Phase1] 20 warmup epochs done | last_nce=0.0142
+    [Phase2] Ep 000/150 | loss=8.5747 | acc=0.1244 | RC-in-top-50=0.4854 | k=50
+    [Phase2] Ep 030/150 | loss=7.5376 | acc=0.5785 | RC-in-top-33=0.5078 | k=33
+    [Phase2] Ep 060/150 | loss=6.8752 | acc=0.5549 | RC-in-top-15=0.2175 | k=15
+    [Phase2] Ep 090/150 | loss=7.2507 | acc=0.3307 | RC-in-top-15=0.1614 | k=15
+    [Phase2] Ep 120/150 | loss=6.9789 | acc=0.5045 | RC-in-top-15=0.1951 | k=15
+    [Phase2] Ep 149/150 | loss=6.6191 | acc=0.4709 | RC-in-top-15=0.2265 | k=15
+  STA training completed in 284.7s
+
+  -- Training STGCN+GIB (Late Bottleneck) --
+    [V1-Phase1] 80 epochs done | beta_eff=0.1111 | last_loss=0.0229
+    [V1-Phase2] Ep 000/150 | loss=4.8390 | acc=0.1334
+    [V1-Phase2] Ep 030/150 | loss=4.5521 | acc=0.3363
+    [V1-Phase2] Ep 060/150 | loss=4.5123 | acc=0.2859
+    [V1-Phase2] Ep 090/150 | loss=4.3774 | acc=0.3150
+    [V1-Phase2] Ep 120/150 | loss=3.9495 | acc=0.3722
+    [V1-Phase2] Ep 149/150 | loss=3.7612 | acc=0.4036
+  Late Bottleneck training completed in 496.5s
+
+  -- Training Late Bottleneck (GATv2, no GIB) --
+    [GAT-Phase1] 80 contrastive epochs done | last_nce=0.0003
+    [GAT-Phase2] Ep 000/150 | loss=4.6247 | acc=0.0045
+    [GAT-Phase2] Ep 030/150 | loss=4.5579 | acc=0.0258
+    [GAT-Phase2] ⚠️  Epoch 50 acc=0.019 < 0.050 — slow/degenerate-looking convergence (no restart).
+    [GAT-Phase2] Ep 060/150 | loss=4.5490 | acc=0.0202
+    [GAT-Phase2] Ep 090/150 | loss=4.4186 | acc=0.0628
+    [GAT-Phase2] Ep 120/150 | loss=4.3202 | acc=0.1020
+    [GAT-Phase2] Ep 149/150 | loss=4.1906 | acc=0.2108
+  Late GAT training completed in 669.7s
+
+  -- Training Full-Graph GCN baseline --
+  -- Training MLP baseline --
+  -- Training RF baseline --
+
+  === Seed 3/5 (seed=7) ===
+
+  -- Training SelectThenAnalyze (k=15, auto from get_optimal_k) --
+    [STA] N=100, k=15 (empirical optimal=15)
+    [Phase1] 20 warmup epochs done | last_nce=0.0143
+    [Phase2] Ep 000/150 | loss=8.5528 | acc=0.2836 | RC-in-top-50=0.5157 | k=50
+    [Phase2] Ep 030/150 | loss=7.8855 | acc=0.5191 | RC-in-top-33=0.3778 | k=33
+    [Phase2] Ep 060/150 | loss=6.9454 | acc=0.5460 | RC-in-top-15=0.1917 | k=15
+    [Phase2] Ep 090/150 | loss=6.5274 | acc=0.5886 | RC-in-top-15=0.2534 | k=15
+    [Phase2] Ep 120/150 | loss=5.4398 | acc=0.6020 | RC-in-top-15=0.4742 | k=15
+    [Phase2] Ep 149/150 | loss=6.1753 | acc=0.6020 | RC-in-top-15=0.3408 | k=15
+  STA training completed in 343.0s
+
+  -- Training STGCN+GIB (Late Bottleneck) --
+    [V1-Phase1] 80 epochs done | beta_eff=0.1111 | last_loss=0.0238
+    [V1-Phase2] Ep 000/150 | loss=4.7230 | acc=0.1771
+    [V1-Phase2] Ep 030/150 | loss=4.5814 | acc=0.2040
+    [V1-Phase2] Ep 060/150 | loss=4.5531 | acc=0.2623
+    [V1-Phase2] Ep 090/150 | loss=4.4305 | acc=0.3307
+    [V1-Phase2] Ep 120/150 | loss=4.3389 | acc=0.3700
+    [V1-Phase2] Ep 149/150 | loss=4.3186 | acc=0.3980
+  Late Bottleneck training completed in 3667.7s
+
+  -- Training Late Bottleneck (GATv2, no GIB) --
+    [GAT-Phase1] 80 contrastive epochs done | last_nce=0.0003
+    [GAT-Phase2] Ep 000/150 | loss=4.6167 | acc=0.0112
+    [GAT-Phase2] Ep 030/150 | loss=4.5973 | acc=0.0146
+    [GAT-Phase2] ⚠️  Epoch 50 acc=0.012 < 0.050 — slow/degenerate-looking convergence (no restart).
+    [GAT-Phase2] Ep 060/150 | loss=4.5768 | acc=0.0112
+    [GAT-Phase2] Ep 090/150 | loss=4.3479 | acc=0.0874
+    [GAT-Phase2] Ep 120/150 | loss=4.0639 | acc=0.3049
+    [GAT-Phase2] Ep 149/150 | loss=3.8751 | acc=0.3587
+  Late GAT training completed in 429.5s
+
+  -- Training Full-Graph GCN baseline --
+  -- Training MLP baseline --
+  -- Training RF baseline --
+
+  === Seed 4/5 (seed=1337) ===
+
+  -- Training SelectThenAnalyze (k=15, auto from get_optimal_k) --
+    [STA] N=100, k=15 (empirical optimal=15)
+    [Phase1] 20 warmup epochs done | last_nce=0.0166
+    [Phase2] Ep 000/150 | loss=8.5752 | acc=0.0135 | RC-in-top-50=0.5381 | k=50
+    [Phase2] Ep 030/150 | loss=7.8843 | acc=0.5168 | RC-in-top-33=0.3879 | k=33
+    [Phase2] Ep 060/150 | loss=7.0234 | acc=0.4910 | RC-in-top-15=0.2186 | k=15
+    [Phase2] Ep 090/150 | loss=6.6497 | acc=0.5605 | RC-in-top-15=0.2399 | k=15
+    [Phase2] Ep 120/150 | loss=5.9339 | acc=0.5471 | RC-in-top-15=0.3767 | k=15
+    [Phase2] Ep 149/150 | loss=5.0561 | acc=0.5751 | RC-in-top-15=0.4765 | k=15
+  STA training completed in 271.5s
+
+  -- Training STGCN+GIB (Late Bottleneck) --
+    [V1-Phase1] 80 epochs done | beta_eff=0.1111 | last_loss=0.0242
+    [V1-Phase2] Ep 000/150 | loss=4.6570 | acc=0.0942
+    [V1-Phase2] Ep 030/150 | loss=4.5472 | acc=0.2713
+    [V1-Phase2] Ep 060/150 | loss=4.4657 | acc=0.3004
+    [V1-Phase2] Ep 090/150 | loss=4.1443 | acc=0.3655
+    [V1-Phase2] Ep 120/150 | loss=3.8273 | acc=0.4148
+    [V1-Phase2] Ep 149/150 | loss=3.5020 | acc=0.4260
+  Late Bottleneck training completed in 471.6s
+
+  -- Training Late Bottleneck (GATv2, no GIB) --
+    [GAT-Phase1] 80 contrastive epochs done | last_nce=0.0003
+    [GAT-Phase2] Ep 000/150 | loss=4.6095 | acc=0.0056
+    [GAT-Phase2] Ep 030/150 | loss=4.5469 | acc=0.0258
+    [GAT-Phase2] ⚠️  Epoch 50 acc=0.038 < 0.050 — slow/degenerate-looking convergence (no restart).
+    [GAT-Phase2] Ep 060/150 | loss=4.4711 | acc=0.0381
+    [GAT-Phase2] Early stop at epoch 76 (patience=75, best_mrr=0.4934)
+  Late GAT training completed in 468.9s
+
+  -- Training Full-Graph GCN baseline --
+  -- Training MLP baseline --
+  -- Training RF baseline --
+
+  === Seed 5/5 (seed=2025) ===
+
+  -- Training SelectThenAnalyze (k=15, auto from get_optimal_k) --
+    [STA] N=100, k=15 (empirical optimal=15)
+    [Phase1] 20 warmup epochs done | last_nce=0.0139
+    [Phase2] Ep 000/150 | loss=8.5250 | acc=0.4809 | RC-in-top-50=0.4865 | k=50
+    [Phase2] Ep 030/150 | loss=7.8748 | acc=0.5392 | RC-in-top-33=0.3722 | k=33
+    [Phase2] Ep 060/150 | loss=7.0407 | acc=0.5370 | RC-in-top-15=0.1939 | k=15
+    [Phase2] Ep 090/150 | loss=6.5352 | acc=0.5673 | RC-in-top-15=0.2444 | k=15
+    [Phase2] Ep 120/150 | loss=6.6262 | acc=0.5684 | RC-in-top-15=0.2859 | k=15
+    [Phase2] Ep 149/150 | loss=6.3996 | acc=0.5762 | RC-in-top-15=0.2836 | k=15
+  STA training completed in 309.0s
+
+  -- Training STGCN+GIB (Late Bottleneck) --
+    [V1-Phase1] 80 epochs done | beta_eff=0.1111 | last_loss=0.0234
+    [V1-Phase2] Ep 000/150 | loss=4.7628 | acc=0.0650
+    [V1-Phase2] Ep 030/150 | loss=4.4988 | acc=0.3206
+    [V1-Phase2] Ep 060/150 | loss=4.5577 | acc=0.1020
+    [V1-Phase2] Ep 090/150 | loss=4.5233 | acc=0.2444
+    [V1-Phase2] Ep 120/150 | loss=3.6025 | acc=0.4787
+    [V1-Phase2] Ep 149/150 | loss=3.4759 | acc=0.4686
+  Late Bottleneck training completed in 83952.6s
+
+  -- Training Late Bottleneck (GATv2, no GIB) --
+    [GAT-Phase1] 80 contrastive epochs done | last_nce=0.0003
+    [GAT-Phase2] Ep 000/150 | loss=4.6202 | acc=0.0078
+    [GAT-Phase2] Ep 030/150 | loss=4.5810 | acc=0.0157
+    [GAT-Phase2] ⚠️  Epoch 50 acc=0.021 < 0.050 — slow/degenerate-looking convergence (no restart).
+    [GAT-Phase2] Ep 060/150 | loss=4.5531 | acc=0.0202
+    [GAT-Phase2] Ep 090/150 | loss=4.4694 | acc=0.0348
+    [GAT-Phase2] Ep 120/150 | loss=4.3821 | acc=0.0639
+    [GAT-Phase2] Ep 149/150 | loss=4.3313 | acc=0.0897
+  Late GAT training completed in 562.8s
+
+  -- Training Full-Graph GCN baseline --
+  -- Training MLP baseline --
+  -- Training RF baseline --
+
+==============================================================================================================
+  RESULTS FOR N=100 (mean over 5 seeds)
+==============================================================================================================
+  MODEL                                  |   TOP-1 |   TOP-2 |   TOP-5 |     MRR |    SEL% |   LAT(ms) |    PARAMS
+  ---------------------------------------+---------+---------+---------+---------+---------+-----------+----------
+  STA Select-then-Analyze (k=10)         | 0.5525±0.046 | 0.5894±0.055 | 0.6390±0.051 | 0.5997±0.048 |  0.7234 |      3.44 |    15,494
+  STA Selector-only (k=10)               | 0.5511±0.047 | 0.5887±0.055 | 0.6390±0.050 | 0.5988±0.048 |  0.0000 |      0.00 |         0
+  Late Bottleneck STGCN+GIB (N=100)      | 0.4709±0.097 | 0.5255±0.098 | 0.5865±0.093 | 0.5319±0.094 |  0.0000 |      2.50 |     8,579
+  Late Bottleneck GATv2 (N=100)          | 0.4901±0.029 | 0.5298±0.035 | 0.5695±0.039 | 0.5383±0.033 |  0.0000 |      3.05 |     9,794
+  Full-Graph GCN (N=100)                 | 0.4660±0.042 | 0.5135±0.046 | 0.5667±0.037 | 0.5214±0.038 |  0.0000 |      1.79 |     7,490
+  MLP Baseline                           | 0.0113±0.004 | 0.0284±0.006 | 0.0617±0.005 | 0.0607±0.004 |  0.0000 |      0.00 |   101,572
+  Random Forest                          | 0.0652±0.009 | 0.0986±0.017 | 0.1525±0.026 | 0.1282±0.014 |  0.0000 |      0.00 |         0
+  ---------------------------------------+---------+---------+---------+--------
+
+  --- Regression check (vs reference Top-1, Δ>0.5% triggers ⚠️) ---
+  OK STA Select-then-Analyze (k=10): Top-1=0.5525 ref=0.0670
+  OK Late Bottleneck STGCN+GIB (N=100): Top-1=0.4709 ref=0.2290
+  OK Late Bottleneck GATv2 (N=100): Top-1=0.4901 ref=0.1880
+  OK Full-Graph GCN (N=100): Top-1=0.4660 ref=0.2530
+
+==============================================================================================================
+  LATENCY SCALING ANALYSIS: O(N^2) vs O(k^2)
+==============================================================================================================
+      N |     k |   STA (ms) | FullGCN (ms) |  Speedup |  Node reduction
+  ------+-------+------------+--------------+----------+----------------
+     20 |     5 |       3.65 |         1.72 |    0.47x |             75%
+     50 |     8 |       3.41 |         1.30 |    0.38x |             84%
+    100 |    10 |       3.44 |         1.79 |    0.52x |             90%
+
+
+  Wrote JSON results to results_transmission/paper_benchmark_sim.json
+
+**************************************************************************************************************
+  BENCHMARK COMPLETE
+**************************************************************************************************************
+[32mOK[0m    Phase 1 done in 98297s → results_transmission/paper_benchmark_sim.json
+[34m[15:46:58][0m 
+[34m[15:46:58][0m ── PHASE 2/6: RCAEval real (metrics-only, 5 seeds) ──
+[34m[15:46:58][0m [34mCMD[0m (02_real_metrics): python -m rca_pipeline.benchmark_real --dataset all --seeds 42,123,7,1337,2025 --epochs 100 --sta-contrastive-warmup 0 --enable-drift --deterministic --output-json results_transmission/paper_benchmark_real.json
+2026-04-29 15:47:28,415 - INFO - Loaded 90 CSV cases from rcaeval/data/RE2/RE2-TT (5 nodes)
+2026-04-29 15:47:28,453 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:47:30,959 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:47:32,418 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:47:34,784 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:47:36,409 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:47:38,454 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:47:39,882 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:47:42,030 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:47:43,536 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:47:45,984 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:47:47,557 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:47:51,428 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:47:52,913 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:47:55,046 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:47:56,654 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:47:58,613 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:48:00,056 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:48:02,309 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:48:03,702 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:48:05,717 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:48:13,486 - INFO - Loaded 90 CSV cases from rcaeval/data/RE2/RE2-SS (5 nodes)
+2026-04-29 15:48:13,490 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:48:15,704 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:48:17,139 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:48:19,261 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:48:20,776 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:48:24,119 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:48:25,516 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:48:27,569 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:48:29,007 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:48:30,933 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:48:32,329 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:48:34,400 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:48:35,834 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:48:37,855 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:48:39,303 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:48:41,897 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:48:43,374 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:48:45,517 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:48:46,981 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:48:49,299 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:48:58,699 - INFO - Loaded 90 CSV cases from rcaeval/data/RE2/RE2-OB (5 nodes)
+2026-04-29 15:48:58,705 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:49:00,910 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:49:02,552 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:49:04,599 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:49:06,105 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:49:08,356 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:49:09,803 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:49:11,992 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:49:13,486 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:49:15,842 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:49:17,353 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:49:19,477 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:49:21,117 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:49:23,735 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:49:25,251 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:49:27,523 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:49:30,372 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:49:32,697 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+2026-04-29 15:49:34,789 - INFO - SelectThenAnalyze: N=5, k=5, features=5, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:49:37,234 - INFO - SpatioTemporalRCA_GAT: features=5, hidden=32, nodes=5, heads=4
+
+======================================================================
+  DATASET: trainticket
+======================================================================
+  Cases: 90, Nodes: 5
+
+======================================================================
+  RCAEval Metrics — STA (trainticket)
+======================================================================
+  METRIC       |    VALUE |      REF |     DIFF | STATUS
+  -------------+----------+----------+----------+--------
+  Avg@1 (Top-1) | 0.9600 ±0.037 |   0.7100 |  +0.2500 | ✅  OK
+  Avg@3        | 1.0000 ±0.000 |   0.8200 |  +0.1800 | ✅  OK
+  Avg@5        | 1.0000 ±0.000 |   0.8600 |  +0.1400 | ✅  OK
+  MRR          | 0.9800 ±0.019 |   0.7700 |  +0.2100 | ✅  OK
+  NDCG@3       | 0.9852 ±0.014 |   0.7500 |  +0.2352 | ✅  OK
+  NDCG@5       | 0.9852 ±0.014 |   0.7900 |  +0.1952 | ✅  OK
+======================================================================
+
+
+===========================================================================
+  RCAEval Comparison — STA on trainticket
+===========================================================================
+  METHOD          |   Avg@1 |   Avg@3 |   Avg@5 |     MRR |  NDCG@3
+  ----------------+---------+---------+---------+---------+--------
+  STA             |  0.9600 |  1.0000 |  1.0000 |  0.9800 |  0.9852
+  MicroRCA        |  0.4900 |  0.6800 |  0.7700 |  0.6000 |  0.5700
+  CausaRank       |  0.5200 |  0.7000 |  0.7900 |  0.6300 |  0.5900
+  BARO            |  0.7100 |  0.8200 |  0.8600 |  0.7700 |  0.7500
+  E-Diagnosis     |  0.6400 |  0.7700 |  0.8300 |  0.7200 |  0.7000
+
+  ✅  Avg@1=0.9600 ≥ BARO threshold (0.6900)
+===========================================================================
+
+
+======================================================================
+  RCAEval Metrics — GATv2 (trainticket)
+======================================================================
+  METRIC       |    VALUE |      REF |     DIFF | STATUS
+  -------------+----------+----------+----------+--------
+  Avg@1 (Top-1) | 0.9500 ±0.045 |   0.7100 |  +0.2400 | ✅  OK
+  Avg@3        | 1.0000 ±0.000 |   0.8200 |  +0.1800 | ✅  OK
+  Avg@5        | 1.0000 ±0.000 |   0.8600 |  +0.1400 | ✅  OK
+  MRR          | 0.9750 ±0.022 |   0.7700 |  +0.2050 | ✅  OK
+  NDCG@3       | 0.9815 ±0.017 |   0.7500 |  +0.2315 | ✅  OK
+  NDCG@5       | 0.9815 ±0.017 |   0.7900 |  +0.1915 | ✅  OK
+======================================================================
+
+
+===========================================================================
+  RCAEval Comparison — GATv2 on trainticket
+===========================================================================
+  METHOD          |   Avg@1 |   Avg@3 |   Avg@5 |     MRR |  NDCG@3
+  ----------------+---------+---------+---------+---------+--------
+  GATv2           |  0.9500 |  1.0000 |  1.0000 |  0.9750 |  0.9815
+  MicroRCA        |  0.4900 |  0.6800 |  0.7700 |  0.6000 |  0.5700
+  CausaRank       |  0.5200 |  0.7000 |  0.7900 |  0.6300 |  0.5900
+  BARO            |  0.7100 |  0.8200 |  0.8600 |  0.7700 |  0.7500
+  E-Diagnosis     |  0.6400 |  0.7700 |  0.8300 |  0.7200 |  0.7000
+
+  ✅  Avg@1=0.9500 ≥ BARO threshold (0.6900)
+===========================================================================
+
+
+  --- Published baselines (RCAEval paper) ---
+         MicroRCA: Avg@1=0.49  Avg@5=0.77  MRR=0.60
+        CausaRank: Avg@1=0.52  Avg@5=0.79  MRR=0.63
+             BARO: Avg@1=0.71  Avg@5=0.86  MRR=0.77
+      E-Diagnosis: Avg@1=0.64  Avg@5=0.83  MRR=0.72
+
+======================================================================
+  DATASET: sockshop
+======================================================================
+  Cases: 90, Nodes: 5
+
+======================================================================
+  RCAEval Metrics — STA (sockshop)
+======================================================================
+  METRIC       |    VALUE |      REF |     DIFF | STATUS
+  -------------+----------+----------+----------+--------
+  Avg@1 (Top-1) | 0.8500 ±0.089 |   0.7100 |  +0.1400 | ✅  OK
+  Avg@3        | 0.9600 ±0.058 |   0.8200 |  +0.1400 | ✅  OK
+  Avg@5        | 1.0000 ±0.000 |   0.8600 |  +0.1400 | ✅  OK
+  MRR          | 0.9085 ±0.058 |   0.7700 |  +0.1385 | ✅  OK
+  NDCG@3       | 0.9155 ±0.065 |   0.7500 |  +0.1655 | ✅  OK
+  NDCG@5       | 0.9314 ±0.044 |   0.7900 |  +0.1414 | ✅  OK
+======================================================================
+
+
+===========================================================================
+  RCAEval Comparison — STA on sockshop
+===========================================================================
+  METHOD          |   Avg@1 |   Avg@3 |   Avg@5 |     MRR |  NDCG@3
+  ----------------+---------+---------+---------+---------+--------
+  STA             |  0.8500 |  0.9600 |  1.0000 |  0.9085 |  0.9155
+  MicroRCA        |  0.4900 |  0.6800 |  0.7700 |  0.6000 |  0.5700
+  CausaRank       |  0.5200 |  0.7000 |  0.7900 |  0.6300 |  0.5900
+  BARO            |  0.7100 |  0.8200 |  0.8600 |  0.7700 |  0.7500
+  E-Diagnosis     |  0.6400 |  0.7700 |  0.8300 |  0.7200 |  0.7000
+
+  ✅  Avg@1=0.8500 ≥ BARO threshold (0.6900)
+===========================================================================
+
+
+======================================================================
+  RCAEval Metrics — GATv2 (sockshop)
+======================================================================
+  METRIC       |    VALUE |      REF |     DIFF | STATUS
+  -------------+----------+----------+----------+--------
+  Avg@1 (Top-1) | 0.8100 ±0.080 |   0.7100 |  +0.1000 | ✅  OK
+  Avg@3        | 0.9100 ±0.086 |   0.8200 |  +0.0900 | ✅  OK
+  Avg@5        | 1.0000 ±0.000 |   0.8600 |  +0.1400 | ✅  OK
+  MRR          | 0.8762 ±0.058 |   0.7700 |  +0.1062 | ✅  OK
+  NDCG@3       | 0.8705 ±0.075 |   0.7500 |  +0.1205 | ✅  OK
+  NDCG@5       | 0.9066 ±0.045 |   0.7900 |  +0.1166 | ✅  OK
+======================================================================
+
+
+===========================================================================
+  RCAEval Comparison — GATv2 on sockshop
+===========================================================================
+  METHOD          |   Avg@1 |   Avg@3 |   Avg@5 |     MRR |  NDCG@3
+  ----------------+---------+---------+---------+---------+--------
+  GATv2           |  0.8100 |  0.9100 |  1.0000 |  0.8762 |  0.8705
+  MicroRCA        |  0.4900 |  0.6800 |  0.7700 |  0.6000 |  0.5700
+  CausaRank       |  0.5200 |  0.7000 |  0.7900 |  0.6300 |  0.5900
+  BARO            |  0.7100 |  0.8200 |  0.8600 |  0.7700 |  0.7500
+  E-Diagnosis     |  0.6400 |  0.7700 |  0.8300 |  0.7200 |  0.7000
+
+  ✅  Avg@1=0.8100 ≥ BARO threshold (0.6900)
+===========================================================================
+
+
+  --- Published baselines (RCAEval paper) ---
+         MicroRCA: Avg@1=0.49  Avg@5=0.77  MRR=0.60
+        CausaRank: Avg@1=0.52  Avg@5=0.79  MRR=0.63
+             BARO: Avg@1=0.71  Avg@5=0.86  MRR=0.77
+      E-Diagnosis: Avg@1=0.64  Avg@5=0.83  MRR=0.72
+
+======================================================================
+  DATASET: online-boutique
+======================================================================
+  Cases: 90, Nodes: 5
+
+======================================================================
+  RCAEval Metrics — STA (online-boutique)
+======================================================================
+  METRIC       |    VALUE |      REF |     DIFF | STATUS
+  -------------+----------+----------+----------+--------
+  Avg@1 (Top-1) | 0.6500 ±0.095 |   0.7100 |  -0.0600 | ⚠️  REGR
+  Avg@3        | 0.8900 ±0.020 |   0.8200 |  +0.0700 | ✅  OK
+  Avg@5        | 1.0000 ±0.000 |   0.8600 |  +0.1400 | ✅  OK
+  MRR          | 0.7795 ±0.053 |   0.7700 |  +0.0095 | ✅  OK
+  NDCG@3       | 0.7896 ±0.045 |   0.7500 |  +0.0396 | ✅  OK
+  NDCG@5       | 0.8344 ±0.040 |   0.7900 |  +0.0444 | ✅  OK
+======================================================================
+
+
+===========================================================================
+  RCAEval Comparison — STA on online-boutique
+===========================================================================
+  METHOD          |   Avg@1 |   Avg@3 |   Avg@5 |     MRR |  NDCG@3
+  ----------------+---------+---------+---------+---------+--------
+  STA             |  0.6500 |  0.8900 |  1.0000 |  0.7795 |  0.7896
+  MicroRCA        |  0.4900 |  0.6800 |  0.7700 |  0.6000 |  0.5700
+  CausaRank       |  0.5200 |  0.7000 |  0.7900 |  0.6300 |  0.5900
+  BARO            |  0.7100 |  0.8200 |  0.8600 |  0.7700 |  0.7500
+  E-Diagnosis     |  0.6400 |  0.7700 |  0.8300 |  0.7200 |  0.7000
+
+  ⚠️  REGRESSION vs BARO: Avg@1=0.6500 < 0.7100 - 0.02
+===========================================================================
+
+
+======================================================================
+  RCAEval Metrics — GATv2 (online-boutique)
+======================================================================
+  METRIC       |    VALUE |      REF |     DIFF | STATUS
+  -------------+----------+----------+----------+--------
+  Avg@1 (Top-1) | 0.6800 ±0.051 |   0.7100 |  -0.0300 | ⚠️  REGR
+  Avg@3        | 0.8400 ±0.080 |   0.8200 |  +0.0200 | ✅  OK
+  Avg@5        | 1.0000 ±0.000 |   0.8600 |  +0.1400 | ✅  OK
+  MRR          | 0.7877 ±0.042 |   0.7700 |  +0.0177 | ✅  OK
+  NDCG@3       | 0.7744 ±0.064 |   0.7500 |  +0.0244 | ✅  OK
+  NDCG@5       | 0.8398 ±0.032 |   0.7900 |  +0.0498 | ✅  OK
+======================================================================
+
+
+===========================================================================
+  RCAEval Comparison — GATv2 on online-boutique
+===========================================================================
+  METHOD          |   Avg@1 |   Avg@3 |   Avg@5 |     MRR |  NDCG@3
+  ----------------+---------+---------+---------+---------+--------
+  GATv2           |  0.6800 |  0.8400 |  1.0000 |  0.7877 |  0.7744
+  MicroRCA        |  0.4900 |  0.6800 |  0.7700 |  0.6000 |  0.5700
+  CausaRank       |  0.5200 |  0.7000 |  0.7900 |  0.6300 |  0.5900
+  BARO            |  0.7100 |  0.8200 |  0.8600 |  0.7700 |  0.7500
+  E-Diagnosis     |  0.6400 |  0.7700 |  0.8300 |  0.7200 |  0.7000
+
+  ⚠️  REGRESSION vs BARO: Avg@1=0.6800 < 0.7100 - 0.02
+===========================================================================
+
+
+  --- Published baselines (RCAEval paper) ---
+         MicroRCA: Avg@1=0.49  Avg@5=0.77  MRR=0.60
+        CausaRank: Avg@1=0.52  Avg@5=0.79  MRR=0.63
+             BARO: Avg@1=0.71  Avg@5=0.86  MRR=0.77
+      E-Diagnosis: Avg@1=0.64  Avg@5=0.83  MRR=0.72
+
+Results saved to results_transmission/paper_benchmark_real.json
+[32mOK[0m    Phase 2 done in 163s → results_transmission/paper_benchmark_real.json
+[34m[15:49:41][0m 
+[34m[15:49:41][0m ── PHASE 3/6: RCAEval multimodal strict (5 seeds) ──
+[34m[15:49:41][0m [34mCMD[0m (03_real_mm): python -m rca_pipeline.benchmark_real --dataset all --seeds 42,123,7,1337,2025 --epochs 100 --sta-contrastive-warmup 0 --enable-drift --deterministic --use-mm --mm-strict --output-json results_transmission/paper_benchmark_real_mm.json
+2026-04-29 15:50:10,468 - INFO - Loaded 90 CSV cases from rcaeval/data/RE2/RE2-TT (5 nodes)
+2026-04-29 15:50:10,502 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:50:13,329 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:50:15,205 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:50:17,927 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:50:19,767 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:50:22,430 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:50:24,429 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:50:27,071 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:50:29,002 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:50:32,226 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:50:34,332 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:50:38,427 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:50:40,477 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:50:43,042 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:50:44,914 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:50:47,652 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:50:49,382 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:50:51,805 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:50:53,656 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:50:56,472 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:51:06,588 - INFO - Loaded 90 CSV cases from rcaeval/data/RE2/RE2-SS (5 nodes)
+2026-04-29 15:51:14,832 - INFO - Loaded 90 CSV cases from rcaeval/data/RE2/RE2-OB (5 nodes)
+2026-04-29 15:51:14,840 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:51:17,482 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:51:19,257 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:51:21,876 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:51:23,732 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:51:26,128 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:51:27,985 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:51:30,505 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:51:32,323 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:51:34,882 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:51:36,795 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:51:39,393 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:51:41,214 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:51:45,037 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:51:46,955 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:51:49,438 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:51:51,252 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:51:53,701 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+2026-04-29 15:51:55,588 - INFO - SelectThenAnalyze_MM (multi-view): N=5, k=5, F_m=5, F_l=8, F_t=6
+2026-04-29 15:51:57,935 - INFO - SpatioTemporalRCA_GAT_MM: F_m=5, F_l=8, F_t=6, H=32, N=5
+
+======================================================================
+  DATASET: trainticket
+======================================================================
+  Cases: 90, Nodes: 5
+
+======================================================================
+  RCAEval Metrics — STA-MM (trainticket)
+======================================================================
+  METRIC       |    VALUE |      REF |     DIFF | STATUS
+  -------------+----------+----------+----------+--------
+  Avg@1 (Top-1) | 0.9100 ±0.020 |   0.7100 |  +0.2000 | ✅  OK
+  Avg@3        | 0.9800 ±0.024 |   0.8200 |  +0.1600 | ✅  OK
+  Avg@5        | 1.0000 ±0.000 |   0.8600 |  +0.1400 | ✅  OK
+  MRR          | 0.9433 ±0.010 |   0.7700 |  +0.1733 | ✅  OK
+  NDCG@3       | 0.9489 ±0.009 |   0.7500 |  +0.1989 | ✅  OK
+  NDCG@5       | 0.9575 ±0.007 |   0.7900 |  +0.1675 | ✅  OK
+======================================================================
+
+
+===========================================================================
+  RCAEval Comparison — STA-MM on trainticket
+===========================================================================
+  METHOD          |   Avg@1 |   Avg@3 |   Avg@5 |     MRR |  NDCG@3
+  ----------------+---------+---------+---------+---------+--------
+  STA-MM          |  0.9100 |  0.9800 |  1.0000 |  0.9433 |  0.9489
+  MicroRCA        |  0.4900 |  0.6800 |  0.7700 |  0.6000 |  0.5700
+  CausaRank       |  0.5200 |  0.7000 |  0.7900 |  0.6300 |  0.5900
+  BARO            |  0.7100 |  0.8200 |  0.8600 |  0.7700 |  0.7500
+  E-Diagnosis     |  0.6400 |  0.7700 |  0.8300 |  0.7200 |  0.7000
+
+  ✅  Avg@1=0.9100 ≥ BARO threshold (0.6900)
+===========================================================================
+
+
+======================================================================
+  RCAEval Metrics — GATv2-MM (trainticket)
+======================================================================
+  METRIC       |    VALUE |      REF |     DIFF | STATUS
+  -------------+----------+----------+----------+--------
+  Avg@1 (Top-1) | 0.8800 ±0.051 |   0.7100 |  +0.1700 | ✅  OK
+  Avg@3        | 0.9600 ±0.020 |   0.8200 |  +0.1400 | ✅  OK
+  Avg@5        | 1.0000 ±0.000 |   0.8600 |  +0.1400 | ✅  OK
+  MRR          | 0.9245 ±0.034 |   0.7700 |  +0.1545 | ✅  OK
+  NDCG@3       | 0.9265 ±0.032 |   0.7500 |  +0.1765 | ✅  OK
+  NDCG@5       | 0.9433 ±0.026 |   0.7900 |  +0.1533 | ✅  OK
+======================================================================
+
+
+===========================================================================
+  RCAEval Comparison — GATv2-MM on trainticket
+===========================================================================
+  METHOD          |   Avg@1 |   Avg@3 |   Avg@5 |     MRR |  NDCG@3
+  ----------------+---------+---------+---------+---------+--------
+  GATv2-MM        |  0.8800 |  0.9600 |  1.0000 |  0.9245 |  0.9265
+  MicroRCA        |  0.4900 |  0.6800 |  0.7700 |  0.6000 |  0.5700
+  CausaRank       |  0.5200 |  0.7000 |  0.7900 |  0.6300 |  0.5900
+  BARO            |  0.7100 |  0.8200 |  0.8600 |  0.7700 |  0.7500
+  E-Diagnosis     |  0.6400 |  0.7700 |  0.8300 |  0.7200 |  0.7000
+
+  ✅  Avg@1=0.8800 ≥ BARO threshold (0.6900)
+===========================================================================
+
+
+  --- Published baselines (RCAEval paper) ---
+         MicroRCA: Avg@1=0.49  Avg@5=0.77  MRR=0.60
+        CausaRank: Avg@1=0.52  Avg@5=0.79  MRR=0.63
+             BARO: Avg@1=0.71  Avg@5=0.86  MRR=0.77
+      E-Diagnosis: Avg@1=0.64  Avg@5=0.83  MRR=0.72
+
+======================================================================
+  DATASET: sockshop
+======================================================================
+  Cases: 90, Nodes: 5
+  Seed 42: MM strict enabled but required modality signal missing; skipping this seed.
+  Seed 123: MM strict enabled but required modality signal missing; skipping this seed.
+  Seed 7: MM strict enabled but required modality signal missing; skipping this seed.
+  Seed 1337: MM strict enabled but required modality signal missing; skipping this seed.
+  Seed 2025: MM strict enabled but required modality signal missing; skipping this seed.
+
+  --- Published baselines (RCAEval paper) ---
+         MicroRCA: Avg@1=0.49  Avg@5=0.77  MRR=0.60
+        CausaRank: Avg@1=0.52  Avg@5=0.79  MRR=0.63
+             BARO: Avg@1=0.71  Avg@5=0.86  MRR=0.77
+      E-Diagnosis: Avg@1=0.64  Avg@5=0.83  MRR=0.72
+
+======================================================================
+  DATASET: online-boutique
+======================================================================
+  Cases: 90, Nodes: 5
+
+======================================================================
+  RCAEval Metrics — STA-MM (online-boutique)
+======================================================================
+  METRIC       |    VALUE |      REF |     DIFF | STATUS
+  -------------+----------+----------+----------+--------
+  Avg@1 (Top-1) | 0.6500 ±0.155 |   0.7100 |  -0.0600 | ⚠️  REGR
+  Avg@3        | 0.9300 ±0.051 |   0.8200 |  +0.1100 | ✅  OK
+  Avg@5        | 1.0000 ±0.000 |   0.8600 |  +0.1400 | ✅  OK
+  MRR          | 0.7937 ±0.083 |   0.7700 |  +0.0237 | ✅  OK
+  NDCG@3       | 0.8162 ±0.048 |   0.7500 |  +0.0662 | ✅  OK
+  NDCG@5       | 0.8459 ±0.061 |   0.7900 |  +0.0559 | ✅  OK
+======================================================================
+
+
+===========================================================================
+  RCAEval Comparison — STA-MM on online-boutique
+===========================================================================
+  METHOD          |   Avg@1 |   Avg@3 |   Avg@5 |     MRR |  NDCG@3
+  ----------------+---------+---------+---------+---------+--------
+  STA-MM          |  0.6500 |  0.9300 |  1.0000 |  0.7937 |  0.8162
+  MicroRCA        |  0.4900 |  0.6800 |  0.7700 |  0.6000 |  0.5700
+  CausaRank       |  0.5200 |  0.7000 |  0.7900 |  0.6300 |  0.5900
+  BARO            |  0.7100 |  0.8200 |  0.8600 |  0.7700 |  0.7500
+  E-Diagnosis     |  0.6400 |  0.7700 |  0.8300 |  0.7200 |  0.7000
+
+  ⚠️  REGRESSION vs BARO: Avg@1=0.6500 < 0.7100 - 0.02
+===========================================================================
+
+
+======================================================================
+  RCAEval Metrics — GATv2-MM (online-boutique)
+======================================================================
+  METRIC       |    VALUE |      REF |     DIFF | STATUS
+  -------------+----------+----------+----------+--------
+  Avg@1 (Top-1) | 0.7900 ±0.086 |   0.7100 |  +0.0800 | ✅  OK
+  Avg@3        | 0.9500 ±0.032 |   0.8200 |  +0.1300 | ✅  OK
+  Avg@5        | 1.0000 ±0.000 |   0.8600 |  +0.1400 | ✅  OK
+  MRR          | 0.8760 ±0.045 |   0.7700 |  +0.1060 | ✅  OK
+  NDCG@3       | 0.8870 ±0.036 |   0.7500 |  +0.1370 | ✅  OK
+  NDCG@5       | 0.9072 ±0.033 |   0.7900 |  +0.1172 | ✅  OK
+======================================================================
+
+
+===========================================================================
+  RCAEval Comparison — GATv2-MM on online-boutique
+===========================================================================
+  METHOD          |   Avg@1 |   Avg@3 |   Avg@5 |     MRR |  NDCG@3
+  ----------------+---------+---------+---------+---------+--------
+  GATv2-MM        |  0.7900 |  0.9500 |  1.0000 |  0.8760 |  0.8870
+  MicroRCA        |  0.4900 |  0.6800 |  0.7700 |  0.6000 |  0.5700
+  CausaRank       |  0.5200 |  0.7000 |  0.7900 |  0.6300 |  0.5900
+  BARO            |  0.7100 |  0.8200 |  0.8600 |  0.7700 |  0.7500
+  E-Diagnosis     |  0.6400 |  0.7700 |  0.8300 |  0.7200 |  0.7000
+
+  ✅  Avg@1=0.7900 ≥ BARO threshold (0.6900)
+===========================================================================
+
+
+  --- Published baselines (RCAEval paper) ---
+         MicroRCA: Avg@1=0.49  Avg@5=0.77  MRR=0.60
+        CausaRank: Avg@1=0.52  Avg@5=0.79  MRR=0.63
+             BARO: Avg@1=0.71  Avg@5=0.86  MRR=0.77
+      E-Diagnosis: Avg@1=0.64  Avg@5=0.83  MRR=0.72
+
+MM global aggregation blocked: sockshop
+
+Results saved to results_transmission/paper_benchmark_real_mm.json
+[32mOK[0m    Phase 3 done in 140s → results_transmission/paper_benchmark_real_mm.json
+[32mOK[0m    ObservIT pre-flight: cluster reachable, 11 CSVs in datasets/sockshop_runs_full
+[34m[15:52:01][0m 
+[34m[15:52:01][0m ── PHASE 4/6: ObservIT sock-shop (metrics-only, 5 seeds) ──
+[34m[15:52:01][0m [34mCMD[0m (04_observit_metrics): python -m rca_pipeline.benchmark_real --observit-csv datasets/sockshop_runs_full --observit-window 12 --observit-topology sock_shop --seeds 42,123,7,1337,2025 --epochs 100 --sta-contrastive-warmup 0 --enable-drift --deterministic --include-late-gib --output-json results_transmission/paper_benchmark_observit.json
+2026-04-29 15:52:04,948 - INFO - Merging 10 CSV files → datasets/sockshop_runs_full/_merged_observit.csv
+2026-04-29 15:52:05,284 - INFO - Loading dataset from datasets/sockshop_runs_full/_merged_observit.csv
+2026-04-29 15:52:05,328 - INFO - Detected optional metrics in CSV: using features=['cpu_usage', 'ram_usage', 'network_tx', 'network_rx', 'error_rate', 'latency_p99']
+2026-04-29 15:52:05,409 - INFO - Pod mapping coverage: mapped=43216/43216 (100.0%), dropped=0
+/home/wassimbadraoui/repos/matrix_simple/rca_pipeline/graph_builder.py:139: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /pytorch/torch/csrc/utils/tensor_numpy.cpp:213.)
+  x[idxs] = torch.from_numpy(feats)
+2026-04-29 15:52:07,733 - INFO - Successfully processed 3067 temporal graph snapshots.
+2026-04-29 15:52:07,735 - INFO - Split dataset into 10 continuous chunks.
+2026-04-29 15:52:07,777 - INFO - Generated 2957 sliding windows (size 12).
+2026-04-29 15:52:07,779 - INFO - Dropped 1437 windows without root_cause (baseline-only)
+2026-04-29 15:52:07,853 - INFO - Scaler fit on 1214 samples (mean=[1.14880006e-02 1.85855655e+08 2.07316499e+03 3.15316998e+02
+ 1.28569237e-04 0.00000000e+00], std=[3.68733516e-02 1.51168454e+08 2.77390109e+03 2.70010523e+02
+ 2.75693296e-03 1.00000000e+00])
+2026-04-29 15:52:07,896 - INFO - SelectThenAnalyze: N=14, k=5, features=6, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:52:36,534 - INFO - SpatioTemporalRCA_GAT: features=6, hidden=32, nodes=14, heads=4
+2026-04-29 15:53:02,466 - INFO - SpatioTemporalRCA initialized: features=6, hidden=32, nodes=14
+2026-04-29 15:53:18,218 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #1. Cooldown: 30 steps.
+2026-04-29 15:53:18,237 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #2. Cooldown: 30 steps.
+2026-04-29 15:53:18,238 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #3. Cooldown: 30 steps.
+2026-04-29 15:53:18,239 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #4. Cooldown: 30 steps.
+2026-04-29 15:53:18,242 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #5. Cooldown: 30 steps.
+2026-04-29 15:53:18,242 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #6. Cooldown: 30 steps.
+2026-04-29 15:53:18,243 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #7. Cooldown: 30 steps.
+2026-04-29 15:53:18,246 - WARNING - DRIFT DETECTED: 83% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #8. Cooldown: 30 steps.
+2026-04-29 15:53:18,248 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #9. Cooldown: 30 steps.
+2026-04-29 15:53:18,249 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #10. Cooldown: 30 steps.
+2026-04-29 15:53:18,250 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #11. Cooldown: 30 steps.
+2026-04-29 15:53:18,253 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #12. Cooldown: 30 steps.
+2026-04-29 15:53:18,255 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #13. Cooldown: 30 steps.
+2026-04-29 15:53:18,258 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #14. Cooldown: 30 steps.
+2026-04-29 15:53:18,273 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #1. Cooldown: 30 steps.
+2026-04-29 15:53:18,284 - INFO - SelectThenAnalyze: N=14, k=5, features=6, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:53:39,644 - INFO - SpatioTemporalRCA_GAT: features=6, hidden=32, nodes=14, heads=4
+2026-04-29 15:53:55,984 - INFO - Scaler fit on 1214 samples (mean=[1.15669091e-02 1.85939002e+08 2.07102526e+03 3.15103612e+02
+ 1.30857517e-04 0.00000000e+00], std=[3.71791721e-02 1.51326216e+08 2.77218324e+03 2.69975599e+02
+ 2.77652160e-03 1.00000000e+00])
+2026-04-29 15:53:55,997 - INFO - SelectThenAnalyze: N=14, k=5, features=6, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:54:25,149 - INFO - SpatioTemporalRCA_GAT: features=6, hidden=32, nodes=14, heads=4
+2026-04-29 15:54:51,269 - INFO - SpatioTemporalRCA initialized: features=6, hidden=32, nodes=14
+2026-04-29 15:55:05,043 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #1. Cooldown: 30 steps.
+2026-04-29 15:55:05,055 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #2. Cooldown: 30 steps.
+2026-04-29 15:55:05,068 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #3. Cooldown: 30 steps.
+2026-04-29 15:55:05,070 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #4. Cooldown: 30 steps.
+2026-04-29 15:55:05,072 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #5. Cooldown: 30 steps.
+2026-04-29 15:55:05,073 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #6. Cooldown: 30 steps.
+2026-04-29 15:55:05,112 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #1. Cooldown: 30 steps.
+2026-04-29 15:55:05,122 - INFO - SelectThenAnalyze: N=14, k=5, features=6, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:55:33,934 - INFO - SpatioTemporalRCA_GAT: features=6, hidden=32, nodes=14, heads=4
+2026-04-29 15:56:15,139 - INFO - Scaler fit on 1214 samples (mean=[1.14246487e-02 1.85841019e+08 2.07395675e+03 3.15367011e+02
+ 1.27915869e-04 0.00000000e+00], std=[3.66767152e-02 1.51148438e+08 2.77378656e+03 2.69979752e+02
+ 2.75257683e-03 1.00000000e+00])
+2026-04-29 15:56:15,173 - INFO - SelectThenAnalyze: N=14, k=5, features=6, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:57:01,785 - INFO - SpatioTemporalRCA_GAT: features=6, hidden=32, nodes=14, heads=4
+2026-04-29 15:57:27,822 - INFO - SpatioTemporalRCA initialized: features=6, hidden=32, nodes=14
+2026-04-29 15:57:38,063 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #1. Cooldown: 30 steps.
+2026-04-29 15:57:38,064 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #2. Cooldown: 30 steps.
+2026-04-29 15:57:38,067 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #3. Cooldown: 30 steps.
+2026-04-29 15:57:38,068 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #4. Cooldown: 30 steps.
+2026-04-29 15:57:38,070 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #5. Cooldown: 30 steps.
+2026-04-29 15:57:38,090 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #6. Cooldown: 30 steps.
+2026-04-29 15:57:38,124 - INFO - SelectThenAnalyze: N=14, k=5, features=6, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:58:01,275 - INFO - SpatioTemporalRCA_GAT: features=6, hidden=32, nodes=14, heads=4
+2026-04-29 15:58:19,438 - INFO - Scaler fit on 1214 samples (mean=[1.15430214e-02 1.85895257e+08 2.07179456e+03 3.15139017e+02
+ 1.35324354e-04 0.00000000e+00], std=[3.70460835e-02 1.51236625e+08 2.77321947e+03 2.69981502e+02
+ 2.85073734e-03 1.00000000e+00])
+2026-04-29 15:58:19,451 - INFO - SelectThenAnalyze: N=14, k=5, features=6, hidden=32, temporal=conv, selector=ste
+2026-04-29 15:58:53,550 - INFO - SpatioTemporalRCA_GAT: features=6, hidden=32, nodes=14, heads=4
+2026-04-29 15:59:35,182 - INFO - SpatioTemporalRCA initialized: features=6, hidden=32, nodes=14
+2026-04-29 15:59:47,624 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #1. Cooldown: 30 steps.
+2026-04-29 15:59:47,627 - WARNING - DRIFT DETECTED: 83% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #2. Cooldown: 30 steps.
+2026-04-29 15:59:47,630 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #3. Cooldown: 30 steps.
+2026-04-29 15:59:47,631 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #4. Cooldown: 30 steps.
+2026-04-29 15:59:47,633 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #5. Cooldown: 30 steps.
+2026-04-29 15:59:47,639 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #6. Cooldown: 30 steps.
+2026-04-29 15:59:47,640 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #7. Cooldown: 30 steps.
+2026-04-29 15:59:47,646 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #8. Cooldown: 30 steps.
+2026-04-29 15:59:47,651 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #9. Cooldown: 30 steps.
+2026-04-29 15:59:47,655 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #10. Cooldown: 30 steps.
+2026-04-29 15:59:47,657 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #11. Cooldown: 30 steps.
+2026-04-29 15:59:47,658 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #12. Cooldown: 30 steps.
+2026-04-29 15:59:47,700 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #1. Cooldown: 30 steps.
+2026-04-29 15:59:47,722 - INFO - SelectThenAnalyze: N=14, k=5, features=6, hidden=32, temporal=conv, selector=ste
+2026-04-29 16:00:20,576 - INFO - SpatioTemporalRCA_GAT: features=6, hidden=32, nodes=14, heads=4
+2026-04-29 16:00:47,054 - INFO - Scaler fit on 1214 samples (mean=[1.14817520e-02 1.85819244e+08 2.07251908e+03 3.15200203e+02
+ 1.37721609e-04 0.00000000e+00], std=[3.68224062e-02 1.51085433e+08 2.77209205e+03 2.69978011e+02
+ 2.87515205e-03 1.00000000e+00])
+2026-04-29 16:00:47,073 - INFO - SelectThenAnalyze: N=14, k=5, features=6, hidden=32, temporal=conv, selector=ste
+2026-04-29 16:01:34,680 - INFO - SpatioTemporalRCA_GAT: features=6, hidden=32, nodes=14, heads=4
+2026-04-29 16:02:27,246 - INFO - SpatioTemporalRCA initialized: features=6, hidden=32, nodes=14
+2026-04-29 16:02:39,331 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #1. Cooldown: 30 steps.
+2026-04-29 16:02:39,332 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #2. Cooldown: 30 steps.
+2026-04-29 16:02:39,349 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #3. Cooldown: 30 steps.
+2026-04-29 16:02:39,352 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #4. Cooldown: 30 steps.
+2026-04-29 16:02:39,354 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #5. Cooldown: 30 steps.
+2026-04-29 16:02:39,367 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #6. Cooldown: 30 steps.
+2026-04-29 16:02:39,376 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #7. Cooldown: 30 steps.
+2026-04-29 16:02:39,382 - WARNING - DRIFT DETECTED: 67% of metrics drifted simultaneously (threshold=50%). suspected_deployment event #8. Cooldown: 30 steps.
+2026-04-29 16:02:39,438 - INFO - SelectThenAnalyze: N=14, k=5, features=6, hidden=32, temporal=conv, selector=ste
+2026-04-29 16:03:18,143 - INFO - SpatioTemporalRCA_GAT: features=6, hidden=32, nodes=14, heads=4
+
+======================================================================
+  DATASET: observ-it (cluster K8s)
+======================================================================
+  Cases: 1520, Nodes: 14
+
+======================================================================
+  RCAEval Metrics — STA (observit)
+======================================================================
+  METRIC       |    VALUE |      REF |     DIFF | STATUS
+  -------------+----------+----------+----------+--------
+  Avg@1 (Top-1) | 0.7957 ±0.043 |   0.7100 |  +0.0857 | ✅  OK
+  Avg@3        | 0.9214 ±0.075 |   0.8200 |  +0.1014 | ✅  OK
+  Avg@5        | 0.9423 ±0.062 |   0.8600 |  +0.0823 | ✅  OK
+  MRR          | 0.8679 ±0.033 |   0.7700 |  +0.0979 | ✅  OK
+  NDCG@3       | 0.8727 ±0.050 |   0.7500 |  +0.1227 | ✅  OK
+  NDCG@5       | 0.8812 ±0.044 |   0.7900 |  +0.0912 | ✅  OK
+======================================================================
+
+
+===========================================================================
+  RCAEval Comparison — STA on observit
+===========================================================================
+  METHOD          |   Avg@1 |   Avg@3 |   Avg@5 |     MRR |  NDCG@3
+  ----------------+---------+---------+---------+---------+--------
+  STA             |  0.7957 |  0.9214 |  0.9423 |  0.8679 |  0.8727
+  MicroRCA        |  0.4900 |  0.6800 |  0.7700 |  0.6000 |  0.5700
+  CausaRank       |  0.5200 |  0.7000 |  0.7900 |  0.6300 |  0.5900
+  BARO            |  0.7100 |  0.8200 |  0.8600 |  0.7700 |  0.7500
+  E-Diagnosis     |  0.6400 |  0.7700 |  0.8300 |  0.7200 |  0.7000
+
+  ✅  Avg@1=0.7957 ≥ BARO threshold (0.6900)
+===========================================================================
+
+
+======================================================================
+  RCAEval Metrics — GATv2 (observit)
+======================================================================
+  METRIC       |    VALUE |      REF |     DIFF | STATUS
+  -------------+----------+----------+----------+--------
+  Avg@1 (Top-1) | 0.7621 ±0.034 |   0.7100 |  +0.0521 | ✅  OK
+  Avg@3        | 0.9782 ±0.010 |   0.8200 |  +0.1582 | ✅  OK
+  Avg@5        | 0.9881 ±0.006 |   0.8600 |  +0.1281 | ✅  OK
+  MRR          | 0.8600 ±0.030 |   0.7700 |  +0.0900 | ✅  OK
+  NDCG@3       | 0.8873 ±0.027 |   0.7500 |  +0.1373 | ✅  OK
+  NDCG@5       | 0.8914 ±0.025 |   0.7900 |  +0.1014 | ✅  OK
+======================================================================
+
+
+===========================================================================
+  RCAEval Comparison — GATv2 on observit
+===========================================================================
+  METHOD          |   Avg@1 |   Avg@3 |   Avg@5 |     MRR |  NDCG@3
+  ----------------+---------+---------+---------+---------+--------
+  GATv2           |  0.7621 |  0.9782 |  0.9881 |  0.8600 |  0.8873
+  MicroRCA        |  0.4900 |  0.6800 |  0.7700 |  0.6000 |  0.5700
+  CausaRank       |  0.5200 |  0.7000 |  0.7900 |  0.6300 |  0.5900
+  BARO            |  0.7100 |  0.8200 |  0.8600 |  0.7700 |  0.7500
+  E-Diagnosis     |  0.6400 |  0.7700 |  0.8300 |  0.7200 |  0.7000
+
+  ✅  Avg@1=0.7621 ≥ BARO threshold (0.6900)
+===========================================================================
+
+
+======================================================================
+  RCAEval Metrics — Late-STGCN+GIB (observit)
+======================================================================
+  METRIC       |    VALUE |      REF |     DIFF | STATUS
+  -------------+----------+----------+----------+--------
+  Avg@1 (Top-1) | 0.7359 ±0.068 |   0.7100 |  +0.0259 | ✅  OK
+  Avg@3        | 0.9490 ±0.035 |   0.8200 |  +0.1290 | ✅  OK
+  Avg@5        | 0.9784 ±0.008 |   0.8600 |  +0.1184 | ✅  OK
+  MRR          | 0.8439 ±0.037 |   0.7700 |  +0.0739 | ✅  OK
+  NDCG@3       | 0.8638 ±0.036 |   0.7500 |  +0.1138 | ✅  OK
+  NDCG@5       | 0.8762 ±0.030 |   0.7900 |  +0.0862 | ✅  OK
+======================================================================
+
+
+===========================================================================
+  RCAEval Comparison — Late-STGCN+GIB on observit
+===========================================================================
+  METHOD          |   Avg@1 |   Avg@3 |   Avg@5 |     MRR |  NDCG@3
+  ----------------+---------+---------+---------+---------+--------
+  Late-STGCN+GIB  |  0.7359 |  0.9490 |  0.9784 |  0.8439 |  0.8638
+  MicroRCA        |  0.4900 |  0.6800 |  0.7700 |  0.6000 |  0.5700
+  CausaRank       |  0.5200 |  0.7000 |  0.7900 |  0.6300 |  0.5900
+  BARO            |  0.7100 |  0.8200 |  0.8600 |  0.7700 |  0.7500
+  E-Diagnosis     |  0.6400 |  0.7700 |  0.8300 |  0.7200 |  0.7000
+
+  ✅  Avg@1=0.7359 ≥ BARO threshold (0.6900)
+===========================================================================
+
+
+  --- Published baselines (RCAEval paper) ---
+         MicroRCA: Avg@1=0.49  Avg@5=0.77  MRR=0.60
+        CausaRank: Avg@1=0.52  Avg@5=0.79  MRR=0.63
+             BARO: Avg@1=0.71  Avg@5=0.86  MRR=0.77
+      E-Diagnosis: Avg@1=0.64  Avg@5=0.83  MRR=0.72
+
+Results saved to results_transmission/paper_benchmark_observit.json
+[32mOK[0m    Phase 4 done in 710s → results_transmission/paper_benchmark_observit.json
+[32mOK[0m    ObservIT pre-flight: cluster reachable, 11 CSVs in datasets/sockshop_runs_full
+[34m[16:03:52][0m 
+[34m[16:03:52][0m ── PHASE 5/6: ObservIT sock-shop multimodal (Loki logs) ──
+[34m[16:03:52][0m Starting Loki port-forward (3100:3100)…
+[33mWARN[0m  Loki not reachable at http://localhost:3100 — skipping Phase 5
+[34m[16:03:56][0m 
+[34m[16:03:56][0m ── PHASE 6/6: SHA256 + canonical manifest + summary report ──
+[32mOK[0m    SHA256 written to results_transmission/paper_benchmark.sha256
+[32mOK[0m    Canonical manifest regenerated → results_transmission/canonical_results_manifest.json
+
+[34m[16:03:56][0m ============================================================
+[34m[16:03:56][0m PUBLICATION SUITE SUMMARY (timestamp: 20260428_122822)
+[34m[16:03:56][0m ============================================================
+[32mOK[0m    results_transmission/paper_benchmark_sim.json           29KB
+[32mOK[0m    results_transmission/paper_benchmark_real.json          50KB
+[32mOK[0m    results_transmission/paper_benchmark_real_mm.json       37KB
+[32mOK[0m    results_transmission/paper_benchmark_observit.json      26KB
+[33mWARN[0m  results_transmission/paper_benchmark_observit_mm.json   missing
+[34m[16:03:56][0m Logs   : results_transmission/logs_publication_20260428_122822/
+[34m[16:03:56][0m SHA256 : results_transmission/paper_benchmark.sha256
+[34m[16:03:56][0m 
+[34m[16:03:56][0m [32mDONE.[0m Cite this run in the paper as commit:
+[34m[16:03:56][0m   c6c2bfa88f51d57285e2af97cf688743404d38fb
+[34m[16:03:56][0m   timestamp: 20260428_122822
+[34m[16:03:56][0m 
+[34m[16:03:56][0m Next steps:
+[34m[16:03:56][0m   git add results_transmission/paper_benchmark_*.json results_transmission/paper_benchmark.sha256 \
+[34m[16:03:56][0m           results_transmission/canonical_results_manifest.json results_transmission/canonical_results_manifest.json.sha256
+[34m[16:03:56][0m   git commit -m 'Add publication-grade benchmark results (5 seeds, deterministic)'
