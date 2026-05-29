@@ -1,0 +1,110 @@
+---
+# =====================================================================
+# AlertmanagerConfig CRD : route les alertes "RCAStaServeRootCauseDetected"
+# (emises par rca-watcher) ET les alertes de sante (PrometheusRule) vers
+# wassim.badraoui@devoteam.com.
+#
+# Cette ressource s'ajoute par-dessus la config existante de
+# l'Alertmanager operator-managee (`monitoring-kube-prometheus-alertmanager`)
+# sans la remplacer. L'operator merge automatiquement les AlertmanagerConfig
+# qui sont dans le meme namespace que le CR Alertmanager (donc `monitoring`).
+#
+# Apply :
+#   kubectl apply -f serving/alertmanager-config.yaml
+#
+# Verifier (apres ~30s, le temps que l'operator reload) :
+#   kubectl logs -n monitoring alertmanager-monitoring-kube-prometheus-alertmanager-0 -c alertmanager --tail=30
+# Forcer une alerte :
+#   kubectl apply -f k8s/chaos/sockshop/stress-mem-carts.yaml   # provoque rca-watcher
+# Verifier reception dans la boite wassim.badraoui@devoteam.com.
+# =====================================================================
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: rca-email-route
+  namespace: monitoring
+  labels:
+    # L'AM operator-managee a alertmanagerConfigSelector={} qui matche tout
+    # le namespace, donc pas de label exige. On le met malgre tout pour
+    # rendre la discovery explicite.
+    alertmanagerConfig: rca
+spec:
+  # ------- Route -------
+  # On declenche une sous-route uniquement pour les alertes qui ont
+  # alertname commencant par "RCAStaServe" (les notres) -- pour ne pas
+  # detourner les alertes systeme deja routees ailleurs.
+  route:
+    receiver: rca-email
+    groupBy: ['alertname', 'root_cause']
+    # Grouper les alertes pendant 30s pour eviter le flood quand plusieurs
+    # services sont identifies en cascade.
+    groupWait: 30s
+    groupInterval: 5m
+    # Repeter le mail toutes les 4h si l'alerte est toujours active.
+    repeatInterval: 4h
+    matchers:
+      - name: alertname
+        matchType: "=~"
+        value: "RCAStaServe.*"
+
+  # ------- Receivers -------
+  receivers:
+    - name: rca-email
+      emailConfigs:
+        - to: wassim.badraoui@devoteam.com
+          # Adresse expediteur affichee dans le mail
+          from: rca-alerts@devoteam.com
+          # ---------------------------------------------------------------
+          # SMTP : par defaut on suppose le relais interne Devoteam,
+          # sans authentification (configuration la plus courante pour
+          # un MX interne d'entreprise). Adapter selon ce que l'equipe ops
+          # met a disposition :
+          #   - O365 :  smtp.office365.com:587  + authPassword secret
+          #   - Gmail Workspace : smtp.gmail.com:587 + app password
+          #   - Relais interne : smtp.devoteam.com:25 (ou :587) souvent
+          #     sans auth en mode "envoi local cluster".
+          # ---------------------------------------------------------------
+          # Relais interne Devoteam, sans authentification, port SMTP 25 en clair.
+          # Si l'equipe ops impose le port 587 ou le STARTTLS, ajuster ici.
+          smarthost: 'smtp.devoteam.com:25'
+          requireTLS: false
+          sendResolved: true
+          headers:
+            - key: Subject
+              value: '[RCA] {{ .CommonLabels.alertname }} | {{ .CommonLabels.root_cause | default "n/a" }} | {{ .CommonLabels.severity }}'
+          html: |
+            <h2 style="margin-bottom:0">{{ .CommonLabels.alertname }}</h2>
+            <p style="color:#888; margin-top:4px">severite : <b>{{ .CommonLabels.severity }}</b> &middot; modele : <code>{{ .CommonLabels.model | default "n/a" }}</code></p>
+            <hr>
+            {{ range .Alerts }}
+              <h3 style="margin-bottom:2px">{{ .Annotations.summary }}</h3>
+              <p>{{ .Annotations.description }}</p>
+              <ul>
+                <li><b>Root cause</b> : <code>{{ .Labels.root_cause | default "(non determinee)" }}</code></li>
+                <li><b>Namespace</b> : <code>{{ .Labels.namespace | default "rca-sandbox" }}</code></li>
+                <li><b>Severite</b> : {{ .Labels.severity }}</li>
+                <li><b>Etat</b> : {{ .Status }}</li>
+                <li><b>StartsAt</b> : {{ .StartsAt }}</li>
+                <li><b>Generator</b> : <a href="{{ .GeneratorURL }}">{{ .GeneratorURL }}</a></li>
+              </ul>
+              <hr>
+            {{ end }}
+            <p style="color:#999;font-size:0.9em">Genere par rca-watcher + STA model sta_sockshop_v1 sur observit-cluster1.</p>
+          text: |
+            === {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }}) ===
+
+            {{ range .Alerts }}
+            Summary    : {{ .Annotations.summary }}
+            Description: {{ .Annotations.description }}
+            Root cause : {{ .Labels.root_cause | default "(non determinee)" }}
+            Namespace  : {{ .Labels.namespace | default "rca-sandbox" }}
+            Model      : {{ .Labels.model | default "n/a" }}
+            Status     : {{ .Status }}
+            StartsAt   : {{ .StartsAt }}
+            Source     : {{ .GeneratorURL }}
+            ----
+            {{ end }}
+
+            Genere par rca-watcher sur observit-cluster1.
+# Pas de Secret SMTP necessaire : le relais interne Devoteam ne demande
+# pas d'authentification depuis le cluster.

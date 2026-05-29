@@ -1,0 +1,113 @@
+---
+# Regles d'alerte Prometheus pour la sante du service d'inference STA.
+# Couvre 4 modes de defaillance:
+#   - service indisponible (pod down / scrape failed)
+#   - latence p95 trop haute
+#   - taux d'erreur trop eleve
+#   - service charge mais predictions a l'arret (modele bloque)
+#
+# Le CRD PrometheusRule est livre par le kube-prometheus-stack present sur le cluster.
+# La regle est decouverte automatiquement par l'operator et chargee dans Prometheus.
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: rca-sta-serve-rules
+  namespace: monitoring
+  labels:
+    app: rca-sta-serve
+    component: inference
+    # Label exige par le kube-prometheus-stack pour discovery automatique
+    release: monitoring
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: rca-sta-serve.health
+      interval: 30s
+      rules:
+
+        - alert: RCAStaServeDown
+          expr: |
+            absent(up{namespace="rca-sandbox", app="rca-sta-serve"} == 1)
+          for: 2m
+          labels:
+            severity: critical
+            component: rca-sta-serve
+          annotations:
+            summary: "STA inference service down ou non scrape"
+            description: |
+              Le pod rca-sta-serve dans rca-sandbox n'est pas joignable par Prometheus
+              depuis plus de 2 minutes. Verifier kubectl get pod -n rca-sandbox -l app=rca-sta-serve
+              et kubectl logs ... pour identifier la cause.
+
+        - alert: RCAStaServeHighErrorRate
+          expr: |
+            sum(rate(rca_predictions_total{status!="ok"}[5m]))
+              /
+            sum(rate(rca_predictions_total[5m])) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+            component: rca-sta-serve
+          annotations:
+            summary: "Taux d'erreur /predict > 5% sur 5 min"
+            description: |
+              Plus de 5% des appels /predict sur les 5 dernieres minutes ont
+              renvoye une erreur (bad_request, unavailable, ou error).
+              Inspecter les logs du pod pour diagnostiquer la racine.
+
+        - alert: RCAStaServeHighLatency
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(rca_predict_latency_seconds_bucket[5m])) by (le)
+            ) > 0.5
+          for: 5m
+          labels:
+            severity: warning
+            component: rca-sta-serve
+          annotations:
+            summary: "Latence p95 /predict > 500 ms sur 5 min"
+            description: |
+              Le 95eme percentile de la latence end-to-end de /predict depasse 500 ms.
+              Verifier la charge CPU du pod et la pression memoire (kubectl top pod).
+
+        - alert: RCAStaServeNoTraffic
+          expr: |
+            sum(rate(rca_predictions_total[10m])) == 0
+            and
+            sum(rate(http_requests_total{handler="/predict"}[10m])) > 0
+          for: 15m
+          labels:
+            severity: warning
+            component: rca-sta-serve
+          annotations:
+            summary: "Requetes /predict recues mais aucune prediction emise"
+            description: |
+              Des requetes HTTP arrivent sur /predict mais le compteur metier
+              rca_predictions_total n'augmente pas. Le modele est probablement
+              bloque ou retourne systematiquement des 5xx. Inspecter les logs.
+---
+# PodMonitor pour que l'instance Prometheus operator-managee (monitoring/
+# monitoring-kube-prometheus-prometheus) scrape notre service rca-sta-serve
+# qui vit dans le namespace rca-sandbox. Sans ce PodMonitor, les regles
+# ci-dessus n'ont aucune metrique a evaluer.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: rca-sta-serve
+  namespace: monitoring
+  labels:
+    release: monitoring
+    app: rca-sta-serve
+spec:
+  namespaceSelector:
+    matchNames:
+      - rca-sandbox
+  selector:
+    matchLabels:
+      app: rca-sta-serve
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s

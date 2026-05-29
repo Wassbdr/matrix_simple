@@ -38,6 +38,17 @@ dev = [
 k8s = [
   "locust>=2.20.0",
 ]
+# Hyperparameter optimization
+hpo = [
+  "optuna>=3.6.0",
+]
+# Inference serving (REST API + Prometheus metrics)
+serve = [
+  "fastapi>=0.115.0",
+  "uvicorn>=0.30.0",
+  "pydantic>=2.9.0",
+  "prometheus-fastapi-instrumentator>=7.0.0",
+]
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]

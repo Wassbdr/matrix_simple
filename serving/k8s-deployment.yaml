@@ -1,0 +1,83 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rca-sta-serve
+  namespace: rca-sandbox
+  labels:
+    app: rca-sta-serve
+    component: inference
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rca-sta-serve
+  template:
+    metadata:
+      labels:
+        app: rca-sta-serve
+        component: inference
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: serve
+          image: localhost:30500/rca-sta-serve:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: MODEL_BUNDLE
+              value: /app/checkpoints/sta_sockshop_v1
+            - name: DEFAULT_TOP_K
+              value: "3"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 24
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rca-sta-serve
+  namespace: rca-sandbox
+  labels:
+    app: rca-sta-serve
+spec:
+  type: ClusterIP
+  selector:
+    app: rca-sta-serve
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP

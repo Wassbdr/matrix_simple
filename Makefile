@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint format audit benchmark-smoke benchmark-paper clean
+.PHONY: help install dev test lint format audit benchmark-smoke benchmark-paper clean report report-clean
 
 PYTHON ?= python
 
@@ -59,3 +59,9 @@ clean:
 	rm -rf .pytest_cache .ruff_cache .mypy_cache build dist *.egg-info
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +
 	rm -f /tmp/benchmark_smoke.json
+
+report:
+	$(MAKE) -C docs/rapport pdf
+
+report-clean:
+	$(MAKE) -C docs/rapport clean

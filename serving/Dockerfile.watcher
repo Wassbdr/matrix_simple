@@ -1,0 +1,24 @@
+# Watcher image: tiny FastAPI loop that polls Prometheus, calls the inference
+# service, and fires alerts to Alertmanager. No PyTorch needed at runtime.
+
+FROM python:3.11-slim AS builder
+WORKDIR /build
+COPY serving/requirements-watcher.txt .
+RUN pip install --user --no-cache-dir -r requirements-watcher.txt
+
+FROM python:3.11-slim
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH \
+    PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1
+
+COPY serving/rca_watcher.py /app/serving/rca_watcher.py
+
+EXPOSE 8090
+HEALTHCHECK --interval=20s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -fsS http://localhost:8090/health || exit 1
+
+CMD ["uvicorn", "serving.rca_watcher:app", "--host", "0.0.0.0", "--port", "8090"]

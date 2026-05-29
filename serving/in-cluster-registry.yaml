@@ -1,0 +1,57 @@
+---
+# Tiny in-cluster Docker registry to host the inference image without
+# depending on an external Hub. Exposed as NodePort so we can push from a
+# `docker push localhost:<port>` after a port-forward, and resolved
+# internally by service DNS for the kubelet pull.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rca-registry
+  namespace: rca-sandbox
+  labels:
+    app: rca-registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rca-registry
+  template:
+    metadata:
+      labels:
+        app: rca-registry
+    spec:
+      containers:
+        - name: registry
+          image: registry:2
+          ports:
+            - containerPort: 5000
+          env:
+            - name: REGISTRY_STORAGE_DELETE_ENABLED
+              value: "true"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rca-registry
+  namespace: rca-sandbox
+spec:
+  # NodePort so the kubelet on every cluster node can pull from
+  # localhost:<nodePort> (containerd treats localhost/127.0.0.1 as
+  # insecure by default, sidestepping TLS/DNS issues with the in-cluster
+  # service domain).
+  type: NodePort
+  selector:
+    app: rca-registry
+  ports:
+    - port: 5000
+      targetPort: 5000
+      nodePort: 30500
+      protocol: TCP
+      name: registry
