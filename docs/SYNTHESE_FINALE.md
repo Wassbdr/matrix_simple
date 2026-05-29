@@ -377,54 +377,56 @@ Ce scénario est le plus difficile pour les modèles : si network_rx a un faible
 
 ---
 
-### 6.4 Évaluation des modèles sur sock-shop cluster
+### 6.4 Évaluation des modèles sur sock-shop cluster — résultats mesurés
 
-**Statut des runs :** les données cluster sock-shop sont collectées via `scripts/run_sockshop_campaign.sh` (10 runs : 5 scénarios × 2 répétitions, 5 min baseline + 5 min anomalie par run). Le benchmark s'exécute ensuite avec :
+Les données cluster ont été collectées via `scripts/run_sockshop_campaign.sh` (5 scénarios chaos, 5 seeds, Chaos-Mesh + Locust + Prometheus). Les JSON canoniques (`paper_benchmark_observit.json`) contiennent un breakdown par root cause (`STA_per_root_cause`, etc.), exploité par le script [analyze_per_scenario.py](../rca_pipeline/analyze_per_scenario.py).
 
-```bash
-python -m rca_pipeline.benchmark_real \
-  --dataset observit \
-  --observit-topology sock_shop \
-  --seeds 42,123,7 \
-  --epochs 100 \
-  --sta-contrastive-warmup 0 \
-  --output-json results/sockshop_cluster.json
-```
+**Matrice mesurée scénario × modèle (Avg@1 moyen ± std, 5 seeds) :**
 
-Les résultats ObservIT globaux (§4.4 et §4.5) incluent des runs sock-shop mais agrégés avec d'autres topologies. L'analyse par scénario ci-dessous est une projection des comportements attendus basée sur les résultats disponibles et les propriétés des scénarios.
+| Scénario | Failure Type | RC | STA | GATv2 | Late-STGCN+GIB |
+|---|---|---|---:|---:|---:|
+| `stress-cpu-catalogue` | hard | catalogue | 0.966 ± 0.026 | 0.959 ± 0.023 | 0.951 ± 0.035 |
+| `stress-mem-carts` | hard | carts | 0.987 ± 0.014 | 0.987 ± 0.014 | 0.984 ± 0.012 |
+| `network-delay-orders-to-orders-db` | **cascade** | orders-db | **0.043 ± 0.095** | **0.459 ± 0.445** | 0.003 ± 0.007 |
+| `network-loss-catalogue-to-catalogue-db` | gray | catalogue-db | **0.987 ± 0.017** | 0.508 ± 0.404 | 0.997 ± 0.007 |
+| `pod-kill-user` | hard | user | 0.951 ± 0.000 | 0.951 ± 0.000 | 0.741 ± 0.360 |
 
-**Analyse prédictive par scénario et failure type :**
+**Agrégat par type de panne :**
 
-| Scénario | Failure Type | STA top-1 attendu | GATv2 top-1 attendu | Facteur limitant |
-|---|---|---|---|---|
-| stress-cpu-catalogue | hard | **Élevé** | Élevé | Signal fort, isolé sur 1 nœud |
-| stress-mem-carts | hard | **Élevé** | Élevé | Signal fort, monotone |
-| network-delay-orders-db | cascade | Moyen | **Élevé** | Propagation multi-hop → GATv2 avantagé |
-| network-loss-catalogue-db | gray | **Faible** | Moyen | Signal réseau faible, STA peut rater |
-| pod-kill-user | hard | **Élevé** | Élevé | Erreurs franches, error_rate explose |
+| Type | STA Avg@1 moyen | GATv2 Avg@1 moyen | Late-STGCN+GIB |
+|---|---:|---:|---:|
+| hard (CPU/mem/pod-kill) | 0.968 | 0.965 | 0.892 |
+| cascade (1 scénario) | **0.043** | 0.459 | 0.003 |
+| gray (1 scénario) | 0.987 | 0.508 | 0.997 |
 
-**Raisonnement pour les pannes hard (scénarios 1, 2, 5) :**
-Le signal est fort et localisé sur un seul nœud. STA et GATv2 devraient tous deux identifier la RC en top-1. La performance sur ObservIT global (STA: 0.796, GATv2: 0.762) suggère un taux de succès élevé.
+**Lecture des résultats — trois constats qui contredisent les prédictions initiales :**
 
-**Raisonnement pour la cascade (scénario 3) :**
-La panne sur `orders-db` se propage via `orders` → `front-end`. GATv2, avec son attention multi-hop, est mieux équipé pour remonter la chaîne causale depuis les symptômes jusqu'à la source. STA risque de sélectionner `orders` ou `front-end` à la place de `orders-db` si son score local est plus élevé.
+1. **Le scénario de cascade est le vrai point de rupture, pas le gray failure.** STA s'effondre à Avg@1 = 0.043 (quasi-aléatoire) sur `network-delay-orders-to-orders-db`. GATv2 résiste mieux (0.459) mais reste loin de ses performances sur les autres scénarios. La panne au niveau d'`orders-db` génère des symptômes massifs en aval (`orders`, `front-end`) qui dominent le scoring local. La cause racine elle-même n'a presque aucune anomalie métrique propre — c'est un effet de propagation pure.
 
-**Raisonnement pour le gray failure (scénario 4) :**
-C'est le scénario le plus critique. 15% de perte de paquets = signal faible. `catalogue-db` peut ne pas faire partie du top-k de STA si sa variation de network_rx est insuffisamment ponderée. Recommandation : utiliser `gray_failure_detector.py` en préfiltre pour détecter les anomalies réseau subtiles et augmenter le score de `catalogue-db` avant l'inférence.
+2. **Le gray failure à 15% de perte de paquets s'est révélé largement détectable.** Contrairement à la prédiction, STA (0.987) et Late-STGCN+GIB (0.997) identifient quasi parfaitement `catalogue-db`. Hypothèse : à 15% de perte, le trafic réseau de `catalogue-db` chute suffisamment pour devenir un signal franc, plutôt qu'une anomalie subtile. Le terme "gray" mériterait d'être réservé à des taux de perte plus faibles (1-5%).
+
+3. **Les pannes hard restent triviales** : STA et GATv2 ≥ 0.95 sur les trois scénarios isolés. Late-STGCN+GIB faiblit sur `pod-kill-user` (0.741 ± 0.360, forte variance — probablement un seed défaillant).
+
+**Implications pour les recommandations §6.5 :**
+- La priorité d'intégration du `gray_failure_detector.py` doit être réorientée vers les **cascades**, pas vers les gray failures. C'est sur la cascade qu'un signal externe (détection de propagation multi-hop) aiderait STA.
+- GATv2 reste le meilleur compromis pour un déploiement où les cascades sont fréquentes.
+- L'agrégat ObservIT (STA Avg@1 = 0.796 reporté §4.4) **masque** cet effondrement sur la cascade : la moyenne (0.97+0.99+0.04+0.99+0.95)/5 ≈ 0.79 colle exactement à l'aggrégat publié. Ce breakdown est donc indispensable pour comprendre le comportement réel.
+
+**Détails complets** : voir [docs/PER_SCENARIO_BREAKDOWN.md](PER_SCENARIO_BREAKDOWN.md) (généré par `python -m rca_pipeline.analyze_per_scenario`).
 
 ---
 
-### 6.5 Recommandations opérationnelles pour le cluster
+### 6.5 Recommandations opérationnelles pour le cluster (révisées après mesure)
 
-1. **Exposer network_rx et network_tx dans le vecteur de features** : s'assurer que le connecteur Prometheus collecte bien les 6 métriques par service (vérifier `prometheus_connector.py:collect_metrics()`).
+1. **GATv2 par défaut sur cluster N ≤ 14** : confirmé par l'agrégat (Avg@3 = 0.978) et par la matrice scénario × modèle. STA peut rester en backup pour les scénarios isolés où le signal est fort.
 
-2. **Activer le gray_failure_detector en préfiltre** pour les scénarios réseau : `gray_failure_detector.py` détecte les nœuds avec des anomalies réseau subtiles et peut augmenter leur score avant d'entrer dans STA.
+2. **Réorienter le `gray_failure_detector.py`** : initialement conçu pour les gray failures à signal faible, sa cible utile sur ce cluster est en fait les **cascades**. La sous-section [§1.2 de la roadmap](../docs/PER_SCENARIO_BREAKDOWN.md) propose une ablation A/B sur le scénario `network-delay-orders-to-orders-db` où STA s'effondre. Un détecteur de propagation multi-hop devrait booster les scores des nœuds ayant des voisins anomaliques mais des métriques propres normales.
 
-3. **Pour les pré-productions (N ≤ 14)** : GATv2 est recommandé en default, car il capture mieux les cascades et son Avg@3 est quasi-parfait sur ObservIT (0.978).
+3. **Pour les staging à grande topologie (N ≥ 50)** : l'avantage théorique de STA en latence reste valide, mais il faut d'abord valider qu'il ne s'effondre pas sur les cascades à cette échelle (limitation non couverte).
 
-4. **Pour les staging à grande topologie (N ≥ 50)** : basculer vers STA pour maintenir des latences d'inférence sous contrôle.
+4. **MM sur cluster** : les résultats ObservIT (STA-MM Avg@1 = 0.772 sans régression) justifient un test étendu avec Loki + Jaeger sur le cluster Devoteam si les modalités sont disponibles avec une bonne couverture.
 
-5. **MM sur cluster** : si logs Loki et traces Jaeger sont disponibles avec un bon taux de couverture, tester STA-MM — les résultats ObservIT (Avg@1=0.772) montrent un signal positif, contrairement à RCAEval.
+5. **Métriques Prometheus** : les 6 métriques actuelles (cpu, mem, network_rx, network_tx, latency_p99, error_rate) suffisent pour les pannes hard et gray. Pour les cascades, ajouter des métriques de **dépendance** (taux d'appel inter-service, taille de queue par lien) serait probablement plus utile que d'ajouter des métriques au nœud lui-même.
 
 ---
 
@@ -438,8 +440,8 @@ Sur les datasets simulés (N≥50), STA dépasse GATv2 de façon constante et si
 **2. La fusion multimodale n'améliore pas les scores sur RCAEval, mais montre un potentiel sur cluster.**
 Sur les trois datasets RCAEval évalués, MM dégrade ou est neutre. Ce résultat négatif est robuste (couverture de modalités complète, 5 seeds). En revanche, sur ObservIT, STA-MM maintient ses performances (Avg@1=0.772) sans régression, et dépasse même GATv2 metrics-only. La différence de comportement entre RCAEval et ObservIT pointe vers la richesse du signal de log/trace comme facteur déterminant.
 
-**3. Sur sock-shop cluster, le succès dépend du type de panne.**
-Les pannes franches (hard) sont bien détectées par les deux modèles. Les cascades favorisent GATv2. Les gray failures sont le point de rupture : le signal est trop faible pour que STA place la RC dans son top-k sans mécanisme de détection préalable. L'intégration de `gray_failure_detector.py` comme étage de préfiltrage est la prochaine étape concrète.
+**3. Sur sock-shop cluster, les résultats par scénario contredisent les prédictions initiales.**
+Les pannes franches (hard) sont triviales pour STA et GATv2 (Avg@1 ≥ 0.95). Le gray failure à 15% de perte de paquets s'est révélé étonnamment facile (STA = 0.987) — le signal n'était pas si "gris". **Le vrai point de rupture est la cascade** : STA s'effondre à 0.043 sur `network-delay-orders-to-orders-db`, GATv2 limite la casse à 0.459. Cet effet est masqué par l'agrégat ObservIT (STA = 0.796). L'intégration future du `gray_failure_detector.py` doit être réorientée vers la détection de propagation multi-hop, pas vers les anomalies réseau subtiles.
 
 ### Perspectives
 
