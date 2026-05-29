@@ -96,10 +96,32 @@ SOCK_SHOP = ServiceTopology(
 )
 
 
+def _load_massive_n50() -> ServiceTopology:
+    """Load the N=50 BA-like topology from the JSON shipped with k8s_massive.
+
+    The JSON is produced by the generator that also emits massive-topology-N50.yaml,
+    so this keeps the K8s deployment and the GNN edge_index strictly aligned.
+    """
+    import json
+    from pathlib import Path
+    p = Path(__file__).parent / "k8s_massive" / "topology_N50.json"
+    if not p.exists():
+        return None  # silently skip if generator artifact absent
+    t = json.loads(p.read_text())
+    names: List[str] = list(t["node_names"])
+    mapping = {n: i for i, n in enumerate(names)}
+    edges = [(names[src], names[dst]) for src, dst in t["edges"]]
+    return ServiceTopology(name="massive_n50", node_mapping=mapping, edges=edges)
+
+
+_MASSIVE_N50 = _load_massive_n50()
+
 TOPOLOGIES: Dict[str, ServiceTopology] = {
     "custom_app": CUSTOM_APP,
     "sock_shop": SOCK_SHOP,
 }
+if _MASSIVE_N50 is not None:
+    TOPOLOGIES["massive_n50"] = _MASSIVE_N50
 
 
 def get_topology(name: str) -> ServiceTopology:

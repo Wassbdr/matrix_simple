@@ -1037,11 +1037,12 @@ def main():
         default=12,
         help="Longueur de fenêtre temporelle pour l'export observ-it (défaut: 12).",
     )
+    from rca_pipeline.topologies import TOPOLOGIES as _AVAILABLE_TOPOLOGIES
     parser.add_argument(
         "--observit-topology",
         type=str,
         default="custom_app",
-        choices=["custom_app", "sock_shop"],
+        choices=sorted(_AVAILABLE_TOPOLOGIES.keys()),
         help="Topologie de services pour GraphBuilder (défaut: custom_app).",
     )
     parser.add_argument(

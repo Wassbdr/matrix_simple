@@ -1,0 +1,65 @@
+"""
+Minimal FastAPI dummy service for the N=50 topology benchmark.
+
+Each pod:
+  * exposes `/api/data` on port 8000
+  * on each call, fans out HTTP GETs to all UPSTREAMS env URLs
+  * exposes Prometheus metrics on `/metrics`
+  * exposes `/health` for liveness probes
+
+Replaces the missing `rca-dummy-service:latest` image. Used together with a
+ConfigMap so the cluster only needs `python:3.9-slim` (already standard).
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+import time
+
+import requests
+import uvicorn
+from fastapi import FastAPI, HTTPException
+from prometheus_fastapi_instrumentator import Instrumentator
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
+SERVICE_NAME = os.environ.get("SERVICE_NAME", "unknown")
+UPSTREAMS = [u.strip() for u in os.environ.get("UPSTREAMS", "").split(",") if u.strip()]
+TIMEOUT_S = float(os.environ.get("UPSTREAM_TIMEOUT_S", "2.0"))
+
+app = FastAPI(title=f"RCA dummy service: {SERVICE_NAME}")
+Instrumentator().instrument(app).expose(app)
+
+
+@app.get("/")
+def root():
+    return {"service": SERVICE_NAME, "upstreams": UPSTREAMS}
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
+@app.get("/api/data")
+def api_data():
+    """Fan out to all upstreams. Return aggregated payload."""
+    start = time.time()
+    children = []
+    for url in UPSTREAMS:
+        try:
+            r = requests.get(url, timeout=TIMEOUT_S)
+            children.append({"url": url, "status": r.status_code, "elapsed_ms": r.elapsed.total_seconds() * 1000})
+        except requests.RequestException as exc:
+            logger.warning("upstream %s failed: %s", url, exc)
+            children.append({"url": url, "error": str(exc)})
+    elapsed_ms = (time.time() - start) * 1000
+    if any("error" in c for c in children):
+        raise HTTPException(status_code=502, detail={"service": SERVICE_NAME, "children": children, "elapsed_ms": elapsed_ms})
+    return {"service": SERVICE_NAME, "children": children, "elapsed_ms": elapsed_ms}
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="warning")

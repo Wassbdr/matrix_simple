@@ -1,0 +1,17 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: cpu-stress-massive
+  namespace: rca-sandbox
+spec:
+  mode: all
+  selector:
+    namespaces:
+      - rca-sandbox
+    labelSelectors:
+      app: core-005
+  stressors:
+    cpu:
+      workers: 2
+      load: 80
+  duration: "5m"
