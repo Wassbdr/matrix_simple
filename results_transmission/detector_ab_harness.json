@@ -1,0 +1,36 @@
+{
+  "config": {
+    "n_nodes": 14,
+    "n_features": 6,
+    "window_len": 30,
+    "n_trials": 500,
+    "boost": 3.0,
+    "seed": 42
+  },
+  "results": [
+    {
+      "scenario": "hard",
+      "n_trials": 500,
+      "baseline_avg1": 1.0,
+      "boosted_avg1": 1.0,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.036
+    },
+    {
+      "scenario": "gray",
+      "n_trials": 500,
+      "baseline_avg1": 0.602,
+      "boosted_avg1": 1.0,
+      "uplift": 0.398,
+      "detector_trigger_rate": 1.0
+    },
+    {
+      "scenario": "cascade",
+      "n_trials": 500,
+      "baseline_avg1": 0.0,
+      "boosted_avg1": 0.0,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.04
+    }
+  ]
+}

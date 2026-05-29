@@ -1,0 +1,337 @@
+{
+  "config": {
+    "dataset_dir": "datasets/sockshop_runs",
+    "topology": "sock_shop",
+    "window_size": 12,
+    "seeds": [
+      42,
+      123,
+      7,
+      1337,
+      2025
+    ],
+    "epochs": 100,
+    "boost": 3.0,
+    "n_windows_total": 2202,
+    "n_nodes": 14
+  },
+  "per_root_cause": [
+    {
+      "root_cause": "carts",
+      "scenario": "stress-mem-carts",
+      "failure_type": "hard",
+      "n_seeds": 5,
+      "n_windows_total": 610,
+      "avg1_baseline_mean": 0.983606557377049,
+      "avg1_baseline_std": 0.01296015434495239,
+      "avg1_boosted_mean": 0.983606557377049,
+      "avg1_boosted_std": 0.01296015434495239,
+      "uplift_mean": 0.0,
+      "detector_trigger_rate_mean": 0.2786885245901639
+    },
+    {
+      "root_cause": "catalogue",
+      "scenario": "stress-cpu-catalogue",
+      "failure_type": "hard",
+      "n_seeds": 5,
+      "n_windows_total": 675,
+      "avg1_baseline_mean": 0.9644444444444444,
+      "avg1_baseline_std": 0.006197481678030158,
+      "avg1_boosted_mean": 0.9644444444444444,
+      "avg1_boosted_std": 0.006197481678030158,
+      "uplift_mean": 0.0,
+      "detector_trigger_rate_mean": 0.1037037037037037
+    },
+    {
+      "root_cause": "catalogue-db",
+      "scenario": "network-loss-catalogue-to-catalogue-db",
+      "failure_type": "gray",
+      "n_seeds": 5,
+      "n_windows_total": 310,
+      "avg1_baseline_mean": 0.6,
+      "avg1_baseline_std": 0.38021435435151946,
+      "avg1_boosted_mean": 0.5838709677419355,
+      "avg1_boosted_std": 0.37712285017048175,
+      "uplift_mean": -0.016129032258064502,
+      "detector_trigger_rate_mean": 0.13870967741935486
+    },
+    {
+      "root_cause": "orders-db",
+      "scenario": "network-delay-orders-to-orders-db",
+      "failure_type": "cascade",
+      "n_seeds": 5,
+      "n_windows_total": 310,
+      "avg1_baseline_mean": 0.4967741935483871,
+      "avg1_baseline_std": 0.4640286420525799,
+      "avg1_boosted_mean": 0.4870967741935484,
+      "avg1_boosted_std": 0.4492159894782394,
+      "uplift_mean": -0.009677419354838679,
+      "detector_trigger_rate_mean": 0.2
+    },
+    {
+      "root_cause": "user",
+      "scenario": "pod-kill-user",
+      "failure_type": "hard",
+      "n_seeds": 5,
+      "n_windows_total": 305,
+      "avg1_baseline_mean": 0.9672131147540984,
+      "avg1_baseline_std": 0.0231838288913622,
+      "avg1_boosted_mean": 0.9672131147540984,
+      "avg1_boosted_std": 0.0231838288913622,
+      "uplift_mean": 0.0,
+      "detector_trigger_rate_mean": 0.3081967213114754
+    }
+  ],
+  "per_seed_detail": {
+    "carts__seed42": {
+      "root_cause": "carts",
+      "scenario": "stress-mem-carts",
+      "failure_type": "hard",
+      "n_windows": 122,
+      "avg1_baseline": 0.9918032786885246,
+      "avg1_boosted": 0.9918032786885246,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.27049180327868855
+    },
+    "catalogue__seed42": {
+      "root_cause": "catalogue",
+      "scenario": "stress-cpu-catalogue",
+      "failure_type": "hard",
+      "n_windows": 135,
+      "avg1_baseline": 0.9703703703703703,
+      "avg1_boosted": 0.9703703703703703,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.11851851851851852
+    },
+    "catalogue-db__seed42": {
+      "root_cause": "catalogue-db",
+      "scenario": "network-loss-catalogue-to-catalogue-db",
+      "failure_type": "gray",
+      "n_windows": 62,
+      "avg1_baseline": 1.0,
+      "avg1_boosted": 0.967741935483871,
+      "uplift": -0.032258064516129004,
+      "detector_trigger_rate": 0.12903225806451613
+    },
+    "orders-db__seed42": {
+      "root_cause": "orders-db",
+      "scenario": "network-delay-orders-to-orders-db",
+      "failure_type": "cascade",
+      "n_windows": 62,
+      "avg1_baseline": 0.0,
+      "avg1_boosted": 0.016129032258064516,
+      "uplift": 0.016129032258064516,
+      "detector_trigger_rate": 0.22580645161290322
+    },
+    "user__seed42": {
+      "root_cause": "user",
+      "scenario": "pod-kill-user",
+      "failure_type": "hard",
+      "n_windows": 61,
+      "avg1_baseline": 0.9836065573770492,
+      "avg1_boosted": 0.9836065573770492,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.18032786885245902
+    },
+    "carts__seed123": {
+      "root_cause": "carts",
+      "scenario": "stress-mem-carts",
+      "failure_type": "hard",
+      "n_windows": 122,
+      "avg1_baseline": 0.9754098360655737,
+      "avg1_boosted": 0.9754098360655737,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.3114754098360656
+    },
+    "catalogue__seed123": {
+      "root_cause": "catalogue",
+      "scenario": "stress-cpu-catalogue",
+      "failure_type": "hard",
+      "n_windows": 135,
+      "avg1_baseline": 0.9629629629629629,
+      "avg1_boosted": 0.9629629629629629,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.08888888888888889
+    },
+    "catalogue-db__seed123": {
+      "root_cause": "catalogue-db",
+      "scenario": "network-loss-catalogue-to-catalogue-db",
+      "failure_type": "gray",
+      "n_windows": 62,
+      "avg1_baseline": 0.11290322580645161,
+      "avg1_boosted": 0.11290322580645161,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.1774193548387097
+    },
+    "orders-db__seed123": {
+      "root_cause": "orders-db",
+      "scenario": "network-delay-orders-to-orders-db",
+      "failure_type": "cascade",
+      "n_windows": 62,
+      "avg1_baseline": 0.9516129032258065,
+      "avg1_boosted": 0.9516129032258065,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.1935483870967742
+    },
+    "user__seed123": {
+      "root_cause": "user",
+      "scenario": "pod-kill-user",
+      "failure_type": "hard",
+      "n_windows": 61,
+      "avg1_baseline": 0.9836065573770492,
+      "avg1_boosted": 0.9836065573770492,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.4426229508196721
+    },
+    "carts__seed7": {
+      "root_cause": "carts",
+      "scenario": "stress-mem-carts",
+      "failure_type": "hard",
+      "n_windows": 122,
+      "avg1_baseline": 0.9836065573770492,
+      "avg1_boosted": 0.9836065573770492,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.2786885245901639
+    },
+    "catalogue__seed7": {
+      "root_cause": "catalogue",
+      "scenario": "stress-cpu-catalogue",
+      "failure_type": "hard",
+      "n_windows": 135,
+      "avg1_baseline": 0.9629629629629629,
+      "avg1_boosted": 0.9629629629629629,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.0962962962962963
+    },
+    "catalogue-db__seed7": {
+      "root_cause": "catalogue-db",
+      "scenario": "network-loss-catalogue-to-catalogue-db",
+      "failure_type": "gray",
+      "n_windows": 62,
+      "avg1_baseline": 0.967741935483871,
+      "avg1_boosted": 0.967741935483871,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.08064516129032258
+    },
+    "orders-db__seed7": {
+      "root_cause": "orders-db",
+      "scenario": "network-delay-orders-to-orders-db",
+      "failure_type": "cascade",
+      "n_windows": 62,
+      "avg1_baseline": 0.0,
+      "avg1_boosted": 0.0,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.20967741935483872
+    },
+    "user__seed7": {
+      "root_cause": "user",
+      "scenario": "pod-kill-user",
+      "failure_type": "hard",
+      "n_windows": 61,
+      "avg1_baseline": 0.9508196721311475,
+      "avg1_boosted": 0.9508196721311475,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.29508196721311475
+    },
+    "carts__seed1337": {
+      "root_cause": "carts",
+      "scenario": "stress-mem-carts",
+      "failure_type": "hard",
+      "n_windows": 122,
+      "avg1_baseline": 1.0,
+      "avg1_boosted": 1.0,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.32786885245901637
+    },
+    "catalogue__seed1337": {
+      "root_cause": "catalogue",
+      "scenario": "stress-cpu-catalogue",
+      "failure_type": "hard",
+      "n_windows": 135,
+      "avg1_baseline": 0.9703703703703703,
+      "avg1_boosted": 0.9703703703703703,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.1037037037037037
+    },
+    "catalogue-db__seed1337": {
+      "root_cause": "catalogue-db",
+      "scenario": "network-loss-catalogue-to-catalogue-db",
+      "failure_type": "gray",
+      "n_windows": 62,
+      "avg1_baseline": 0.4032258064516129,
+      "avg1_boosted": 0.3709677419354839,
+      "uplift": -0.032258064516129004,
+      "detector_trigger_rate": 0.12903225806451613
+    },
+    "orders-db__seed1337": {
+      "root_cause": "orders-db",
+      "scenario": "network-delay-orders-to-orders-db",
+      "failure_type": "cascade",
+      "n_windows": 62,
+      "avg1_baseline": 0.8548387096774194,
+      "avg1_boosted": 0.8064516129032258,
+      "uplift": -0.048387096774193616,
+      "detector_trigger_rate": 0.1935483870967742
+    },
+    "user__seed1337": {
+      "root_cause": "user",
+      "scenario": "pod-kill-user",
+      "failure_type": "hard",
+      "n_windows": 61,
+      "avg1_baseline": 0.9344262295081968,
+      "avg1_boosted": 0.9344262295081968,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.32786885245901637
+    },
+    "carts__seed2025": {
+      "root_cause": "carts",
+      "scenario": "stress-mem-carts",
+      "failure_type": "hard",
+      "n_windows": 122,
+      "avg1_baseline": 0.9672131147540983,
+      "avg1_boosted": 0.9672131147540983,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.20491803278688525
+    },
+    "catalogue__seed2025": {
+      "root_cause": "catalogue",
+      "scenario": "stress-cpu-catalogue",
+      "failure_type": "hard",
+      "n_windows": 135,
+      "avg1_baseline": 0.9555555555555556,
+      "avg1_boosted": 0.9555555555555556,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.1111111111111111
+    },
+    "catalogue-db__seed2025": {
+      "root_cause": "catalogue-db",
+      "scenario": "network-loss-catalogue-to-catalogue-db",
+      "failure_type": "gray",
+      "n_windows": 62,
+      "avg1_baseline": 0.5161290322580645,
+      "avg1_boosted": 0.5,
+      "uplift": -0.016129032258064502,
+      "detector_trigger_rate": 0.1774193548387097
+    },
+    "orders-db__seed2025": {
+      "root_cause": "orders-db",
+      "scenario": "network-delay-orders-to-orders-db",
+      "failure_type": "cascade",
+      "n_windows": 62,
+      "avg1_baseline": 0.6774193548387096,
+      "avg1_boosted": 0.6612903225806451,
+      "uplift": -0.016129032258064502,
+      "detector_trigger_rate": 0.1774193548387097
+    },
+    "user__seed2025": {
+      "root_cause": "user",
+      "scenario": "pod-kill-user",
+      "failure_type": "hard",
+      "n_windows": 61,
+      "avg1_baseline": 0.9836065573770492,
+      "avg1_boosted": 0.9836065573770492,
+      "uplift": 0.0,
+      "detector_trigger_rate": 0.29508196721311475
+    }
+  }
+}
