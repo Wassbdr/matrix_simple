@@ -47,10 +47,13 @@ spec:
               value: "360"
             - name: STEP_SECONDS
               value: "30"
+            # Seuils calibres sur la distribution des scores live observee sur
+            # le cluster (typiquement [-1, +1]). Le defaut 5.0 du code python
+            # correspond au regime synthetique (4-7), pas au live.
             - name: CONFIDENCE_THRESHOLD
-              value: "5.0"
+              value: "-0.5"
             - name: ERROR_RATE_TRIGGER
-              value: "0.01"
+              value: "0.0"
             - name: TOP_K
               value: "3"
           resources:
