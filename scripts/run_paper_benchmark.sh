@@ -41,7 +41,7 @@ REAL_EPOCHS=100
 log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 
 log "=========================================="
-log "GNN-RCA — Paper Benchmark Suite"
+log "STA RCA — Paper Benchmark Suite"
 log "  seeds        : $SEEDS"
 log "  sim epochs   : sup=$SIM_SUP_EPOCHS contrastive=$SIM_CONTRASTIVE_EPOCHS"
 log "                 warmup=$SIM_WARMUP_EPOCHS anneal=$SIM_ANNEAL_EPOCHS"

@@ -108,7 +108,7 @@ print_summary() {
 trap 'err "Interrupted at line $LINENO"; print_summary; exit 130' INT TERM
 
 log "============================================================"
-log "GNN-RCA — Publication Result Suite"
+log "STA RCA — Publication Result Suite"
 log "  timestamp     : $TS"
 log "  seeds         : $SEEDS"
 log "  output dir    : $OUT_DIR/"

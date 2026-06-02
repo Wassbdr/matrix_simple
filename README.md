@@ -1,4 +1,4 @@
-# GNN-RCA: Graph Neural Network Root Cause Analysis for Kubernetes
+# STA: A Select-Then-Analyze Framework for Scalable Root Cause Analysis in Microservice Architectures
 
 [![CI](https://github.com/Wassbdr/matrix_simple/actions/workflows/ci.yml/badge.svg)](https://github.com/Wassbdr/matrix_simple/actions/workflows/ci.yml)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
@@ -353,9 +353,9 @@ All benchmark commands above already include `--sta-contrastive-warmup 0`.
 If you use this code or results, please cite:
 
 ```bibtex
-@misc{badraoui2026gnnrca,
-  title  = {GNN-RCA: Spatio-Temporal Graph Neural Networks for Root Cause
-             Analysis in Kubernetes Microservices},
+@misc{badraoui2026sta,
+  title  = {STA: A Select-Then-Analyze Framework for Scalable Root Cause
+             Analysis in Microservice Architectures},
   author = {Badraoui, Wassim},
   year   = {2026},
   note   = {Preprint. Code: https://github.com/Wassbdr/matrix_simple}

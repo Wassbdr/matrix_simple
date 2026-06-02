@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this software or results, please cite as below."
-title: "GNN-RCA: Spatio-Temporal Graph Neural Networks for Root Cause Analysis in Kubernetes Microservices"
+title: "STA: A Select-Then-Analyze Framework for Scalable Root Cause Analysis in Microservice Architectures"
 type: software
 authors:
   - family-names: Badraoui
@@ -23,6 +23,6 @@ preferred-citation:
   authors:
     - family-names: Badraoui
       given-names: Wassim
-  title: "GNN-RCA: Spatio-Temporal Graph Neural Networks for Root Cause Analysis in Kubernetes Microservices"
+  title: "STA: A Select-Then-Analyze Framework for Scalable Root Cause Analysis in Microservice Architectures"
   year: 2026
   notes: "Preprint. Replace with arXiv ID once available."
