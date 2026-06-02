@@ -51,14 +51,20 @@ LOG_DIR="$OUT_DIR/logs_publication_$TS"
 mkdir -p "$LOG_DIR"
 MAIN_LOG="$LOG_DIR/main.log"
 
-SEEDS="42,123,7,1337,2025"
-SIM_OUT="$OUT_DIR/paper_benchmark_sim.json"
-REAL_OUT="$OUT_DIR/paper_benchmark_real.json"
-MM_OUT="$OUT_DIR/paper_benchmark_real_mm.json"
-OBS_OUT="$OUT_DIR/paper_benchmark_observit.json"
-OBS_MM_OUT="$OUT_DIR/paper_benchmark_observit_mm.json"
-SHA_OUT="$OUT_DIR/paper_benchmark.sha256"
-MANIFEST_OUT="$OUT_DIR/canonical_results_manifest.json"
+# Seeds and output naming are env-overridable so a higher-power re-run (e.g. the
+# 10-seed paper preset) writes to NEW artifacts without clobbering the frozen
+# 5-seed canonical files. Example 10-seed run:
+#   RCA_SEEDS=42,123,7,1337,2025,314,555,888,999,4242 RCA_OUT_SUFFIX=_10seed \
+#       bash scripts/run_publication_suite.sh --skip-observit
+SEEDS="${RCA_SEEDS:-42,123,7,1337,2025}"
+SUFFIX="${RCA_OUT_SUFFIX:-}"
+SIM_OUT="$OUT_DIR/paper_benchmark_sim${SUFFIX}.json"
+REAL_OUT="$OUT_DIR/paper_benchmark_real${SUFFIX}.json"
+MM_OUT="$OUT_DIR/paper_benchmark_real_mm${SUFFIX}.json"
+OBS_OUT="$OUT_DIR/paper_benchmark_observit${SUFFIX}.json"
+OBS_MM_OUT="$OUT_DIR/paper_benchmark_observit_mm${SUFFIX}.json"
+SHA_OUT="$OUT_DIR/paper_benchmark${SUFFIX}.sha256"
+MANIFEST_OUT="$OUT_DIR/canonical_results_manifest${SUFFIX}.json"
 
 OBSERVIT_DATA="${OBSERVIT_DATA:-datasets/sockshop_runs_full}"
 LOKI_URL="${LOKI_URL:-http://localhost:3100}"

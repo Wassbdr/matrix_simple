@@ -57,6 +57,9 @@ port_forward.log
 # Claude Code (versionner CLAUDE.md + .claude/settings.json ; exclure l'override local)
 .claude/settings.local.json
 
+# Internal / personal documents — never in the public repo (kept local only)
+docs/internal/
+
 # Test / tooling caches
 .pytest_cache/
 .ruff_cache/

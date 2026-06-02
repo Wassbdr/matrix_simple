@@ -4,7 +4,11 @@
 PDFLATEX = pdflatex -interaction=nonstopmode -file-line-error
 DOC      = preprint
 
-.PHONY: pdf clean distclean
+.PHONY: pdf clean distclean figures
+
+# Regenerate figures/*.pdf from the canonical benchmark JSON (run from repo root).
+figures:
+	cd ../.. && python -m rca_pipeline.make_figures --out docs/arxiv/figures
 
 pdf: $(DOC).pdf
 

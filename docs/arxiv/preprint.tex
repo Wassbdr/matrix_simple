@@ -20,6 +20,8 @@
 \usepackage[dvipsnames,table]{xcolor}
 \usepackage{caption}
 \usepackage{subcaption}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
 \usepackage[hidelinks]{hyperref}
 \usepackage{microtype}
 \usepackage{authblk}
@@ -288,20 +290,32 @@ not contradict---the selector's initial ranking.
 
 \begin{figure}[t]
 \centering
-\begin{tabular}{rl}
-$X \in \mathbb{R}^{T\times N\times F}$ & input window \\
-$\big\downarrow$ & \\
-LightEncoder (Conv1d $\times 2$ + temp.\ attn) & $O(N)$ \\
-$\big\downarrow$ & \\
-STESelector (Gumbel + top-$k$ + STE) & $O(N)$ \\
-$\big\downarrow$ & \\
-\texttt{pyg\_subgraph} on selected $k$ nodes & $O(E)$ \\
-$\big\downarrow$ & \\
-DeepSTGCN (Conv1d $\times 2$ + GCN $\times 2$) on $S$ & $O(k^{2})$ \\
-$\big\downarrow$ & \\
-SubgraphScorer with residual blend $\alpha$ & $O(k)$ \\
-\end{tabular}
-\caption{\STA{} five-stage pipeline. Total cost per forward pass: $O(N+k^{2})$.}
+\begin{tikzpicture}[
+  node distance=5mm,
+  box/.style={draw, rounded corners, align=center, font=\small,
+              minimum width=62mm, minimum height=9mm, fill=blue!5},
+  io/.style={draw, align=center, font=\small, minimum width=62mm,
+             minimum height=8mm, fill=black!8},
+  cmplx/.style={font=\footnotesize\itshape, anchor=west},
+  arr/.style={-{Stealth[length=2mm]}, thick}]
+  \node[io] (x) {Input window $X \in \mathbb{R}^{T\times N\times F}$};
+  \node[box, below=of x]    (enc)   {LightEncoder\\[-1pt]{\scriptsize Conv1d $\times2$ + temporal attention}};
+  \node[box, below=of enc]  (sel)   {STESelector\\[-1pt]{\scriptsize Gumbel + top-$k$ + Straight-Through}};
+  \node[box, below=of sel]  (sub)   {Subgraph extraction\\[-1pt]{\scriptsize \texttt{pyg\_subgraph} on selected $k$ nodes}};
+  \node[box, below=of sub]  (deep)  {DeepSTGCN\\[-1pt]{\scriptsize Conv1d $\times2$ + GCN $\times2$ on $S$}};
+  \node[box, below=of deep] (score) {SubgraphScorer\\[-1pt]{\scriptsize residual blend $\alpha$}};
+  \node[io, below=of score] (out)   {Root-cause ranking};
+  \foreach \a/\b in {x/enc, enc/sel, sel/sub, sub/deep, deep/score, score/out}
+    \draw[arr] (\a) -- (\b);
+  \node[cmplx, right=3mm of enc]   {$O(N)$};
+  \node[cmplx, right=3mm of sel]   {$O(N)$};
+  \node[cmplx, right=3mm of sub]   {$O(E)$};
+  \node[cmplx, right=3mm of deep]  {$O(k^2)$};
+  \node[cmplx, right=3mm of score] {$O(k)$};
+\end{tikzpicture}
+\caption{\STA{} five-stage pipeline. The early bottleneck (STESelector) caps the
+deep spatial analysis at $k \ll N$ nodes, yielding $O(N+k^{2})$ per forward pass
+instead of the $O(N^2)$ of full-graph models.}
 \label{fig:sta-pipeline}
 \end{figure}
 
@@ -500,6 +514,16 @@ inference under $3.5$~ms.}
 \label{tab:sim}
 \end{table}
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/scaling.pdf}
+\caption{Scaling on synthetic BA graphs (5 seeds, $\pm\sigma$).
+(a)~\STA{} is the only model whose \Avg{1} lead grows with $N$;
+(b)~\STA{}'s per-query latency stays flat (bounded by $O(k^2)$) while
+attention/full-graph models trend upward with $N$.}
+\label{fig:scaling}
+\end{figure}
+
 Table~\ref{tab:sim} shows that the four GNN models are statistically tied at
 $N{=}20$ (within noise envelope). At $N{=}50$, the three Late/Full models
 degrade by $\sim 30$ pp; \STA{} retains a $+1.8$ pp lead over \GATv{}. At
@@ -525,6 +549,15 @@ Online Boutique  & $65.0 \pm 9.5$           & $77.9 \pm 5.3$           & $\mathb
 \caption{RCAEval metrics-only, $\Avg{1}/\MRR{}\,(\%)\pm\sigma$, 5 seeds.}
 \label{tab:rcaeval}
 \end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/real.pdf}
+\caption{RCAEval real-world datasets, metrics-only (5 seeds, $\pm\sigma$).
+\STA{} and \GATv{} overlap within the standard-deviation envelope at this
+$N{=}5$ scale (cf. Section~\ref{sec:results} discussion).}
+\label{fig:real}
+\end{figure}
 
 Table~\ref{tab:rcaeval} shows that \STA{} matches or beats \GATv{} on
 TrainTicket and SockShop, and is statistically tied on Online Boutique. As a
@@ -553,6 +586,15 @@ SockShop is intentionally skipped: \texttt{--mm-strict} refuses to
 substitute zeros when a modality is missing.}
 \label{tab:rcaeval-mm}
 \end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/multimodal.pdf}
+\caption{Multimodal fusion vs metrics-only \Avg{1} (5 seeds, $\pm\sigma$).
+Adding logs and traces does not improve the mean on either dataset, the
+negative result discussed in this section.}
+\label{fig:multimodal}
+\end{figure}
 
 Table~\ref{tab:rcaeval-mm} shows a clean negative result: on TrainTicket,
 \STA{}-MM drops $-5.0$ pp \Avg{1} relative to metrics-only \STA{}; on Online
@@ -596,6 +638,14 @@ $\sigma$ drops from $4.3$ to $2.1$. We propose three hypotheses:
 Multimodal logs \emph{halve} \STA{}'s seed-to-seed variance ($\sigma\!:\!4.3\to2.1$).}
 \label{tab:observit}
 \end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.8\linewidth]{figures/observit.pdf}
+\caption{ObservIT live cluster (sock-shop, $N{=}14$, 5 seeds, $\pm\sigma$),
+metrics-only. \STA{} leads on \Avg{1}; the three models are tied on \MRR{}.}
+\label{fig:observit}
+\end{figure}
 
 \subsubsection*{Per-scenario breakdown}
 \label{sec:perscenario}

@@ -670,6 +670,15 @@ GCN full-graph & 0{,}466 $\pm$ 0{,}042 & 0{,}537 $\pm$ 0{,}039 & 0{,}567 $\pm$ 0
 \end{tabular}
 \end{table}
 
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\linewidth]{figures/scaling.pdf}
+\caption{Scalabilit\'e sur graphes BA synth\'etiques (5 seeds, $\pm$\'ecart-type).
+(a)~STA est le seul mod\`ele dont l'avantage Avg@1 cro\^it avec $N$~;
+(b)~la latence par requ\^ete de STA reste plate (born\'ee par $O(k^2)$).}
+\label{fig:sim-scaling}
+\end{figure}
+
 \paragraph{Analyse.} \`A $N{=}20$, GATv2 et le GCN full-graph d\'epassent l\'eg\`erement STA (0{,}828--0{,}830 vs.\ 0{,}805). \`A cette \'echelle, $k{=}5 \approx N/4$ et le sous-graphe s\'electionn\'e capture la majeure partie de la connectivit\'e du graphe~: le goulot de s\'election apporte peu tandis qu'il introduit de la variance via le bruit de Gumbel. \`A partir de $N{=}50$, l'avantage d'efficacit\'e de STA se mat\'erialise~: 0{,}589 vs.\ 0{,}571 pour GATv2 ($+1{,}8$~pp). \`A $N{=}100$, l'\'ecart se creuse \`a $+6{,}3$~pp (0{,}552 vs.\ 0{,}490). Random Forest s'effondre \`a $N{=}100$ (0{,}065), confirmant que les approches non structurelles ne g\'en\'eralisent pas aux grands graphes h\'et\'erog\`enes.
 
 \section{Benchmark RCAEval r\'eel --- m\'etriques seules}
@@ -690,6 +699,14 @@ Dataset & STA & GATv2 & BARO$^\dagger$ & E-Diag$^\dagger$ & CausaRank$^\dagger$ 
 \end{tabular}\\
 {\footnotesize $^\dagger$ Chiffres publi\'es~; protocole non enti\`erement isop\'erim\`etre. Voir \cref{sec:comparabilite}.}
 \end{table}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\linewidth]{figures/real.pdf}
+\caption{RCAEval m\'etriques seules (5 seeds, $\pm$\'ecart-type). \`A $N{=}5$,
+STA et GATv2 se recouvrent dans l'enveloppe d'\'ecart-type.}
+\label{fig:real-bars}
+\end{figure}
 
 \paragraph{Analyse.} \`A $N{=}5$ (l'\'echelle des trois jeux RCAEval), STA et GATv2 produisent des r\'esultats \emph{dans le bruit} l'un de l'autre~:
 \begin{itemize}
@@ -717,6 +734,15 @@ Dataset & STA (m) & STA-MM & $\Delta$ STA & GATv2 (m) & GATv2-MM & $\Delta$ GATv
 \end{tabular}
 \end{table}
 
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\linewidth]{figures/multimodal.pdf}
+\caption{Fusion multimodale vs m\'etriques seules, Avg@1 (5 seeds,
+$\pm$\'ecart-type). L'ajout des logs et traces n'am\'eliore pas la moyenne~:
+le r\'esultat n\'egatif discut\'e dans cette section.}
+\label{fig:mm-bars}
+\end{figure}
+
 \paragraph{R\'esultat 1 : MM d\'egrade sur trainticket.} STA-MM ($-5\,\%$) et GATv2-MM ($-7\,\%$) sous-performent leurs homologues unimodaux sur \texttt{trainticket}, malgr\'e une couverture compl\`ete des logs et traces (\texttt{logs\_ratio} = \texttt{traces\_ratio} = 1{,}0 dans les deux datasets). La d\'egradation n'est pas attribuable \`a des modalit\'es manquantes.
 
 \paragraph{R\'esultat 2 : gain isol\'e de GATv2-MM sur online-boutique ($+11\,\%$).} L'architecture de fusion tardive de GATv2-MM appara\^it plus tol\'erante aux modalit\'es auxiliaires \`a faible signal --- quand les logs/traces portent peu d'information discriminante, le FusionMLP peut implicitement les sous-pond\'erer, alors que l'attention cross-modale de STA-MM peut encore produire de l'interf\'erence de gradient.
@@ -741,6 +767,15 @@ GATv2-MM & 0{,}762 $\pm$ 0{,}016 & 0{,}937 $\pm$ 0{,}083 & 0{,}950 $\pm$ 0{,}086
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.8\linewidth]{figures/observit.pdf}
+\caption{Cluster ObservIT sock-shop ($N{=}14$, 5 seeds, $\pm$\'ecart-type),
+m\'etriques seules. STA m\`ene sur Avg@1~; les trois mod\`eles sont \`a \'egalit\'e
+sur MRR.}
+\label{fig:observit-bars}
+\end{figure}
 
 Sur cluster, STA atteint le meilleur Avg@1 (0{,}796 vs.\ 0{,}762 pour GATv2), mais GATv2 atteint un bien meilleur Avg@3 (0{,}978 vs.\ 0{,}921). Ce sch\'ema sugg\`ere que STA identifie correctement la cause racine en top-1 dans 79{,}6\,\% des pr\'edictions imm\'ediates, tandis que GATv2 manque presque jamais la vraie RC dans le top-3 --- propri\'et\'e pratique importante pour le triage assist\'e par humain. Critiquement, \textbf{STA-MM ne r\'egresse pas sur cluster} (Avg@1 = 0{,}772, $-0{,}024$ vs.\ STA unimodal), avec une variance plus faible ($\pm 0{,}021$ vs.\ $\pm 0{,}043$). Cela contraste fortement avec la d\'egradation MM sur RCAEval, sugg\'erant que les donn\'ees d'observabilit\'e collect\'ees sur cluster contiennent des signaux log/trace plus riches.
 

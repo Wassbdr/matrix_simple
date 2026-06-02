@@ -2,7 +2,7 @@
 # =====================================================================
 # AlertmanagerConfig CRD : route les alertes "RCAStaServeRootCauseDetected"
 # (emises par rca-watcher) ET les alertes de sante (PrometheusRule) vers
-# wassim.badraoui@devoteam.com.
+# une adresse email (a configurer ci-dessous).
 #
 # Cette ressource s'ajoute par-dessus la config existante de
 # l'Alertmanager operator-managee (`monitoring-kube-prometheus-alertmanager`)
@@ -16,7 +16,7 @@
 #   kubectl logs -n monitoring alertmanager-monitoring-kube-prometheus-alertmanager-0 -c alertmanager --tail=30
 # Forcer une alerte :
 #   kubectl apply -f k8s/chaos/sockshop/stress-mem-carts.yaml   # provoque rca-watcher
-# Verifier reception dans la boite wassim.badraoui@devoteam.com.
+# Verifier reception dans la boite email configuree dans `to:`.
 # =====================================================================
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: AlertmanagerConfig
@@ -51,24 +51,24 @@ spec:
   receivers:
     - name: rca-email
       emailConfigs:
-        - to: wassim.badraoui@devoteam.com
-          # Adresse expediteur affichee dans le mail
-          from: rca-alerts@devoteam.com
+        - to: alerts@example.com
+          # Adresse expediteur : doit etre un sender verifie aupres de votre
+          # relais SMTP. Remplacer par la votre.
+          from: rca-alerts@example.com
           # ---------------------------------------------------------------
-          # SMTP : par defaut on suppose le relais interne Devoteam,
-          # sans authentification (configuration la plus courante pour
-          # un MX interne d'entreprise). Adapter selon ce que l'equipe ops
-          # met a disposition :
-          #   - O365 :  smtp.office365.com:587  + authPassword secret
-          #   - Gmail Workspace : smtp.gmail.com:587 + app password
-          #   - Relais interne : smtp.devoteam.com:25 (ou :587) souvent
-          #     sans auth en mode "envoi local cluster".
+          # SMTP : adapter au relais mis a disposition. Exemples courants :
+          #   - O365            : smtp.office365.com:587 + authPassword secret
+          #   - Gmail Workspace : smtp.gmail.com:587     + app password
+          #   - Relais transactionnel authentifie (SMTPS port 587, TLS)
+          #   - Relais interne d'entreprise (souvent :25, sans auth)
           # ---------------------------------------------------------------
-          # Relais interne Devoteam, sans authentification, port SMTP 25 en clair.
-          # Si l'equipe ops impose le port 587 ou le STARTTLS, ajuster ici.
-          smarthost: 'smtp.devoteam.com:25'
-          requireTLS: false
+          smarthost: 'smtp.example.com:587'
+          requireTLS: true
           sendResolved: true
+          authUsername: 'rca-alerts@example.com'
+          authPassword:
+            name: rca-smtp-credentials
+            key:  password
           headers:
             - key: Subject
               value: '[RCA] {{ .CommonLabels.alertname }} | {{ .CommonLabels.root_cause | default "n/a" }} | {{ .CommonLabels.severity }}'
@@ -89,7 +89,7 @@ spec:
               </ul>
               <hr>
             {{ end }}
-            <p style="color:#999;font-size:0.9em">Genere par rca-watcher + STA model sta_sockshop_v1 sur observit-cluster1.</p>
+            <p style="color:#999;font-size:0.9em">Genere par rca-watcher + STA model sta_sockshop_v1.</p>
           text: |
             === {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }}) ===
 
@@ -105,6 +105,6 @@ spec:
             ----
             {{ end }}
 
-            Genere par rca-watcher sur observit-cluster1.
-# Pas de Secret SMTP necessaire : le relais interne Devoteam ne demande
-# pas d'authentification depuis le cluster.
+            Genere par rca-watcher.
+# Le Secret `rca-smtp-credentials` (cle `password`) doit exister dans le
+# namespace `monitoring` si le relais SMTP exige une authentification.

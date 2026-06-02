@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint format audit benchmark-smoke benchmark-paper clean report report-clean
+.PHONY: help install dev test lint format audit benchmark-smoke benchmark-paper clean report report-clean figures paper
 
 PYTHON ?= python
 
@@ -12,6 +12,8 @@ help:
 	@echo "  make audit            Run pre-publication audit"
 	@echo "  make benchmark-smoke  Quick simulated benchmark (1 seed, N=20)"
 	@echo "  make benchmark-paper  Full publication-grade benchmark (~4h)"
+	@echo "  make figures          Regenerate paper figures from results_transmission/*.json"
+	@echo "  make paper            Build the arXiv preprint PDF (docs/arxiv)"
 	@echo "  make clean            Remove caches and generated artifacts"
 
 install:
@@ -65,3 +67,12 @@ report:
 
 report-clean:
 	$(MAKE) -C docs/rapport clean
+
+# Regenerate the paper figures (F1-F4) from the canonical benchmark JSON.
+# Pass RESULTS_DIR=... or per-file overrides to point at a re-run (e.g. 10-seed).
+figures:
+	$(PYTHON) -m rca_pipeline.make_figures --out docs/arxiv/figures
+	$(PYTHON) -m rca_pipeline.make_figures --out docs/rapport/figures
+
+paper:
+	$(MAKE) -C docs/arxiv pdf
