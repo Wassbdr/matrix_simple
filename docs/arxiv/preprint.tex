@@ -58,30 +58,33 @@ spatio-temporal GNN that reduces RCA complexity to $O(N + k^{2})$ by selecting
 a compact candidate subgraph of $k \ll N$ nodes before any deep spatial
 analysis. Selection is performed by a Straight-Through Estimator with annealed
 Gumbel noise, regularized by a Variational Graph Information Bottleneck loss
-that is \emph{asymmetric} between healthy and faulty windows. We evaluate four
-model variants (\STA{}, \GATv{}, and their multimodal extensions) under a single
-shared protocol of 5 deterministic seeds across four regimes: (i)~Barab\'asi--Albert
-synthetic graphs at $N\in\{20,50,100\}$; (ii)~three RCAEval public benchmarks
-(TrainTicket, SockShop, Online Boutique); (iii)~a live 14-service sock-shop
-deployment on a private Kubernetes cluster with Chaos Mesh fault injection
-(metrics-only and metrics+logs); and (iv)~a 50-service synthetic-but-real
-deployment on the same cluster. Three results are reported and explicitly
-scoped. First, \STA{}'s asymptotic advantage transfers from simulation to real
-clusters: $+5.8$ percentage points (pp) \Avg{1} over \GATv{} at $N{=}50$ on
-the cluster, with $4.6\times$ lower variance. Second, at small graph scale
-$(N{\le}14)$ \STA{} and \GATv{} are within the noise envelope of five-seed
-evaluation. Third, multimodal fusion on RCAEval degrades or matches
-metrics-only performance on TrainTicket and Online Boutique ($-5{-}14$ pp
-\Avg{1}), while on the same cluster it leaves \Avg{1} unchanged but
-\emph{halves} seed-to-seed variance ($\sigma\!:\!4.3 \to 2.1$). Beyond
-evaluation, we contribute an end-to-end pipeline: 25-trial Optuna HPO,
-self-describing model bundle, FastAPI inference service with Prometheus
-metrics, ADWIN drift detector with cooldown, and a four-mechanism gray-failure
-detector whose synthetic A/B raises gray \Avg{1} from $0.602$ to $1.000$ at
-zero cost on hard and cascade scenarios. We do not claim SOTA; we ship an
-explicit comparability matrix flagging \emph{partially comparable} vs.
-\emph{not isoperimeter} verdicts for every published baseline. All code,
-manifests, SHA-256-pinned result JSONs and Docker artifacts are released at
+that is \emph{asymmetric} between healthy and faulty windows. Rather than chase
+a state-of-the-art number, we report a deliberately honest, fully reproducible
+study of four model variants (\STA{}, \GATv{}, and their multimodal extensions)
+across four regimes: (i)~Barab\'asi--Albert synthetic graphs at
+$N\in\{20,50,100\}$; (ii)~three RCAEval public benchmarks (TrainTicket,
+SockShop, Online Boutique); (iii)~a live 14-service sock-shop deployment on a
+private Kubernetes cluster with Chaos Mesh fault injection; and (iv)~a
+50-service synthetic-but-real deployment on the same cluster. Four findings, all
+reproducible from released code and seeds. \textbf{(i)}~\STA{}'s $O(N+k^2)$
+design keeps per-query latency \emph{flat} as $N$ grows; its accuracy edge over
+attention/full-graph models is real but \emph{modest and shrinks under
+scrutiny} --- from $+6.3$ to $+2.4$ percentage points (pp) \Avg{1} at $N{=}100$
+when moving from 5 to 10 seeds, though it holds in direction (and reaches
+$+5.8$ pp on the $N{=}50$ cluster). \textbf{(ii)}~At small graph scale
+$(N{\le}14)$, the public-benchmark regime, \STA{}, \GATv{} and a strong
+statistical baseline are statistically tied. \textbf{(iii)}~Re-running BARO
+\emph{isoperimetrically} (same cases, candidate nodes, per-seed split and
+metric functions) shows it is far stronger than its published number and
+\emph{beats} our models on Online Boutique: we make \emph{no} SOTA claim.
+\textbf{(iv)}~Multimodal fusion (logs+traces) degrades or matches metrics-only
+on RCAEval while halving seed variance on the cluster --- a robust negative
+result. Beyond evaluation we contribute a full operational stack: 25-trial
+Optuna HPO, a self-describing model bundle, and a FastAPI inference service
+with Prometheus metrics and live alerting deployed on the cluster, plus an
+ADWIN drift detector and a four-mechanism gray-failure detector. All code,
+manifests, SHA-256-pinned result JSONs (including 10-seed and
+isoperimetric-baseline artifacts) and Docker images are released at
 \url{https://github.com/Wassbdr/matrix_simple}.
 \end{abstract}
 
@@ -133,13 +136,17 @@ selection with annealed Gumbel noise and a Straight-Through Estimator. A
 Variational GIB regularizer is used in place of an $L_1$ sparsity penalty
 and is \emph{asymmetric} between healthy and faulty windows.
 
-\textbf{C2.~Systematic multi-regime evaluation (Sections~\ref{sec:proto},
-\ref{sec:results}).} Four model variants are benchmarked across simulated
-Barab\'asi--Albert graphs at $N \in \{20,50,100\}$, three RCAEval datasets, a
-live 14-service Kubernetes cluster, and a 50-service synthetic-but-real
-deployment on the same cluster. \Avg{k}, \MRR{}, and \NDCG{3} are reported
-with standard deviations across five independent seeds. Every JSON artifact
-is SHA-256-pinned.
+\textbf{C2.~A rigorous, honestly-scoped multi-regime evaluation
+(Sections~\ref{sec:proto},~\ref{sec:results}).} Four model variants are
+benchmarked across simulated Barab\'asi--Albert graphs at $N \in \{20,50,100\}$,
+three RCAEval datasets, a live 14-service Kubernetes cluster, and a 50-service
+synthetic-but-real deployment. We go beyond a single point estimate: a
+\emph{10-seed robustness check} (which shrinks \STA{}'s $N{=}100$ lead from
+$+6.3$ to $+2.4$ pp and flips the bootstrap-reliability flag to true) and an
+\emph{isoperimetric re-run of BARO} on identical cases, candidate nodes, split
+and metric functions --- under which BARO is a strong baseline our models do
+\emph{not} uniformly beat (losing on Online Boutique). We explicitly make no
+SOTA claim. Every JSON artifact is SHA-256-pinned.
 
 \textbf{C3.~A robust negative result on multimodal fusion
 (Section~\ref{sec:mm}).} Adding logs and traces to metrics degrades or matches
@@ -155,11 +162,13 @@ cascade-aware loss including a learnable propagation matrix; a 25-trial
 Optuna HPO loop; a self-describing model bundle; and a FastAPI inference
 service with Prometheus metrics deployed on the same private cluster.
 
-We \emph{do not} claim state-of-the-art. Section~\ref{sec:comparability}
-ships an explicit comparability matrix that classifies every baseline
-comparison as \emph{partially comparable} (metrics-only) or \emph{not
-isoperimeter} (multimodal). All numbers in this paper are reproducible from
-the released code, datasets, and seeds.
+We \emph{do not} claim state-of-the-art --- and our own isoperimetric BARO
+re-run (Section~\ref{sec:results}) shows precisely why such a claim would be
+unsafe. Section~\ref{sec:comparability} ships an explicit comparability matrix:
+the metrics-only-vs-BARO comparison is now \emph{comparable} (isoperimetric),
+while comparisons to other published numbers remain \emph{partially comparable}
+and all multimodal comparisons \emph{not isoperimeter}. Every number in this
+paper is reproducible from the released code, datasets, and seeds.
 
 \section{Related Work}
 \label{sec:related}

@@ -12,13 +12,16 @@ the dependency graph is large, alerts are noisy, and faults propagate non-linear
 We propose a spatio-temporal GNN pipeline that combines a Late-Bottleneck STGCN with a
 Graph Information Bottleneck (GIB) for full-graph analysis, and a complementary
 Select-Then-Analyze (STA) architecture for sublinear inference on large topologies.
-Evaluated on three RCAEval real-world datasets (TrainTicket, SockShop, Online Boutique)
-and on multi-scale Barabási-Albert simulations (N = 20–100), our models reach
-**Top-1 Avg@1 96.0% ± 3.7%** on TrainTicket (5 seeds, 90 test cases), with STA inference
-latency under **4 ms** at N = 20 and competitive accuracy at N = 100 where
-O(N²) full-graph models degrade.
-The full pipeline, benchmark scripts, chaos manifests, and SHA-256-verified result
-artifacts are released to support reproducibility.
+This is a **deliberately honest, reproducible study — not a SOTA claim**. Across three
+RCAEval benchmarks, Barabási-Albert simulations (N = 20–100), a live 14-service Kubernetes
+cluster, and a 50-service synthetic-but-real deployment, STA keeps inference latency **flat**
+as N grows and holds a **modest** accuracy edge at large N (**+2.4 pp** Avg@1 over GATv2 at
+N = 100, 10 seeds — down from +6.3 pp at 5 seeds). At small graph scale (N ≤ 14) STA, GATv2
+and an **isoperimetric BARO** baseline are within noise — BARO even **wins on Online Boutique**.
+We also report a robust **negative result** on multimodal fusion and a fully **deployed**
+operational stack (HPO → bundle → FastAPI service + live alerting on the cluster). All code,
+benchmark scripts, chaos manifests, 10-seed and isoperimetric-baseline JSONs (SHA-256-verified)
+and Docker images are released to support reproducibility.
 
 ---
 
