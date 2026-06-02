@@ -983,6 +983,31 @@ Le r\'esultat r\'eel est \emph{plus fort} que le synth\'etique sur deux points~:
 \end{itemize}
 L'interpr\'etation honn\^ete~: le d\'etecteur de gray failure, tel que con\c{c}u, n'a pas aid\'e sur les sc\'enarios r\'eels du cluster. L'uplift synth\'etique sur un sch\'ema construit-pour-coller ($+39{,}8$~pp) est r\'eel mais ne se transf\`ere pas \`a la distribution empirique de pannes. Ce r\'esultat motive un d\'etecteur \emph{cascade-aware} plut\^ot qu'un investissement suppl\'ementaire dans la conception \`a quatre m\'ecanismes actuelle.
 
+\section{Robustesse~: 5 vs.\ 10 seeds}
+\label{sec:robustesse}
+
+Les chiffres ci-dessus utilisent 5 seeds d\'eterministes, pour lesquels les IC bootstrap au niveau seed sont trop \'etroits pour \^etre publi\'es (chaque JSON porte \texttt{seed\_level\_bootstrap\_reliable = false}). J'ai donc relanc\'e les suites synth\'etique et RCAEval \`a 10 seeds (\texttt{42,123,7,1337,2025,314,555,888,999,4242}~; artefacts \texttt{paper\_benchmark\_*\_10seed.json}). Deux choses changent (\cref{tab:robustesse}). D'abord, les IC deviennent fiables (\texttt{seed\_level\_bootstrap\_reliable = true} sur toutes les m\'etriques). Ensuite, l'avantage de STA sur GATv2 \`a $N{=}100$ r\'etr\'ecit de $+6{,}2$ \`a $+2{,}4$~pp~: l'avantage asymptotique tient en direction mais est plus modeste que ne le sugg\'erait l'estimation \`a 5 seeds. STA bat toujours nettement STGCN+GIB, dont l'Avg@1 \`a $N{=}100$ se d\'egrade encore ($32{,}9 \pm 19{,}0$). \`A $N{=}5$, la conclusion est \emph{renforc\'ee}~: sur trainticket, STA et GATv2 se rapprochent \`a moins de $1$~pp ($94{,}5$ vs.\ $95{,}5$), coh\'erent avec le constat \og dans le bruit \fg{} \`a petit graphe. Je conserve les chiffres \`a 5 seeds comme principaux (continuit\'e avec les artefacts canoniques fig\'es) et traite le run \`a 10 seeds comme un contr\^ole de robustesse.
+
+\begin{table}[ht]
+\centering
+\caption{Contr\^ole de robustesse 5 vs.\ 10 seeds. Avg@1 (\%) $\pm$ \'ecart-type.}
+\label{tab:robustesse}
+\begin{tabular}{lrr}
+\toprule
+M\'etrique (Avg@1\,\%) & 5 seeds & 10 seeds \\
+\midrule
+Synth\'etique $N{=}100$, STA   & $55{,}2 \pm 4{,}6$ & $52{,}9 \pm 4{,}4$ \\
+Synth\'etique $N{=}100$, GATv2 & $49{,}0 \pm 2{,}9$ & $50{,}5 \pm 4{,}5$ \\
+\quad \'ecart STA$-$GATv2       & $+6{,}2$           & $+2{,}4$ \\
+trainticket, STA               & $96{,}0 \pm 3{,}7$ & $94{,}5 \pm 4{,}2$ \\
+sockshop, STA                  & $85{,}0 \pm 8{,}9$ & $80{,}5 \pm 8{,}8$ \\
+online-boutique, STA           & $65{,}0 \pm 9{,}5$ & $67{,}0 \pm 8{,}1$ \\
+\midrule
+IC bootstrap fiable            & non                & \textbf{oui} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 % =====================================================================
 % Chapitre 7 --- HPO + deploiement
 % =====================================================================
