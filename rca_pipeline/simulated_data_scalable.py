@@ -367,8 +367,8 @@ def generate_scalable_dataset(
             t = rng.randint(0, window_size - 1)
             node = rng.randint(0, N)
             n_feats = rng.randint(1, max(2, num_features))
-            feats = sorted(rng.choice(num_features, size=n_feats, replace=False))
-            strength = 0.5 + rng.rand() * 1.5
+            feats = sorted(int(f) for f in rng.choice(num_features, size=n_feats, replace=False))
+            strength = float(0.5 + rng.rand() * 1.5)
             X[t, node, feats] += strength
             # 1-hop propagation (weak)
             if t + 1 < window_size:

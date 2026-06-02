@@ -30,6 +30,9 @@ jobs:
           pip install torch==2.0.1 --index-url https://download.pytorch.org/whl/cpu
           pip install torch_geometric==2.4.0
           pip install -e ".[dev]"
+          # torch 2.0.1 is built against NumPy 1.x; pin numpy<2 to avoid the
+          # NumPy 2.x ABI break (_ARRAY_API not found / dtype inference errors).
+          pip install "numpy<2"
 
       - name: Lint (ruff)
         run: python -m ruff check rca_pipeline
