@@ -599,6 +599,7 @@ class RCAEvalLoader:
                 d.y = torch.tensor([1], dtype=torch.long)
                 d.root_cause = [service_part]
                 d.failure_type = "real"
+                d.case_path = str(inst_dir)  # raw case dir (metrics.csv + inject_time.txt)
 
                 # Multimodal features
                 if self.extract_multimodal:

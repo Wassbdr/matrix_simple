@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-04-01T12:36:27.667737+00:00",
+  "generated_at_utc": "2026-06-02T15:33:31.330826+00:00",
   "source_artifacts": {
     "metrics_only": "rca_pipeline/benchmark_real_long_prepublish.json",
     "full_mm_strict": "rca_pipeline/benchmark_real_long_mm_strict_prepublish.json"
@@ -116,15 +116,49 @@
       "ndcg5": 0.63
     }
   ],
+  "isoperimetric_baro": [
+    {
+      "dataset": "trainticket",
+      "baro_avg1": 0.7999999999999999,
+      "baro_avg1_std": 0.08366600265340755,
+      "baro_mrr": 0.8550000000000001,
+      "sta_avg1": 0.96,
+      "gatv2_avg1": 0.95,
+      "verdict": "ours_better"
+    },
+    {
+      "dataset": "sockshop",
+      "baro_avg1": 0.8400000000000001,
+      "baro_avg1_std": 0.037416573867739396,
+      "baro_mrr": 0.9056666666666665,
+      "sta_avg1": 0.85,
+      "gatv2_avg1": 0.8099999999999999,
+      "verdict": "within_noise"
+    },
+    {
+      "dataset": "online-boutique",
+      "baro_avg1": 0.8600000000000001,
+      "baro_avg1_std": 0.05830951894845298,
+      "baro_mrr": 0.9183333333333336,
+      "sta_avg1": 0.65,
+      "gatv2_avg1": 0.6799999999999999,
+      "verdict": "baro_better"
+    }
+  ],
   "comparability_findings": [
     {
-      "claim": "Ours vs published RCAEval baselines (metrics-only)",
-      "evidence_in_repo": "Baseline values available, but no per-dataset split/preprocessing signatures.",
+      "claim": "Ours vs BARO (metrics-only), isoperimetric (our protocol)",
+      "evidence_in_repo": "BARO re-run on identical cases, candidate node set, per-seed split and metric functions (results_transmission/baselines_rcaeval_ourprotocol.json). Under identical conditions BARO is far stronger than its published 0.71: ours wins on trainticket, ties on sockshop, loses on online-boutique — no uniform SOTA claim.",
+      "verdict": "comparable",
+      "required_for_full_isoperimeter": []
+    },
+    {
+      "claim": "Ours vs *published* RCAEval baseline numbers (BARO 0.71 etc.)",
+      "evidence_in_repo": "Published constants have no per-dataset split/preprocessing signature; superseded by the isoperimetric row above.",
       "verdict": "partially_comparable",
       "required_for_full_isoperimeter": [
         "Published baseline split protocol per dataset",
-        "Published preprocessing/normalization details",
-        "Case filtering policy alignment (max_cases, exclusions)"
+        "Published preprocessing/normalization details"
       ]
     },
     {

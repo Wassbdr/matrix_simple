@@ -485,9 +485,12 @@ Their split strategy, number of seeds, case filtering, and preprocessing are
 not fully specified. We therefore classify our baseline comparisons as
 \emph{partially comparable} for metrics-only evaluations and \emph{not
 isoperimeter} for multimodal evaluations. When our \Avg{1} exceeds a published
-baseline, we cannot rule out a protocol-difference confound. A rigorous SOTA
-claim would require re-implementing each baseline under our isoperimeter
-protocol; this is deliberately out of scope.
+baseline, we cannot rule out a protocol-difference confound. To remove that
+confound for the strongest baseline, we additionally re-implement BARO under
+our \emph{exact} protocol --- same cases, candidate node set, per-seed split and
+metric functions (Section~\ref{sec:results}, Table~\ref{tab:baro-iso}). Under
+identical conditions BARO is markedly stronger than its published number and our
+models do \emph{not} uniformly beat it; we make no SOTA claim.
 
 \section{Results}
 \label{sec:results}
@@ -560,12 +563,34 @@ $N{=}5$ scale (cf. Section~\ref{sec:results} discussion).}
 \end{figure}
 
 Table~\ref{tab:rcaeval} shows that \STA{} matches or beats \GATv{} on
-TrainTicket and SockShop, and is statistically tied on Online Boutique. As a
-\emph{partially comparable} reference, the reproduced RCAEval baselines on
-SockShop report BARO $\approx 71\%$, CausaRank $\approx 52\%$,
-MicroRCA $\approx 49\%$~\cite{pham2024rcaeval}; both \STA{} and \GATv{}
-exceed those numbers, but Section~\ref{sec:comparability} discusses why this
-should not be read as a SOTA claim.
+TrainTicket and SockShop, and is statistically tied on Online Boutique. The
+\emph{published} RCAEval numbers (BARO $\approx 71\%$, CausaRank $\approx 52\%$,
+MicroRCA $\approx 49\%$~\cite{pham2024rcaeval}) use a different split and are only
+indicative. We therefore re-run BARO isoperimetrically --- on the same cases,
+candidate nodes, per-seed split and metric functions
+(Table~\ref{tab:baro-iso}). The result is sobering: under identical conditions
+BARO reaches \Avg{1} of $0.80$--$0.86$, far above its published $0.71$. Our
+models clearly win on TrainTicket ($+16$ pp), are within noise on SockShop, and
+\emph{lose} on Online Boutique ($-18$--$21$ pp). We make no uniform SOTA claim
+over BARO.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Dataset} & BARO (ours) & BARO (pub.) & \STA{} & \GATv{} \\
+\midrule
+TrainTicket     & $80.0 \pm 8.4$ & $71$ & $\mathbf{96.0}$ & $95.0$ \\
+SockShop        & $84.0 \pm 3.7$ & $71$ & $\mathbf{85.0}$ & $81.0$ \\
+Online Boutique & $\mathbf{86.0 \pm 5.8}$ & $71$ & $65.0$ & $68.0$ \\
+\bottomrule
+\end{tabular}
+\caption{Isoperimetric BARO: \Avg{1}\,(\%) on the \emph{same} cases, candidate
+nodes, per-seed split and metric functions as our models (5 seeds;
+\texttt{baseline\_baro.py}). BARO is far stronger than its published $0.71$ and
+wins on Online Boutique; ours wins on TrainTicket and ties on SockShop.}
+\label{tab:baro-iso}
+\end{table}
 
 \subsection{Multimodal Fusion --- The Negative Result}
 \label{sec:mm}

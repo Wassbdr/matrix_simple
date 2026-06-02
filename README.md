@@ -40,7 +40,14 @@ Source: `results_transmission/paper_benchmark_real.json`
 | SockShop         | 85.0% ± 8.9%  | 90.8% ± 5.8%  | 81.0% ± 8.0%  | 87.6% ± 5.8%  |
 | Online Boutique  | 65.0% ± 9.5%  | 77.9% ± 5.3%  | 68.0% ± 5.1%  | 78.8% ± 4.2%  |
 
-> Beats published RCAEval baselines on SockShop (BARO 71%, CausaRank 52%, MicroRCA 49%).
+> **Comparability note (read this before citing a "beats baselines" claim).** The
+> published RCAEval baseline numbers (BARO 71%, CausaRank 52%, MicroRCA 49%) use a
+> *different* split/preprocessing. We re-ran BARO **isoperimetrically** — same cases,
+> candidate node set, per-seed split and metric functions (`baseline_baro.py`,
+> `results_transmission/baselines_rcaeval_ourprotocol.json`). Under identical
+> conditions BARO is far stronger (Avg@1 **0.80 / 0.84 / 0.86** on TT / SS / OB): our
+> models **win on TrainTicket, tie on SockShop, and lose on Online Boutique**. We make
+> **no uniform SOTA claim** over BARO. See `docs/COMPARABILITY_MATRIX.md`.
 
 ### RCAEval — Multimodal Strict (metrics + traces, 5 seeds)
 

@@ -1,0 +1,173 @@
+{
+  "_meta": {
+    "method": "BARO (RobustScaler max-zscore ranking), our protocol",
+    "isoperimetric": true,
+    "note": "Same cases, candidate node set, per-seed stratified split and metric functions as benchmark_real.py. BARO uses the full pre/post-injection series (split at inject_time.txt) over the same num_features columns our models see.",
+    "seeds": [
+      42,
+      123,
+      7,
+      1337,
+      2025
+    ]
+  },
+  "trainticket": {
+    "BARO_ourprotocol": {
+      "avg1": 0.7999999999999999,
+      "avg1_std": 0.08366600265340755,
+      "avg3": 0.89,
+      "avg3_std": 0.048989794855663536,
+      "avg5": 1.0,
+      "avg5_std": 0.0,
+      "mrr": 0.8550000000000001,
+      "mrr_std": 0.06037843618010954,
+      "ndcg3": 0.8450000000000001,
+      "ndcg3_std": 0.06595452979136461,
+      "ndcg5": 0.8901832338461306,
+      "ndcg5_std": 0.04569036909426834,
+      "n_nodes": 5,
+      "node_names": [
+        "auth-service",
+        "order-service",
+        "route-service",
+        "train-service",
+        "travel-service"
+      ],
+      "n_test_cases_per_seed": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "n_seeds": 5,
+      "n_cases_missing_inject_or_metrics": 0
+    },
+    "BARO_published": {
+      "avg1": 0.71,
+      "avg3": 0.82,
+      "avg5": 0.86,
+      "mrr": 0.77,
+      "ndcg3": 0.75,
+      "ndcg5": 0.79
+    },
+    "STA_ours": {
+      "avg1": 0.96,
+      "avg1_std": 0.03741657386773941,
+      "mrr": 0.9800000000000001,
+      "mrr_std": 0.018708286933869722
+    },
+    "GATv2_ours": {
+      "avg1": 0.95,
+      "avg1_std": 0.04472135954999579,
+      "mrr": 0.975,
+      "mrr_std": 0.022360679774997918
+    }
+  },
+  "sockshop": {
+    "BARO_ourprotocol": {
+      "avg1": 0.8400000000000001,
+      "avg1_std": 0.037416573867739396,
+      "avg3": 0.9800000000000001,
+      "avg3_std": 0.024494897427831803,
+      "avg5": 1.0,
+      "avg5_std": 0.0,
+      "mrr": 0.9056666666666665,
+      "mrr_std": 0.021202725191719056,
+      "ndcg3": 0.9217836778214311,
+      "ndcg3_std": 0.020936238537277226,
+      "ndcg5": 0.929520733966122,
+      "ndcg5_std": 0.015838635486219613,
+      "n_nodes": 5,
+      "node_names": [
+        "carts",
+        "catalogue",
+        "orders",
+        "payment",
+        "user"
+      ],
+      "n_test_cases_per_seed": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "n_seeds": 5,
+      "n_cases_missing_inject_or_metrics": 0
+    },
+    "BARO_published": {
+      "avg1": 0.71,
+      "avg3": 0.82,
+      "avg5": 0.86,
+      "mrr": 0.77,
+      "ndcg3": 0.75,
+      "ndcg5": 0.79
+    },
+    "STA_ours": {
+      "avg1": 0.85,
+      "avg1_std": 0.0894427190999916,
+      "mrr": 0.9084999999999999,
+      "mrr_std": 0.05841042524907504
+    },
+    "GATv2_ours": {
+      "avg1": 0.8099999999999999,
+      "avg1_std": 0.07999999999999999,
+      "mrr": 0.8761666666666666,
+      "mrr_std": 0.05835380593129009
+    }
+  },
+  "online-boutique": {
+    "BARO_ourprotocol": {
+      "avg1": 0.8600000000000001,
+      "avg1_std": 0.05830951894845298,
+      "avg3": 0.9800000000000001,
+      "avg3_std": 0.024494897427831803,
+      "avg5": 1.0,
+      "avg5_std": 0.0,
+      "mrr": 0.9183333333333336,
+      "mrr_std": 0.03146867931416528,
+      "ndcg3": 0.9304743802857167,
+      "ndcg3_std": 0.026251338637515973,
+      "ndcg5": 0.9390879114471845,
+      "ndcg5_std": 0.023391553285005934,
+      "n_nodes": 5,
+      "node_names": [
+        "checkoutservice",
+        "currencyservice",
+        "emailservice",
+        "productcatalogservice",
+        "recommendationservice"
+      ],
+      "n_test_cases_per_seed": [
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "n_seeds": 5,
+      "n_cases_missing_inject_or_metrics": 0
+    },
+    "BARO_published": {
+      "avg1": 0.71,
+      "avg3": 0.82,
+      "avg5": 0.86,
+      "mrr": 0.77,
+      "ndcg3": 0.75,
+      "ndcg5": 0.79
+    },
+    "STA_ours": {
+      "avg1": 0.65,
+      "avg1_std": 0.09486832980505137,
+      "mrr": 0.7795,
+      "mrr_std": 0.0534519514247245
+    },
+    "GATv2_ours": {
+      "avg1": 0.6799999999999999,
+      "avg1_std": 0.05099019513592784,
+      "mrr": 0.7876666666666666,
+      "mrr_std": 0.042062783761631556
+    }
+  }
+}

@@ -132,18 +132,63 @@ def build_matrix(repo_root: Path) -> Dict[str, object]:
         for method, vals in sorted(RCAEVAL_PUBLISHED_BASELINES.items())
     ]
 
-    # In this repository, published baseline protocol details are metrics-only constants.
-    # Without dataset-specific split/preprocessing metadata from paper artifacts, isoperimeter
-    # can only be rated as partially comparable.
+    # Isoperimetric BARO: re-run on identical cases / candidate nodes / per-seed split /
+    # metric functions (baselines_rcaeval_ourprotocol.json), produced by baseline_baro.py.
+    iso = _load_json(repo_root / "results_transmission/baselines_rcaeval_ourprotocol.json") or {}
+    iso_rows: List[Dict] = []
+    for ds_name in ("trainticket", "sockshop", "online-boutique"):
+        blob = iso.get(ds_name)
+        if not isinstance(blob, dict):
+            continue
+        baro = blob.get("BARO_ourprotocol", {})
+        sta = blob.get("STA_ours", {})
+        gat = blob.get("GATv2_ours", {})
+        baro1 = baro.get("avg1")
+        ours_vals = [v for v in (sta.get("avg1"), gat.get("avg1")) if v is not None]
+        best_ours = max(ours_vals) if ours_vals else None
+        if baro1 is None or best_ours is None:
+            verdict = "n/a"
+        elif best_ours - baro1 > 0.03:
+            verdict = "ours_better"
+        elif best_ours - baro1 < -0.03:
+            verdict = "baro_better"
+        else:
+            verdict = "within_noise"
+        iso_rows.append({
+            "dataset": ds_name,
+            "baro_avg1": baro1,
+            "baro_avg1_std": baro.get("avg1_std"),
+            "baro_mrr": baro.get("mrr"),
+            "sta_avg1": sta.get("avg1"),
+            "gatv2_avg1": gat.get("avg1"),
+            "verdict": verdict,
+        })
+
+    metrics_verdict = "comparable" if iso_rows else "partially_comparable"
     comparability_findings = [
         {
-            "claim": "Ours vs published RCAEval baselines (metrics-only)",
-            "evidence_in_repo": "Baseline values available, but no per-dataset split/preprocessing signatures.",
+            "claim": "Ours vs BARO (metrics-only), isoperimetric (our protocol)",
+            "evidence_in_repo": (
+                "BARO re-run on identical cases, candidate node set, per-seed split and "
+                "metric functions (results_transmission/baselines_rcaeval_ourprotocol.json). "
+                "Under identical conditions BARO is far stronger than its published 0.71: "
+                "ours wins on trainticket, ties on sockshop, loses on online-boutique — no "
+                "uniform SOTA claim."
+            ) if iso_rows else "Baseline values available, but no per-dataset split/preprocessing signatures.",
+            "verdict": metrics_verdict,
+            "required_for_full_isoperimeter": [] if iso_rows else [
+                "Published baseline split protocol per dataset",
+                "Published preprocessing/normalization details",
+                "Case filtering policy alignment (max_cases, exclusions)",
+            ],
+        },
+        {
+            "claim": "Ours vs *published* RCAEval baseline numbers (BARO 0.71 etc.)",
+            "evidence_in_repo": "Published constants have no per-dataset split/preprocessing signature; superseded by the isoperimetric row above.",
             "verdict": "partially_comparable",
             "required_for_full_isoperimeter": [
                 "Published baseline split protocol per dataset",
                 "Published preprocessing/normalization details",
-                "Case filtering policy alignment (max_cases, exclusions)",
             ],
         },
         {
@@ -165,6 +210,7 @@ def build_matrix(repo_root: Path) -> Dict[str, object]:
         },
         "protocol_rows": [row.__dict__ for row in rows],
         "published_baselines": baseline_rows,
+        "isoperimetric_baro": iso_rows,
         "comparability_findings": comparability_findings,
     }
 
@@ -194,6 +240,35 @@ def render_markdown(matrix: Dict[str, object]) -> str:
     for row in matrix["published_baselines"]:
         lines.append(
             f"| {row['method']} | {row['avg1']:.2f} | {row['avg3']:.2f} | {row['avg5']:.2f} | {row['mrr']:.2f} | {row['ndcg3']:.2f} | {row['ndcg5']:.2f} |"
+        )
+
+    iso = matrix.get("isoperimetric_baro") or []
+    if iso:
+        lines.append("")
+        lines.append("## Isoperimetric BARO (our protocol)")
+        lines.append("")
+        lines.append(
+            "BARO re-run on the *same* cases, candidate node set, per-seed split and metric "
+            "functions as our models (see `baseline_baro.py`). Avg@1 (%)."
+        )
+        lines.append("")
+        lines.append("| Dataset | BARO (ours) | BARO (published) | STA (ours) | GATv2 (ours) | Verdict |")
+        lines.append("|---|---:|---:|---:|---:|---|")
+
+        def _pct(v):
+            return f"{v * 100:.1f}" if isinstance(v, (int, float)) else "n/a"
+
+        pub_baro = next((b["avg1"] for b in matrix["published_baselines"] if b["method"] == "BARO"), None)
+        for r in iso:
+            lines.append(
+                f"| {r['dataset']} | {_pct(r['baro_avg1'])} | {_pct(pub_baro)} | "
+                f"{_pct(r['sta_avg1'])} | {_pct(r['gatv2_avg1'])} | {r['verdict']} |"
+            )
+        lines.append("")
+        lines.append(
+            "> Under identical conditions BARO is far stronger than its published 0.71. "
+            "Our models win on trainticket, are within noise on sockshop, and **lose on "
+            "online-boutique** — we make no uniform SOTA claim over BARO."
         )
 
     lines.append("")

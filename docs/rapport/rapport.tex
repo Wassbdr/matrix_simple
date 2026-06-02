@@ -605,7 +605,7 @@ Pour toutes les \'evaluations sur donn\'ees r\'eelles, \texttt{--sta-contrastive
 \section{Comparabilit\'e aux baselines}
 \label{sec:comparabilite}
 
-Les baselines publi\'ees (BARO, E-Diagnosis, CausaRank, MicroRCA) sont reproduites depuis les nombres de r\'ef\'erence livr\'es avec le benchmark RCAEval. Je n'ai \emph{pas} r\'eimpl\'ement\'e ces baselines sous mon propre protocole d'entra\^inement. Leur strat\'egie de \emph{split}, leur nombre de seeds, leur politique de filtrage de cas et leur normalisation de pr\'etraitement ne sont pas enti\`erement sp\'ecifi\'es dans la documentation disponible. Je classe donc mes comparaisons baselines comme \textbf{partiellement comparables} pour les \'evaluations m\'etriques seules et \textbf{non isop\'erim\`etres} pour les \'evaluations multimodales.
+Les baselines publi\'ees (BARO, E-Diagnosis, CausaRank, MicroRCA) sont reproduites depuis les nombres de r\'ef\'erence livr\'es avec le benchmark RCAEval. Leur strat\'egie de \emph{split}, leur nombre de seeds, leur politique de filtrage de cas et leur normalisation de pr\'etraitement ne sont pas enti\`erement sp\'ecifi\'es. Pour la baseline la plus forte, j'ai lev\'e ce doute en r\'eimpl\'ementant \textbf{BARO sous mon protocole exact} (\cref{sec:resultats-real}, \cref{tab:baro-iso})~; \`a conditions identiques, BARO est bien plus fort que ses 0,71 publi\'es et mes mod\`eles ne le battent pas uniform\'ement. Je classe donc la comparaison m\'etriques seules vs.\ BARO comme \textbf{comparable}, et les comparaisons aux \emph{nombres publi\'es} (et toutes les comparaisons multimodales) comme \textbf{partiellement comparables} / \textbf{non isop\'erim\`etres}.
 
 Pratiquement, cela signifie que quand mes mod\`eles rapportent un Avg@1 sup\'erieur \`a une baseline de r\'ef\'erence, je ne peux pas exclure que l'\'ecart soit partiellement expliqu\'e par des diff\'erences de protocole (\emph{split} diff\'erent, normalisation diff\'erente, filtrage de cas plus strict). Toutes les comparaisons aux baselines publi\'ees doivent \^etre lues comme une \textbf{comp\'etitivit\'e indicative} et non comme une preuve concluante de SOTA. Une revendication SOTA rigoureuse n\'ecessiterait de r\'eimpl\'ementer chaque baseline sous mon protocole isop\'erim\`etre. Cela est d\'elib\'er\'ement hors du p\'erim\`etre de ce travail, qui se concentre sur la comparaison relative entre mes quatre variantes de mod\`ele sous un seul protocole partag\'e.
 
@@ -714,7 +714,22 @@ STA et GATv2 se recouvrent dans l'enveloppe d'\'ecart-type.}
   \item \texttt{sockshop}~: STA 0{,}850 vs.\ GATv2 0{,}810 --- 4{,}0~pp, en de\c{c}\`a des deux \'ecarts-types~;
   \item \texttt{online-boutique}~: GATv2 0{,}680 vs.\ STA 0{,}650 --- 3{,}0~pp, en de\c{c}\`a de l'\'ecart-type STA ($\pm$0{,}095).
 \end{itemize}
-Je ne revendique donc pas de vainqueur entre STA et GATv2 \`a $N{=}5$. Ce que les r\'esultats montrent en revanche est que les deux architectures sont comp\'etitives \`a cette \'echelle~: les niveaux absolus d'Avg@1 (0{,}65--0{,}96) sont substantiellement au-dessus de ce que les baselines non graphe atteignent \`a petit $N$. Compar\'es aux chiffres de r\'ef\'erence RCAEval (indicatifs, non isop\'erim\`etres), STA et GATv2 rapportent tous deux un Avg@1 sup\'erieur \`a BARO (0{,}71) sur \texttt{trainticket} et \texttt{sockshop}.
+Je ne revendique donc pas de vainqueur entre STA et GATv2 \`a $N{=}5$. Ce que les r\'esultats montrent en revanche est que les deux architectures sont comp\'etitives \`a cette \'echelle~: les niveaux absolus d'Avg@1 (0{,}65--0{,}96) sont substantiellement au-dessus de ce que les baselines non graphe atteignent \`a petit $N$. Les chiffres de r\'ef\'erence RCAEval (BARO 0,71, etc.) utilisent un \emph{split} diff\'erent et ne sont qu'indicatifs. J'ai donc r\'eimpl\'ement\'e BARO de fa\c{c}on \textbf{isop\'erim\`etre} --- m\^emes cas, m\^emes nœuds candidats, m\^eme \emph{split} par seed et m\^emes fonctions de m\'etriques (\cref{tab:baro-iso}, via \texttt{baseline\_baro.py}). \`A conditions identiques, BARO est bien plus fort que ses 0,71 publi\'es (Avg@1 0,80--0,86)~: mes mod\`eles gagnent sur \texttt{trainticket} ($+16$~pp), sont dans le bruit sur \texttt{sockshop}, et \emph{perdent} sur \texttt{online-boutique} ($-18$ \`a $-21$~pp). Je ne revendique aucune sup\'eriorit\'e SOTA uniforme sur BARO.
+
+\begin{table}[ht]
+\centering
+\caption{BARO isop\'erim\`etre. Avg@1 (\%) sur les m\^emes cas/nœuds/\emph{split}/m\'etriques que mes mod\`eles (5 seeds, \texttt{baseline\_baro.py}).}
+\label{tab:baro-iso}
+\begin{tabular}{lcccc}
+\toprule
+Dataset & BARO (moi) & BARO (publi\'e) & STA & GATv2 \\
+\midrule
+\texttt{trainticket}     & 80,0 $\pm$ 8,4 & 71 & \textbf{96,0} & 95,0 \\
+\texttt{sockshop}        & 84,0 $\pm$ 3,7 & 71 & \textbf{85,0} & 81,0 \\
+\texttt{online-boutique} & \textbf{86,0 $\pm$ 5,8} & 71 & 65,0 & 68,0 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \section{\'Evaluation multimodale}
 \label{sec:resultats-mm}
@@ -1255,7 +1270,7 @@ Je liste les limites explicitement pour que les contributions puissent \^etre ju
 
 \paragraph{Rigueur statistique.} Cinq seeds avec \emph{splits} variants produisent des \'ecarts-types qui confondent variance du mod\`ele et variance du \emph{split} de donn\'ees. Avec $n{=}5$, les intervalles de confiance bootstrap ne sont pas statistiquement fiables, et les tests de significativit\'e formels (Wilcoxon, $t$-test appari\'e, correction de Bonferroni) ne sont pas appropri\'es \`a cette taille d'\'echantillon. J'adopte la lecture conservatrice tout au long du \cref{chap:resultats}~: un r\'esultat est \emph{significatif} seulement quand l'\'ecart d\'epasse les deux \'ecarts-types rapport\'es, sinon \emph{dans le bruit}.
 
-\paragraph{Comparaison baseline non isop\'erim\`etre.} Voir \cref{sec:comparabilite,sec:resultats-real}. Je rapporte un Avg@1 sup\'erieur \`a BARO/E-Diagnosis sur trainticket et sockshop, mais leur protocole d'entra\^inement n'est pas sp\'ecifi\'e assez bien pour garantir que la comparaison est \`a armes \'egales. Une revendication SOTA rigoureuse n\'ecessiterait de r\'eimpl\'ementer chaque baseline sous mon protocole. Je ne l'ai pas fait~; ma contribution r\'eside dans la comparaison relative entre mes quatre variantes de mod\`ele et dans le r\'esultat n\'egatif MM, tous deux internes au protocole.
+\paragraph{Comparaison baseline.} Voir \cref{sec:comparabilite,sec:resultats-real}. J'ai r\'eimpl\'ement\'e BARO (la baseline la plus forte) sous mon protocole exact (\cref{tab:baro-iso})~: \`a conditions identiques, BARO atteint Avg@1 0,80--0,86 (bien au-dessus de ses 0,71 publi\'es) et bat m\^eme mes mod\`eles sur \texttt{online-boutique}. Je ne revendique donc \emph{aucune} sup\'eriorit\'e SOTA uniforme~; ma contribution r\'eside dans la comparaison relative entre mes quatre variantes de mod\`ele, le r\'esultat n\'egatif MM, et cette comparaison isop\'erim\`etre honn\^ete. Les autres baselines (E-Diagnosis, CausaRank, MicroRCA) ne sont compar\'ees qu'aux nombres publi\'es (non isop\'erim\`etres).
 
 \paragraph{Absence de baseline multimodale.} Aucune baseline RCA publi\'ee que j'ai pu v\'erifier ne rapporte de r\'esultats multimodaux avec un protocole comparable. Mon \'evaluation MM est donc relative (unimodal vs.\ MM pour mes propres mod\`eles) mais ne peut pas \^etre situ\'ee dans le paysage plus large des approches multimodales.
 
