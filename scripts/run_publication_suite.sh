@@ -333,36 +333,43 @@ if run_phase_p 6; then
   if [[ $DRY_RUN -eq 0 ]]; then
     pushd "$OUT_DIR" >/dev/null
     : >"$(basename "$SHA_OUT")"
-    for f in paper_benchmark_sim.json paper_benchmark_real.json \
-             paper_benchmark_real_mm.json paper_benchmark_observit.json \
-             paper_benchmark_observit_mm.json; do
+    for f in "$(basename "$SIM_OUT")" "$(basename "$REAL_OUT")" \
+             "$(basename "$MM_OUT")" "$(basename "$OBS_OUT")" \
+             "$(basename "$OBS_MM_OUT")"; do
       [[ -s "$f" ]] && sha256sum "$f" >>"$(basename "$SHA_OUT")"
     done
     popd >/dev/null
     ok "SHA256 written to $SHA_OUT"
 
-    # Regenerate canonical manifest (best-effort; tool may not see new files)
-    if python -m rca_pipeline.results_manifest --repo-root . \
-         --output "$MANIFEST_OUT" >>"$LOG_DIR/06_manifest.log" 2>&1; then
-      ok "Canonical manifest regenerated → $MANIFEST_OUT"
-      sha256sum "$MANIFEST_OUT" > "${MANIFEST_OUT}.sha256"
+    # Regenerate canonical manifest only for the canonical (no-suffix) run:
+    # results_manifest documents the frozen prepublish artifacts and ignores
+    # $SUFFIX, so regenerating it for a suffixed run would just duplicate the
+    # 5-seed manifest under a misleading name.
+    if [[ -z "$SUFFIX" ]]; then
+      if python -m rca_pipeline.results_manifest --repo-root . \
+           --output "$MANIFEST_OUT" >>"$LOG_DIR/06_manifest.log" 2>&1; then
+        ok "Canonical manifest regenerated → $MANIFEST_OUT"
+        sha256sum "$MANIFEST_OUT" > "${MANIFEST_OUT}.sha256"
+      else
+        warn "results_manifest tool failed; manifest not updated (see 06_manifest.log)"
+      fi
     else
-      warn "results_manifest tool failed; manifest not updated (see 06_manifest.log)"
+      log "Skipping canonical manifest regeneration for suffixed run ($SUFFIX)"
     fi
 
     # Reliability summary across all produced JSONs
     python - <<PYEOF | tee "$LOG_DIR/06_reliability.txt" "$MAIN_LOG" >/dev/null
 import json, os
 files = [
-    "results_transmission/paper_benchmark_sim.json",
-    "results_transmission/paper_benchmark_real.json",
-    "results_transmission/paper_benchmark_real_mm.json",
-    "results_transmission/paper_benchmark_observit.json",
-    "results_transmission/paper_benchmark_observit_mm.json",
+    "$SIM_OUT",
+    "$REAL_OUT",
+    "$MM_OUT",
+    "$OBS_OUT",
+    "$OBS_MM_OUT",
 ]
 print()
 print("=" * 64)
-print("RELIABILITY SUMMARY (5 seeds → bootstrap CIs should be reliable)")
+print("RELIABILITY SUMMARY (seeds: $SEEDS)")
 print("=" * 64)
 for f in files:
     if not os.path.exists(f) or os.path.getsize(f) == 0:

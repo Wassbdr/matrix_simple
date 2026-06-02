@@ -1,0 +1,2103 @@
+{
+  "trainticket": {
+    "STA-MM": {
+      "avg1": 0.9200000000000002,
+      "avg1_std": 0.033166247903553984,
+      "avg3": 0.9800000000000001,
+      "avg3_std": 0.033166247903554,
+      "avg5": 1.0,
+      "avg5_std": 0.0,
+      "mrr": 0.9505833333333331,
+      "mrr_std": 0.02162512042355679,
+      "ndcg3": 0.9545825413750009,
+      "ndcg3_std": 0.02534898746260962,
+      "ndcg5": 0.9629769537822745,
+      "ndcg5_std": 0.01633277691099944,
+      "ci95": {
+        "avg1": {
+          "mean": 0.9200000000000002,
+          "ci_low": 0.9049999999999999,
+          "ci_high": 0.9400000000000001,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "avg3": {
+          "mean": 0.9800000000000001,
+          "ci_low": 0.9550000000000001,
+          "ci_high": 0.9951249999999993,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "avg5": {
+          "mean": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "mrr": {
+          "mean": 0.9505833333333331,
+          "ci_low": 0.9385,
+          "ci_high": 0.9641666666666667,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "ndcg3": {
+          "mean": 0.9545825413750009,
+          "ci_low": 0.9382598424968756,
+          "ci_high": 0.9689308574839296,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "ndcg5": {
+          "mean": 0.9629769537822745,
+          "ci_low": 0.9536898684454777,
+          "ci_high": 0.9732057179771634,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        }
+      }
+    },
+    "GATv2-MM": {
+      "avg1": 0.8699999999999999,
+      "avg1_std": 0.07483314773547882,
+      "avg3": 0.945,
+      "avg3_std": 0.026925824035672508,
+      "avg5": 1.0,
+      "avg5_std": 0.0,
+      "mrr": 0.9160833333333335,
+      "mrr_std": 0.045594910169155206,
+      "ndcg3": 0.9140464876785728,
+      "ndcg3_std": 0.043185802083941044,
+      "ndcg5": 0.9368572233558325,
+      "ndcg5_std": 0.03414149761701525,
+      "ci95": {
+        "avg1": {
+          "mean": 0.8699999999999999,
+          "ci_low": 0.825,
+          "ci_high": 0.9149999999999998,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "avg3": {
+          "mean": 0.945,
+          "ci_low": 0.9299999999999999,
+          "ci_high": 0.96,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "avg5": {
+          "mean": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "mrr": {
+          "mean": 0.9160833333333335,
+          "ci_low": 0.8881645833333333,
+          "ci_high": 0.94316875,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "ndcg3": {
+          "mean": 0.9140464876785728,
+          "ci_low": 0.8873167666410736,
+          "ci_high": 0.9389412939495544,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "ndcg5": {
+          "mean": 0.9368572233558325,
+          "ci_low": 0.9158991313960364,
+          "ci_high": 0.9571589913816991,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        }
+      }
+    },
+    "STA_raw": {
+      "avg1": 0.9200000000000002,
+      "avg1_std": 0.033166247903553984,
+      "avg3": 0.9800000000000001,
+      "avg3_std": 0.033166247903554,
+      "avg5": 1.0,
+      "avg5_std": 0.0,
+      "mrr": 0.9505833333333331,
+      "mrr_std": 0.02162512042355679,
+      "ndcg3": 0.9545825413750009,
+      "ndcg3_std": 0.02534898746260962,
+      "ndcg5": 0.9629769537822745,
+      "ndcg5_std": 0.01633277691099944
+    },
+    "STA_drift_filtered": {
+      "avg1": 0.9200000000000002,
+      "avg1_std": 0.033166247903553984,
+      "avg3": 0.9800000000000001,
+      "avg3_std": 0.033166247903554,
+      "avg5": 1.0,
+      "avg5_std": 0.0,
+      "mrr": 0.9505833333333331,
+      "mrr_std": 0.02162512042355679,
+      "ndcg3": 0.9545825413750009,
+      "ndcg3_std": 0.02534898746260962,
+      "ndcg5": 0.9629769537822745,
+      "ndcg5_std": 0.01633277691099944
+    },
+    "GATv2_raw": {
+      "avg1": 0.8699999999999999,
+      "avg1_std": 0.07483314773547882,
+      "avg3": 0.945,
+      "avg3_std": 0.026925824035672508,
+      "avg5": 1.0,
+      "avg5_std": 0.0,
+      "mrr": 0.9160833333333335,
+      "mrr_std": 0.045594910169155206,
+      "ndcg3": 0.9140464876785728,
+      "ndcg3_std": 0.043185802083941044,
+      "ndcg5": 0.9368572233558325,
+      "ndcg5_std": 0.03414149761701525
+    },
+    "GATv2_drift_filtered": {
+      "avg1": 0.8699999999999999,
+      "avg1_std": 0.07483314773547882,
+      "avg3": 0.945,
+      "avg3_std": 0.026925824035672508,
+      "avg5": 1.0,
+      "avg5_std": 0.0,
+      "mrr": 0.9160833333333335,
+      "mrr_std": 0.045594910169155206,
+      "ndcg3": 0.9140464876785728,
+      "ndcg3_std": 0.043185802083941044,
+      "ndcg5": 0.9368572233558325,
+      "ndcg5_std": 0.03414149761701525
+    },
+    "config": {
+      "dataset": "trainticket",
+      "seeds": [
+        42,
+        123,
+        7,
+        1337,
+        2025,
+        314,
+        555,
+        888,
+        999,
+        4242
+      ],
+      "n_cases_loaded": 90,
+      "n_nodes": 5,
+      "max_cases": null,
+      "use_mm": true,
+      "mm_strict": true,
+      "mm_logs_only": false,
+      "mm_traces_only": false,
+      "mm_trace_prior": false,
+      "mm_effective": true,
+      "mm_coverage": {
+        "n": 90,
+        "logs_ratio": 1.0,
+        "traces_ratio": 1.0,
+        "both_ratio": 1.0
+      },
+      "mm_dataset_status": "comparable",
+      "mm_dataset_reason": "All requested seeds executed with required modalities.",
+      "mm_requested_seeds": 10,
+      "mm_executed_seeds": 10,
+      "mm_skipped_seeds": [],
+      "enable_drift": true,
+      "drift_delta": 0.002,
+      "drift_cooldown_steps": 30,
+      "observit_normalized": false,
+      "normalized": false,
+      "split_mode": "varying_split_by_run_seed",
+      "hyperparams": {
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "batch_size": 64,
+        "hidden_dim": 32,
+        "epochs": 100,
+        "sta_contrastive_warmup": 0,
+        "allow_real_warmup": false
+      },
+      "split": {
+        "type": "stratified_split_shuffle",
+        "mode": "varying_split_by_run_seed",
+        "seed_source": "run_seed",
+        "train_ratio": 0.8,
+        "requested_seeds": [
+          42,
+          123,
+          7,
+          1337,
+          2025,
+          314,
+          555,
+          888,
+          999,
+          4242
+        ],
+        "executed_seeds": [
+          42,
+          123,
+          7,
+          1337,
+          2025,
+          314,
+          555,
+          888,
+          999,
+          4242
+        ],
+        "mm_skipped_seeds": []
+      }
+    },
+    "drift_filter": {
+      "train_drop_ratio_mean": 0.0,
+      "test_drop_ratio_mean": 0.0
+    },
+    "STA_per_root_cause": [
+      {
+        "auth-service": 1.0,
+        "order-service": 1.0,
+        "route-service": 0.75,
+        "train-service": 0.75,
+        "travel-service": 1.0
+      },
+      {
+        "auth-service": 1.0,
+        "order-service": 0.75,
+        "route-service": 1.0,
+        "train-service": 1.0,
+        "travel-service": 1.0
+      },
+      {
+        "auth-service": 1.0,
+        "order-service": 1.0,
+        "route-service": 0.5,
+        "train-service": 1.0,
+        "travel-service": 1.0
+      },
+      {
+        "auth-service": 1.0,
+        "order-service": 1.0,
+        "route-service": 0.75,
+        "train-service": 0.75,
+        "travel-service": 1.0
+      },
+      {
+        "auth-service": 1.0,
+        "order-service": 0.75,
+        "route-service": 0.75,
+        "train-service": 1.0,
+        "travel-service": 1.0
+      },
+      {
+        "auth-service": 1.0,
+        "order-service": 0.75,
+        "route-service": 1.0,
+        "train-service": 0.75,
+        "travel-service": 1.0
+      },
+      {
+        "auth-service": 1.0,
+        "order-service": 1.0,
+        "route-service": 1.0,
+        "train-service": 1.0,
+        "travel-service": 1.0
+      },
+      {
+        "auth-service": 1.0,
+        "order-service": 0.5,
+        "route-service": 1.0,
+        "train-service": 1.0,
+        "travel-service": 1.0
+      },
+      {
+        "auth-service": 1.0,
+        "order-service": 1.0,
+        "route-service": 1.0,
+        "train-service": 0.75,
+        "travel-service": 1.0
+      },
+      {
+        "auth-service": 1.0,
+        "order-service": 0.5,
+        "route-service": 1.0,
+        "train-service": 1.0,
+        "travel-service": 1.0
+      }
+    ],
+    "STA_per_root_cause_details": [
+      {
+        "per_service_top1": {
+          "auth-service": 1.0,
+          "order-service": 1.0,
+          "route-service": 0.75,
+          "train-service": 0.75,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 3,
+          "train-service": 3,
+          "travel-service": 4
+        },
+        "weighted_top1": 0.9,
+        "global_avg1": 0.9,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "auth-service": 1.0,
+          "order-service": 0.75,
+          "route-service": 1.0,
+          "train-service": 1.0,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 4,
+          "order-service": 3,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "weighted_top1": 0.95,
+        "global_avg1": 0.95,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "auth-service": 1.0,
+          "order-service": 1.0,
+          "route-service": 0.5,
+          "train-service": 1.0,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 2,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "weighted_top1": 0.9,
+        "global_avg1": 0.9,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "auth-service": 1.0,
+          "order-service": 1.0,
+          "route-service": 0.75,
+          "train-service": 0.75,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 3,
+          "train-service": 3,
+          "travel-service": 4
+        },
+        "weighted_top1": 0.9,
+        "global_avg1": 0.9,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "auth-service": 1.0,
+          "order-service": 0.75,
+          "route-service": 0.75,
+          "train-service": 1.0,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 4,
+          "order-service": 3,
+          "route-service": 3,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "weighted_top1": 0.9,
+        "global_avg1": 0.9,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "auth-service": 1.0,
+          "order-service": 0.75,
+          "route-service": 1.0,
+          "train-service": 0.75,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 4,
+          "order-service": 3,
+          "route-service": 4,
+          "train-service": 3,
+          "travel-service": 4
+        },
+        "weighted_top1": 0.9,
+        "global_avg1": 0.9,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "auth-service": 1.0,
+          "order-service": 1.0,
+          "route-service": 1.0,
+          "train-service": 1.0,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "weighted_top1": 1.0,
+        "global_avg1": 1.0,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "auth-service": 1.0,
+          "order-service": 0.5,
+          "route-service": 1.0,
+          "train-service": 1.0,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 4,
+          "order-service": 2,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "weighted_top1": 0.9,
+        "global_avg1": 0.9,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "auth-service": 1.0,
+          "order-service": 1.0,
+          "route-service": 1.0,
+          "train-service": 0.75,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 3,
+          "travel-service": 4
+        },
+        "weighted_top1": 0.95,
+        "global_avg1": 0.95,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "auth-service": 1.0,
+          "order-service": 0.5,
+          "route-service": 1.0,
+          "train-service": 1.0,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 4,
+          "order-service": 2,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "weighted_top1": 0.9,
+        "global_avg1": 0.9,
+        "abs_gap_vs_global_avg1": 0.0
+      }
+    ],
+    "STA_per_root_cause_consistency": {
+      "tolerance": 1e-06,
+      "max_abs_gap": 0.0,
+      "checked_runs": 10
+    },
+    "STA_per_root_cause_summary": {
+      "source_model_key": "STA-MM",
+      "mean_top1_by_service": {
+        "auth-service": 1.0,
+        "order-service": 0.825,
+        "route-service": 0.875,
+        "train-service": 0.9,
+        "travel-service": 1.0
+      },
+      "total_support_by_service": {
+        "auth-service": 40,
+        "order-service": 40,
+        "route-service": 40,
+        "train-service": 40,
+        "travel-service": 40
+      },
+      "support_share_by_service": {
+        "auth-service": 0.2,
+        "order-service": 0.2,
+        "route-service": 0.2,
+        "train-service": 0.2,
+        "travel-service": 0.2
+      },
+      "num_seeds_aggregated": 10
+    },
+    "GATv2_per_root_cause": [
+      {
+        "auth-service": 1.0,
+        "order-service": 0.75,
+        "route-service": 1.0,
+        "train-service": 0.75,
+        "travel-service": 1.0
+      },
+      {
+        "auth-service": 1.0,
+        "order-service": 0.75,
+        "route-service": 0.75,
+        "train-service": 1.0,
+        "travel-service": 1.0
+      },
+      {
+        "auth-service": 1.0,
+        "order-service": 1.0,
+        "route-service": 0.75,
+        "train-service": 1.0,
+        "travel-service": 1.0
+      },
+      {
+        "auth-service": 1.0,
+        "order-service": 0.75,
+        "route-service": 1.0,
+        "train-service": 0.5,
+        "travel-service": 1.0
+      },
+      {
+        "auth-service": 0.75,
+        "order-service": 0.5,
+        "route-service": 1.0,
+        "train-service": 0.75,
+        "travel-service": 1.0
+      },
+      {
+        "auth-service": 0.75,
+        "order-service": 1.0,
+        "route-service": 1.0,
+        "train-service": 1.0,
+        "travel-service": 1.0
+      },
+      {
+        "auth-service": 0.75,
+        "order-service": 0.75,
+        "route-service": 1.0,
+        "train-service": 1.0,
+        "travel-service": 0.75
+      },
+      {
+        "auth-service": 0.75,
+        "order-service": 0.5,
+        "route-service": 0.75,
+        "train-service": 0.5,
+        "travel-service": 1.0
+      },
+      {
+        "auth-service": 0.75,
+        "order-service": 0.75,
+        "route-service": 1.0,
+        "train-service": 0.75,
+        "travel-service": 1.0
+      },
+      {
+        "auth-service": 1.0,
+        "order-service": 0.75,
+        "route-service": 1.0,
+        "train-service": 1.0,
+        "travel-service": 1.0
+      }
+    ],
+    "GATv2_per_root_cause_details": [
+      {
+        "per_service_top1": {
+          "auth-service": 1.0,
+          "order-service": 0.75,
+          "route-service": 1.0,
+          "train-service": 0.75,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 4,
+          "order-service": 3,
+          "route-service": 4,
+          "train-service": 3,
+          "travel-service": 4
+        },
+        "weighted_top1": 0.9,
+        "global_avg1": 0.9,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "auth-service": 1.0,
+          "order-service": 0.75,
+          "route-service": 0.75,
+          "train-service": 1.0,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 4,
+          "order-service": 3,
+          "route-service": 3,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "weighted_top1": 0.9,
+        "global_avg1": 0.9,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "auth-service": 1.0,
+          "order-service": 1.0,
+          "route-service": 0.75,
+          "train-service": 1.0,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 3,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "weighted_top1": 0.95,
+        "global_avg1": 0.95,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "auth-service": 1.0,
+          "order-service": 0.75,
+          "route-service": 1.0,
+          "train-service": 0.5,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 4,
+          "order-service": 3,
+          "route-service": 4,
+          "train-service": 2,
+          "travel-service": 4
+        },
+        "weighted_top1": 0.85,
+        "global_avg1": 0.85,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "auth-service": 0.75,
+          "order-service": 0.5,
+          "route-service": 1.0,
+          "train-service": 0.75,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 3,
+          "order-service": 2,
+          "route-service": 4,
+          "train-service": 3,
+          "travel-service": 4
+        },
+        "weighted_top1": 0.8,
+        "global_avg1": 0.8,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "auth-service": 0.75,
+          "order-service": 1.0,
+          "route-service": 1.0,
+          "train-service": 1.0,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 3,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "weighted_top1": 0.95,
+        "global_avg1": 0.95,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "auth-service": 0.75,
+          "order-service": 0.75,
+          "route-service": 1.0,
+          "train-service": 1.0,
+          "travel-service": 0.75
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 3,
+          "order-service": 3,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 3
+        },
+        "weighted_top1": 0.85,
+        "global_avg1": 0.85,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "auth-service": 0.75,
+          "order-service": 0.5,
+          "route-service": 0.75,
+          "train-service": 0.5,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 3,
+          "order-service": 2,
+          "route-service": 3,
+          "train-service": 2,
+          "travel-service": 4
+        },
+        "weighted_top1": 0.7,
+        "global_avg1": 0.7,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "auth-service": 0.75,
+          "order-service": 0.75,
+          "route-service": 1.0,
+          "train-service": 0.75,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 3,
+          "order-service": 3,
+          "route-service": 4,
+          "train-service": 3,
+          "travel-service": 4
+        },
+        "weighted_top1": 0.85,
+        "global_avg1": 0.85,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "auth-service": 1.0,
+          "order-service": 0.75,
+          "route-service": 1.0,
+          "train-service": 1.0,
+          "travel-service": 1.0
+        },
+        "per_service_counts": {
+          "auth-service": 4,
+          "order-service": 4,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "per_service_hits": {
+          "auth-service": 4,
+          "order-service": 3,
+          "route-service": 4,
+          "train-service": 4,
+          "travel-service": 4
+        },
+        "weighted_top1": 0.95,
+        "global_avg1": 0.95,
+        "abs_gap_vs_global_avg1": 0.0
+      }
+    ],
+    "GATv2_per_root_cause_consistency": {
+      "tolerance": 1e-06,
+      "max_abs_gap": 0.0,
+      "checked_runs": 10
+    },
+    "GATv2_per_root_cause_summary": {
+      "source_model_key": "GATv2-MM",
+      "mean_top1_by_service": {
+        "auth-service": 0.875,
+        "order-service": 0.75,
+        "route-service": 0.925,
+        "train-service": 0.825,
+        "travel-service": 0.975
+      },
+      "total_support_by_service": {
+        "auth-service": 40,
+        "order-service": 40,
+        "route-service": 40,
+        "train-service": 40,
+        "travel-service": 40
+      },
+      "support_share_by_service": {
+        "auth-service": 0.2,
+        "order-service": 0.2,
+        "route-service": 0.2,
+        "train-service": 0.2,
+        "travel-service": 0.2
+      },
+      "num_seeds_aggregated": 10
+    },
+    "env": {
+      "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+      "torch": "2.11.0+cu130",
+      "cuda_available": false,
+      "device_count": 0
+    },
+    "deterministic": true
+  },
+  "sockshop": {
+    "config": {
+      "dataset": "sockshop",
+      "seeds": [
+        42,
+        123,
+        7,
+        1337,
+        2025,
+        314,
+        555,
+        888,
+        999,
+        4242
+      ],
+      "n_cases_loaded": 90,
+      "n_nodes": 5,
+      "max_cases": null,
+      "use_mm": true,
+      "mm_strict": true,
+      "mm_logs_only": false,
+      "mm_traces_only": false,
+      "mm_trace_prior": false,
+      "mm_effective": true,
+      "mm_coverage": {
+        "n": 90,
+        "logs_ratio": 1.0,
+        "traces_ratio": 0.0,
+        "both_ratio": 0.0
+      },
+      "mm_dataset_status": "skipped_with_reason",
+      "mm_dataset_reason": "MM strict required modality signal was missing on all requested seeds.",
+      "mm_requested_seeds": 10,
+      "mm_executed_seeds": 0,
+      "mm_skipped_seeds": [
+        42,
+        123,
+        7,
+        1337,
+        2025,
+        314,
+        555,
+        888,
+        999,
+        4242
+      ],
+      "enable_drift": true,
+      "drift_delta": 0.002,
+      "drift_cooldown_steps": 30,
+      "observit_normalized": false,
+      "normalized": false,
+      "split_mode": "varying_split_by_run_seed",
+      "hyperparams": {
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "batch_size": 64,
+        "hidden_dim": 32,
+        "epochs": 100,
+        "sta_contrastive_warmup": 0,
+        "allow_real_warmup": false
+      },
+      "split": {
+        "type": "stratified_split_shuffle",
+        "mode": "varying_split_by_run_seed",
+        "seed_source": "run_seed",
+        "train_ratio": 0.8,
+        "requested_seeds": [
+          42,
+          123,
+          7,
+          1337,
+          2025,
+          314,
+          555,
+          888,
+          999,
+          4242
+        ],
+        "executed_seeds": [],
+        "mm_skipped_seeds": [
+          42,
+          123,
+          7,
+          1337,
+          2025,
+          314,
+          555,
+          888,
+          999,
+          4242
+        ]
+      }
+    },
+    "env": {
+      "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+      "torch": "2.11.0+cu130",
+      "cuda_available": false,
+      "device_count": 0
+    },
+    "deterministic": true
+  },
+  "online-boutique": {
+    "STA-MM": {
+      "avg1": 0.69,
+      "avg1_std": 0.128062484748657,
+      "avg3": 0.9400000000000001,
+      "avg3_std": 0.05385164807134505,
+      "avg5": 1.0,
+      "avg5_std": 0.0,
+      "mrr": 0.8173333333333332,
+      "mrr_std": 0.07500629603202953,
+      "ndcg3": 0.8385673556428624,
+      "ndcg3_std": 0.060352782050156324,
+      "ndcg5": 0.863531474110489,
+      "ndcg5_std": 0.056009078520794064,
+      "ci95": {
+        "avg1": {
+          "mean": 0.69,
+          "ci_low": 0.6,
+          "ci_high": 0.755,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "avg3": {
+          "mean": 0.9400000000000001,
+          "ci_low": 0.9049999999999999,
+          "ci_high": 0.97,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "avg5": {
+          "mean": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "mrr": {
+          "mean": 0.8173333333333332,
+          "ci_low": 0.7689958333333332,
+          "ci_high": 0.8576708333333333,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "ndcg3": {
+          "mean": 0.8385673556428624,
+          "ci_low": 0.8004022704093802,
+          "ci_high": 0.8733301655000039,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "ndcg5": {
+          "mean": 0.863531474110489,
+          "ci_low": 0.8275772230823311,
+          "ci_high": 0.8937714006649584,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        }
+      }
+    },
+    "GATv2-MM": {
+      "avg1": 0.76,
+      "avg1_std": 0.10198039027185571,
+      "avg3": 0.9400000000000001,
+      "avg3_std": 0.05830951894845299,
+      "avg5": 1.0,
+      "avg5_std": 0.0,
+      "mrr": 0.8529166666666667,
+      "mrr_std": 0.06270660296615943,
+      "ndcg3": 0.8650569216607176,
+      "ndcg3_std": 0.06426072044187077,
+      "ndcg5": 0.8898019213741499,
+      "ndcg5_std": 0.04705855749353383,
+      "ci95": {
+        "avg1": {
+          "mean": 0.76,
+          "ci_low": 0.7,
+          "ci_high": 0.825,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "avg3": {
+          "mean": 0.9400000000000001,
+          "ci_low": 0.9000000000000001,
+          "ci_high": 0.97,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "avg5": {
+          "mean": 1.0,
+          "ci_low": 1.0,
+          "ci_high": 1.0,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "mrr": {
+          "mean": 0.8529166666666667,
+          "ci_low": 0.8142479166666667,
+          "ci_high": 0.8938354166666665,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "ndcg3": {
+          "mean": 0.8650569216607176,
+          "ci_low": 0.8243948013040209,
+          "ci_high": 0.9037505890017888,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        },
+        "ndcg5": {
+          "mean": 0.8898019213741499,
+          "ci_low": 0.860972303978347,
+          "ci_high": 0.9202899626744444,
+          "n": 10,
+          "seed_level_bootstrap_reliable": true
+        }
+      }
+    },
+    "STA_raw": {
+      "avg1": 0.69,
+      "avg1_std": 0.128062484748657,
+      "avg3": 0.9400000000000001,
+      "avg3_std": 0.05385164807134505,
+      "avg5": 1.0,
+      "avg5_std": 0.0,
+      "mrr": 0.8173333333333332,
+      "mrr_std": 0.07500629603202953,
+      "ndcg3": 0.8385673556428624,
+      "ndcg3_std": 0.060352782050156324,
+      "ndcg5": 0.863531474110489,
+      "ndcg5_std": 0.056009078520794064
+    },
+    "STA_drift_filtered": {
+      "avg1": 0.69,
+      "avg1_std": 0.128062484748657,
+      "avg3": 0.9400000000000001,
+      "avg3_std": 0.05385164807134505,
+      "avg5": 1.0,
+      "avg5_std": 0.0,
+      "mrr": 0.8173333333333332,
+      "mrr_std": 0.07500629603202953,
+      "ndcg3": 0.8385673556428624,
+      "ndcg3_std": 0.060352782050156324,
+      "ndcg5": 0.863531474110489,
+      "ndcg5_std": 0.056009078520794064
+    },
+    "GATv2_raw": {
+      "avg1": 0.76,
+      "avg1_std": 0.10198039027185571,
+      "avg3": 0.9400000000000001,
+      "avg3_std": 0.05830951894845299,
+      "avg5": 1.0,
+      "avg5_std": 0.0,
+      "mrr": 0.8529166666666667,
+      "mrr_std": 0.06270660296615943,
+      "ndcg3": 0.8650569216607176,
+      "ndcg3_std": 0.06426072044187077,
+      "ndcg5": 0.8898019213741499,
+      "ndcg5_std": 0.04705855749353383
+    },
+    "GATv2_drift_filtered": {
+      "avg1": 0.76,
+      "avg1_std": 0.10198039027185571,
+      "avg3": 0.9400000000000001,
+      "avg3_std": 0.05830951894845299,
+      "avg5": 1.0,
+      "avg5_std": 0.0,
+      "mrr": 0.8529166666666667,
+      "mrr_std": 0.06270660296615943,
+      "ndcg3": 0.8650569216607176,
+      "ndcg3_std": 0.06426072044187077,
+      "ndcg5": 0.8898019213741499,
+      "ndcg5_std": 0.04705855749353383
+    },
+    "config": {
+      "dataset": "online-boutique",
+      "seeds": [
+        42,
+        123,
+        7,
+        1337,
+        2025,
+        314,
+        555,
+        888,
+        999,
+        4242
+      ],
+      "n_cases_loaded": 90,
+      "n_nodes": 5,
+      "max_cases": null,
+      "use_mm": true,
+      "mm_strict": true,
+      "mm_logs_only": false,
+      "mm_traces_only": false,
+      "mm_trace_prior": false,
+      "mm_effective": true,
+      "mm_coverage": {
+        "n": 90,
+        "logs_ratio": 1.0,
+        "traces_ratio": 1.0,
+        "both_ratio": 1.0
+      },
+      "mm_dataset_status": "comparable",
+      "mm_dataset_reason": "All requested seeds executed with required modalities.",
+      "mm_requested_seeds": 10,
+      "mm_executed_seeds": 10,
+      "mm_skipped_seeds": [],
+      "enable_drift": true,
+      "drift_delta": 0.002,
+      "drift_cooldown_steps": 30,
+      "observit_normalized": false,
+      "normalized": false,
+      "split_mode": "varying_split_by_run_seed",
+      "hyperparams": {
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "batch_size": 64,
+        "hidden_dim": 32,
+        "epochs": 100,
+        "sta_contrastive_warmup": 0,
+        "allow_real_warmup": false
+      },
+      "split": {
+        "type": "stratified_split_shuffle",
+        "mode": "varying_split_by_run_seed",
+        "seed_source": "run_seed",
+        "train_ratio": 0.8,
+        "requested_seeds": [
+          42,
+          123,
+          7,
+          1337,
+          2025,
+          314,
+          555,
+          888,
+          999,
+          4242
+        ],
+        "executed_seeds": [
+          42,
+          123,
+          7,
+          1337,
+          2025,
+          314,
+          555,
+          888,
+          999,
+          4242
+        ],
+        "mm_skipped_seeds": []
+      }
+    },
+    "drift_filter": {
+      "train_drop_ratio_mean": 0.0,
+      "test_drop_ratio_mean": 0.0
+    },
+    "STA_per_root_cause": [
+      {
+        "checkoutservice": 1.0,
+        "currencyservice": 0.75,
+        "emailservice": 0.75,
+        "productcatalogservice": 0.5,
+        "recommendationservice": 0.75
+      },
+      {
+        "checkoutservice": 0.75,
+        "currencyservice": 1.0,
+        "emailservice": 0.25,
+        "productcatalogservice": 0.75,
+        "recommendationservice": 1.0
+      },
+      {
+        "checkoutservice": 0.75,
+        "currencyservice": 0.0,
+        "emailservice": 0.0,
+        "productcatalogservice": 0.75,
+        "recommendationservice": 0.25
+      },
+      {
+        "checkoutservice": 1.0,
+        "currencyservice": 0.5,
+        "emailservice": 0.5,
+        "productcatalogservice": 0.75,
+        "recommendationservice": 1.0
+      },
+      {
+        "checkoutservice": 1.0,
+        "currencyservice": 0.75,
+        "emailservice": 0.25,
+        "productcatalogservice": 0.25,
+        "recommendationservice": 1.0
+      },
+      {
+        "checkoutservice": 0.75,
+        "currencyservice": 1.0,
+        "emailservice": 0.5,
+        "productcatalogservice": 0.5,
+        "recommendationservice": 1.0
+      },
+      {
+        "checkoutservice": 1.0,
+        "currencyservice": 0.5,
+        "emailservice": 0.75,
+        "productcatalogservice": 0.25,
+        "recommendationservice": 1.0
+      },
+      {
+        "checkoutservice": 0.75,
+        "currencyservice": 0.25,
+        "emailservice": 0.75,
+        "productcatalogservice": 0.5,
+        "recommendationservice": 0.75
+      },
+      {
+        "checkoutservice": 1.0,
+        "currencyservice": 0.5,
+        "emailservice": 0.75,
+        "productcatalogservice": 0.75,
+        "recommendationservice": 1.0
+      },
+      {
+        "checkoutservice": 0.75,
+        "currencyservice": 1.0,
+        "emailservice": 0.75,
+        "productcatalogservice": 0.5,
+        "recommendationservice": 1.0
+      }
+    ],
+    "STA_per_root_cause_details": [
+      {
+        "per_service_top1": {
+          "checkoutservice": 1.0,
+          "currencyservice": 0.75,
+          "emailservice": 0.75,
+          "productcatalogservice": 0.5,
+          "recommendationservice": 0.75
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 4,
+          "currencyservice": 3,
+          "emailservice": 3,
+          "productcatalogservice": 2,
+          "recommendationservice": 3
+        },
+        "weighted_top1": 0.75,
+        "global_avg1": 0.75,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "checkoutservice": 0.75,
+          "currencyservice": 1.0,
+          "emailservice": 0.25,
+          "productcatalogservice": 0.75,
+          "recommendationservice": 1.0
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 3,
+          "currencyservice": 4,
+          "emailservice": 1,
+          "productcatalogservice": 3,
+          "recommendationservice": 4
+        },
+        "weighted_top1": 0.75,
+        "global_avg1": 0.75,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "checkoutservice": 0.75,
+          "currencyservice": 0.0,
+          "emailservice": 0.0,
+          "productcatalogservice": 0.75,
+          "recommendationservice": 0.25
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 3,
+          "currencyservice": 0,
+          "emailservice": 0,
+          "productcatalogservice": 3,
+          "recommendationservice": 1
+        },
+        "weighted_top1": 0.35,
+        "global_avg1": 0.35,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "checkoutservice": 1.0,
+          "currencyservice": 0.5,
+          "emailservice": 0.5,
+          "productcatalogservice": 0.75,
+          "recommendationservice": 1.0
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 4,
+          "currencyservice": 2,
+          "emailservice": 2,
+          "productcatalogservice": 3,
+          "recommendationservice": 4
+        },
+        "weighted_top1": 0.75,
+        "global_avg1": 0.75,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "checkoutservice": 1.0,
+          "currencyservice": 0.75,
+          "emailservice": 0.25,
+          "productcatalogservice": 0.25,
+          "recommendationservice": 1.0
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 4,
+          "currencyservice": 3,
+          "emailservice": 1,
+          "productcatalogservice": 1,
+          "recommendationservice": 4
+        },
+        "weighted_top1": 0.65,
+        "global_avg1": 0.65,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "checkoutservice": 0.75,
+          "currencyservice": 1.0,
+          "emailservice": 0.5,
+          "productcatalogservice": 0.5,
+          "recommendationservice": 1.0
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 3,
+          "currencyservice": 4,
+          "emailservice": 2,
+          "productcatalogservice": 2,
+          "recommendationservice": 4
+        },
+        "weighted_top1": 0.75,
+        "global_avg1": 0.75,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "checkoutservice": 1.0,
+          "currencyservice": 0.5,
+          "emailservice": 0.75,
+          "productcatalogservice": 0.25,
+          "recommendationservice": 1.0
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 4,
+          "currencyservice": 2,
+          "emailservice": 3,
+          "productcatalogservice": 1,
+          "recommendationservice": 4
+        },
+        "weighted_top1": 0.7,
+        "global_avg1": 0.7,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "checkoutservice": 0.75,
+          "currencyservice": 0.25,
+          "emailservice": 0.75,
+          "productcatalogservice": 0.5,
+          "recommendationservice": 0.75
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 3,
+          "currencyservice": 1,
+          "emailservice": 3,
+          "productcatalogservice": 2,
+          "recommendationservice": 3
+        },
+        "weighted_top1": 0.6,
+        "global_avg1": 0.6,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "checkoutservice": 1.0,
+          "currencyservice": 0.5,
+          "emailservice": 0.75,
+          "productcatalogservice": 0.75,
+          "recommendationservice": 1.0
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 4,
+          "currencyservice": 2,
+          "emailservice": 3,
+          "productcatalogservice": 3,
+          "recommendationservice": 4
+        },
+        "weighted_top1": 0.8,
+        "global_avg1": 0.8,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "checkoutservice": 0.75,
+          "currencyservice": 1.0,
+          "emailservice": 0.75,
+          "productcatalogservice": 0.5,
+          "recommendationservice": 1.0
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 3,
+          "currencyservice": 4,
+          "emailservice": 3,
+          "productcatalogservice": 2,
+          "recommendationservice": 4
+        },
+        "weighted_top1": 0.8,
+        "global_avg1": 0.8,
+        "abs_gap_vs_global_avg1": 0.0
+      }
+    ],
+    "STA_per_root_cause_consistency": {
+      "tolerance": 1e-06,
+      "max_abs_gap": 0.0,
+      "checked_runs": 10
+    },
+    "STA_per_root_cause_summary": {
+      "source_model_key": "STA-MM",
+      "mean_top1_by_service": {
+        "checkoutservice": 0.875,
+        "currencyservice": 0.625,
+        "emailservice": 0.525,
+        "productcatalogservice": 0.55,
+        "recommendationservice": 0.875
+      },
+      "total_support_by_service": {
+        "checkoutservice": 40,
+        "currencyservice": 40,
+        "emailservice": 40,
+        "productcatalogservice": 40,
+        "recommendationservice": 40
+      },
+      "support_share_by_service": {
+        "checkoutservice": 0.2,
+        "currencyservice": 0.2,
+        "emailservice": 0.2,
+        "productcatalogservice": 0.2,
+        "recommendationservice": 0.2
+      },
+      "num_seeds_aggregated": 10
+    },
+    "GATv2_per_root_cause": [
+      {
+        "checkoutservice": 1.0,
+        "currencyservice": 0.75,
+        "emailservice": 1.0,
+        "productcatalogservice": 0.75,
+        "recommendationservice": 1.0
+      },
+      {
+        "checkoutservice": 0.75,
+        "currencyservice": 1.0,
+        "emailservice": 1.0,
+        "productcatalogservice": 0.75,
+        "recommendationservice": 0.75
+      },
+      {
+        "checkoutservice": 1.0,
+        "currencyservice": 0.5,
+        "emailservice": 0.5,
+        "productcatalogservice": 0.25,
+        "recommendationservice": 1.0
+      },
+      {
+        "checkoutservice": 1.0,
+        "currencyservice": 0.5,
+        "emailservice": 1.0,
+        "productcatalogservice": 0.5,
+        "recommendationservice": 1.0
+      },
+      {
+        "checkoutservice": 1.0,
+        "currencyservice": 1.0,
+        "emailservice": 0.75,
+        "productcatalogservice": 0.25,
+        "recommendationservice": 0.75
+      },
+      {
+        "checkoutservice": 1.0,
+        "currencyservice": 1.0,
+        "emailservice": 0.5,
+        "productcatalogservice": 0.5,
+        "recommendationservice": 0.5
+      },
+      {
+        "checkoutservice": 0.5,
+        "currencyservice": 1.0,
+        "emailservice": 0.5,
+        "productcatalogservice": 0.5,
+        "recommendationservice": 0.75
+      },
+      {
+        "checkoutservice": 0.5,
+        "currencyservice": 0.5,
+        "emailservice": 0.75,
+        "productcatalogservice": 0.25,
+        "recommendationservice": 1.0
+      },
+      {
+        "checkoutservice": 1.0,
+        "currencyservice": 1.0,
+        "emailservice": 1.0,
+        "productcatalogservice": 0.0,
+        "recommendationservice": 1.0
+      },
+      {
+        "checkoutservice": 1.0,
+        "currencyservice": 1.0,
+        "emailservice": 1.0,
+        "productcatalogservice": 0.5,
+        "recommendationservice": 1.0
+      }
+    ],
+    "GATv2_per_root_cause_details": [
+      {
+        "per_service_top1": {
+          "checkoutservice": 1.0,
+          "currencyservice": 0.75,
+          "emailservice": 1.0,
+          "productcatalogservice": 0.75,
+          "recommendationservice": 1.0
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 4,
+          "currencyservice": 3,
+          "emailservice": 4,
+          "productcatalogservice": 3,
+          "recommendationservice": 4
+        },
+        "weighted_top1": 0.9,
+        "global_avg1": 0.9,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "checkoutservice": 0.75,
+          "currencyservice": 1.0,
+          "emailservice": 1.0,
+          "productcatalogservice": 0.75,
+          "recommendationservice": 0.75
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 3,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 3,
+          "recommendationservice": 3
+        },
+        "weighted_top1": 0.85,
+        "global_avg1": 0.85,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "checkoutservice": 1.0,
+          "currencyservice": 0.5,
+          "emailservice": 0.5,
+          "productcatalogservice": 0.25,
+          "recommendationservice": 1.0
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 4,
+          "currencyservice": 2,
+          "emailservice": 2,
+          "productcatalogservice": 1,
+          "recommendationservice": 4
+        },
+        "weighted_top1": 0.65,
+        "global_avg1": 0.65,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "checkoutservice": 1.0,
+          "currencyservice": 0.5,
+          "emailservice": 1.0,
+          "productcatalogservice": 0.5,
+          "recommendationservice": 1.0
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 4,
+          "currencyservice": 2,
+          "emailservice": 4,
+          "productcatalogservice": 2,
+          "recommendationservice": 4
+        },
+        "weighted_top1": 0.8,
+        "global_avg1": 0.8,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "checkoutservice": 1.0,
+          "currencyservice": 1.0,
+          "emailservice": 0.75,
+          "productcatalogservice": 0.25,
+          "recommendationservice": 0.75
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 3,
+          "productcatalogservice": 1,
+          "recommendationservice": 3
+        },
+        "weighted_top1": 0.75,
+        "global_avg1": 0.75,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "checkoutservice": 1.0,
+          "currencyservice": 1.0,
+          "emailservice": 0.5,
+          "productcatalogservice": 0.5,
+          "recommendationservice": 0.5
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 2,
+          "productcatalogservice": 2,
+          "recommendationservice": 2
+        },
+        "weighted_top1": 0.7,
+        "global_avg1": 0.7,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "checkoutservice": 0.5,
+          "currencyservice": 1.0,
+          "emailservice": 0.5,
+          "productcatalogservice": 0.5,
+          "recommendationservice": 0.75
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 2,
+          "currencyservice": 4,
+          "emailservice": 2,
+          "productcatalogservice": 2,
+          "recommendationservice": 3
+        },
+        "weighted_top1": 0.65,
+        "global_avg1": 0.65,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "checkoutservice": 0.5,
+          "currencyservice": 0.5,
+          "emailservice": 0.75,
+          "productcatalogservice": 0.25,
+          "recommendationservice": 1.0
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 2,
+          "currencyservice": 2,
+          "emailservice": 3,
+          "productcatalogservice": 1,
+          "recommendationservice": 4
+        },
+        "weighted_top1": 0.6,
+        "global_avg1": 0.6,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "checkoutservice": 1.0,
+          "currencyservice": 1.0,
+          "emailservice": 1.0,
+          "productcatalogservice": 0.0,
+          "recommendationservice": 1.0
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 0,
+          "recommendationservice": 4
+        },
+        "weighted_top1": 0.8,
+        "global_avg1": 0.8,
+        "abs_gap_vs_global_avg1": 0.0
+      },
+      {
+        "per_service_top1": {
+          "checkoutservice": 1.0,
+          "currencyservice": 1.0,
+          "emailservice": 1.0,
+          "productcatalogservice": 0.5,
+          "recommendationservice": 1.0
+        },
+        "per_service_counts": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 4,
+          "recommendationservice": 4
+        },
+        "per_service_hits": {
+          "checkoutservice": 4,
+          "currencyservice": 4,
+          "emailservice": 4,
+          "productcatalogservice": 2,
+          "recommendationservice": 4
+        },
+        "weighted_top1": 0.9,
+        "global_avg1": 0.9,
+        "abs_gap_vs_global_avg1": 0.0
+      }
+    ],
+    "GATv2_per_root_cause_consistency": {
+      "tolerance": 1e-06,
+      "max_abs_gap": 0.0,
+      "checked_runs": 10
+    },
+    "GATv2_per_root_cause_summary": {
+      "source_model_key": "GATv2-MM",
+      "mean_top1_by_service": {
+        "checkoutservice": 0.875,
+        "currencyservice": 0.825,
+        "emailservice": 0.8,
+        "productcatalogservice": 0.425,
+        "recommendationservice": 0.875
+      },
+      "total_support_by_service": {
+        "checkoutservice": 40,
+        "currencyservice": 40,
+        "emailservice": 40,
+        "productcatalogservice": 40,
+        "recommendationservice": 40
+      },
+      "support_share_by_service": {
+        "checkoutservice": 0.2,
+        "currencyservice": 0.2,
+        "emailservice": 0.2,
+        "productcatalogservice": 0.2,
+        "recommendationservice": 0.2
+      },
+      "num_seeds_aggregated": 10
+    },
+    "env": {
+      "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+      "torch": "2.11.0+cu130",
+      "cuda_available": false,
+      "device_count": 0
+    },
+    "deterministic": true
+  },
+  "_mm_global_summary": {
+    "allow_global_aggregation": false,
+    "reason": "Global MM aggregation blocked because at least one dataset is skipped or non-comparable.",
+    "dataset_status": {
+      "trainticket": "comparable",
+      "sockshop": "skipped_with_reason",
+      "online-boutique": "comparable"
+    },
+    "blocked_by_datasets": [
+      "sockshop"
+    ]
+  }
+}
