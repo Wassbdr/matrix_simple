@@ -45,6 +45,9 @@ rcaeval/**/.mm_cache/
 port_forward.log
 *.log
 
+# Publication-suite run logs (provenance kept in 00_env.json + the JSON artifacts)
+results_transmission/logs_publication_*/*.txt
+
 # Local environment files
 .env
 .env.*
