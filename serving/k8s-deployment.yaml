@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: serve
-          image: localhost:30500/rca-sta-serve:v1
+          image: localhost:30501/rca-sta-serve:v1
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

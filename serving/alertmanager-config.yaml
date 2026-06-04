@@ -2,21 +2,33 @@
 # =====================================================================
 # AlertmanagerConfig CRD : route les alertes "RCAStaServeRootCauseDetected"
 # (emises par rca-watcher) ET les alertes de sante (PrometheusRule) vers
-# une adresse email (a configurer ci-dessous).
+# un webhook.
 #
-# Cette ressource s'ajoute par-dessus la config existante de
-# l'Alertmanager operator-managee (`monitoring-kube-prometheus-alertmanager`)
-# sans la remplacer. L'operator merge automatiquement les AlertmanagerConfig
-# qui sont dans le meme namespace que le CR Alertmanager (donc `monitoring`).
+# Pourquoi webhook plutot qu'email :
+#   Le relais SMTP interne (smtp.devoteam.com:25) refuse le RCPT vers
+#   @devoteam.com sans authentification ("554 5.7.1 Relay access denied")
+#   et aucun compte SMTP authentifie n'est dispo pour la demo. Un webhook
+#   contourne ce blocage : la requete sortante HTTPS est autorisee depuis
+#   le cluster, et le service de notification (ntfy / Slack / Discord /
+#   Teams) reste hors infrastructure Devoteam.
+#
+# Cible par defaut : ntfy.sh
+#   - service public gratuit, sans compte
+#   - URL = https://ntfy.sh/<TOPIC>  -- choisis un TOPIC unique (sinon
+#     n'importe qui peut lire) et inscris-y l'app ntfy sur ton tel
+#     (Android/iOS) OU laisse https://ntfy.sh/<TOPIC> ouvert dans un
+#     onglet.
+#   - REMPLACE `wassim-rca-ae47c51eb01cd276` ci-dessous par un slug a toi
+#     (idealement long et imprevisible, ex.
+#      `wassim-rca-7f4a9c2e1b8d`).
 #
 # Apply :
 #   kubectl apply -f serving/alertmanager-config.yaml
 #
-# Verifier (apres ~30s, le temps que l'operator reload) :
-#   kubectl logs -n monitoring alertmanager-monitoring-kube-prometheus-alertmanager-0 -c alertmanager --tail=30
-# Forcer une alerte :
-#   kubectl apply -f k8s/chaos/sockshop/stress-mem-carts.yaml   # provoque rca-watcher
-# Verifier reception dans la boite email configuree dans `to:`.
+# Test :
+#   kubectl apply -f k8s/chaos/sockshop/stress-mem-carts.yaml
+#   # ~90s plus tard, la notif arrive sur ntfy.sh/<TOPIC>
+#   kubectl delete -f k8s/chaos/sockshop/stress-mem-carts.yaml
 # =====================================================================
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: AlertmanagerConfig
@@ -24,23 +36,14 @@ metadata:
   name: rca-email-route
   namespace: monitoring
   labels:
-    # L'AM operator-managee a alertmanagerConfigSelector={} qui matche tout
-    # le namespace, donc pas de label exige. On le met malgre tout pour
-    # rendre la discovery explicite.
     alertmanagerConfig: rca
 spec:
   # ------- Route -------
-  # On declenche une sous-route uniquement pour les alertes qui ont
-  # alertname commencant par "RCAStaServe" (les notres) -- pour ne pas
-  # detourner les alertes systeme deja routees ailleurs.
   route:
-    receiver: rca-email
+    receiver: rca-webhook
     groupBy: ['alertname', 'root_cause']
-    # Grouper les alertes pendant 30s pour eviter le flood quand plusieurs
-    # services sont identifies en cascade.
     groupWait: 30s
     groupInterval: 5m
-    # Repeter le mail toutes les 4h si l'alerte est toujours active.
     repeatInterval: 4h
     matchers:
       - name: alertname
@@ -49,62 +52,37 @@ spec:
 
   # ------- Receivers -------
   receivers:
-    - name: rca-email
-      emailConfigs:
-        - to: alerts@example.com
-          # Adresse expediteur : doit etre un sender verifie aupres de votre
-          # relais SMTP. Remplacer par la votre.
-          from: rca-alerts@example.com
-          # ---------------------------------------------------------------
-          # SMTP : adapter au relais mis a disposition. Exemples courants :
-          #   - O365            : smtp.office365.com:587 + authPassword secret
-          #   - Gmail Workspace : smtp.gmail.com:587     + app password
-          #   - Relais transactionnel authentifie (SMTPS port 587, TLS)
-          #   - Relais interne d'entreprise (souvent :25, sans auth)
-          # ---------------------------------------------------------------
-          smarthost: 'smtp.example.com:587'
-          requireTLS: true
+    - name: rca-webhook
+      webhookConfigs:
+        # Webhook -> rca-watcher /ntfy-relay : le watcher reformate le
+        # payload AM en push ntfy lisible (titre, emoji, priorite). Le
+        # topic ntfy est configure dans le deployment du watcher
+        # (env NTFY_TOPIC). Cf. serving/k8s-watcher.yaml.
+        - url: 'http://rca-watcher.rca-sandbox.svc.cluster.local:8090/ntfy-relay'
           sendResolved: true
-          authUsername: 'rca-alerts@example.com'
-          authPassword:
-            name: rca-smtp-credentials
-            key:  password
-          headers:
-            - key: Subject
-              value: '[RCA] {{ .CommonLabels.alertname }} | {{ .CommonLabels.root_cause | default "n/a" }} | {{ .CommonLabels.severity }}'
-          html: |
-            <h2 style="margin-bottom:0">{{ .CommonLabels.alertname }}</h2>
-            <p style="color:#888; margin-top:4px">severite : <b>{{ .CommonLabels.severity }}</b> &middot; modele : <code>{{ .CommonLabels.model | default "n/a" }}</code></p>
-            <hr>
-            {{ range .Alerts }}
-              <h3 style="margin-bottom:2px">{{ .Annotations.summary }}</h3>
-              <p>{{ .Annotations.description }}</p>
-              <ul>
-                <li><b>Root cause</b> : <code>{{ .Labels.root_cause | default "(non determinee)" }}</code></li>
-                <li><b>Namespace</b> : <code>{{ .Labels.namespace | default "rca-sandbox" }}</code></li>
-                <li><b>Severite</b> : {{ .Labels.severity }}</li>
-                <li><b>Etat</b> : {{ .Status }}</li>
-                <li><b>StartsAt</b> : {{ .StartsAt }}</li>
-                <li><b>Generator</b> : <a href="{{ .GeneratorURL }}">{{ .GeneratorURL }}</a></li>
-              </ul>
-              <hr>
-            {{ end }}
-            <p style="color:#999;font-size:0.9em">Genere par rca-watcher + STA model sta_sockshop_v1.</p>
-          text: |
-            === {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }}) ===
 
-            {{ range .Alerts }}
-            Summary    : {{ .Annotations.summary }}
-            Description: {{ .Annotations.description }}
-            Root cause : {{ .Labels.root_cause | default "(non determinee)" }}
-            Namespace  : {{ .Labels.namespace | default "rca-sandbox" }}
-            Model      : {{ .Labels.model | default "n/a" }}
-            Status     : {{ .Status }}
-            StartsAt   : {{ .StartsAt }}
-            Source     : {{ .GeneratorURL }}
-            ----
-            {{ end }}
+          # ---------------------------------------------------------------
+          # Exemples alternatifs (decommente celui que tu veux utiliser,
+          # commente le bloc ntfy ci-dessus). Tous ont besoin d'une URL
+          # creee depuis l'interface du service.
+          #
+          # SLACK incoming webhook (cree dans ton workspace) :
+          #   - url: 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX'
+          #     sendResolved: true
+          #
+          # DISCORD webhook (Channel -> Edit Channel -> Integrations) :
+          #   - url: 'https://discord.com/api/webhooks/123456789012345678/AbCdEfGhIjKlMnOpQrStUvWxYz'
+          #     sendResolved: true
+          #     # Discord exige `/slack` a la fin pour parser le payload AM :
+          #     # ou utilise un AlertmanagerConfig + un proxy. Le plus simple
+          #     # = pointer vers https://.../api/webhooks/.../slack
+          #
+          # MS TEAMS via "Incoming Webhook" sur un canal :
+          #   - url: 'https://outlook.office.com/webhook/<guid>@<guid>/IncomingWebhook/<id>/<id>'
+          #     sendResolved: true
+          # ---------------------------------------------------------------
 
-            Genere par rca-watcher.
-# Le Secret `rca-smtp-credentials` (cle `password`) doit exister dans le
-# namespace `monitoring` si le relais SMTP exige une authentification.
+# Pas de Secret necessaire pour ntfy.sh public.
+# Si tu passes a un webhook authentifie (Slack avec basic auth, Teams
+# avec token), il faudra ajouter un `httpConfig.bearerTokenSecret` ou
+# `httpConfig.basicAuth` ici, plus un Secret kubectl correspondant.

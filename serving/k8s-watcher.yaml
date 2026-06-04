@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: watcher
-          image: localhost:30500/rca-sta-watcher:v1
+          image: localhost:30501/rca-sta-watcher:v3
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8090
@@ -35,10 +35,17 @@ spec:
             - name: INFERENCE_URL
               value: http://rca-sta-serve.rca-sandbox.svc.cluster.local:8080
             - name: ALERTMANAGER_URL
-              # Cible l'Alertmanager operator-managee : c'est celui dans
-              # lequel l'AlertmanagerConfig (serving/alertmanager-config.yaml)
-              # injecte le receiver email (cf. `to:` dans ce fichier).
-              value: http://monitoring-kube-prometheus-alertmanager.monitoring.svc.cluster.local:9093
+              # Pas d'Alertmanager sur ce cluster pour le moment : on
+              # laisse l'URL pointer vers un nom de service inexistant.
+              # Les POST AM echoueront silencieusement, et le watcher
+              # bascule sur la livraison ntfy directe (NTFY_DIRECT=true).
+              value: http://no-alertmanager.invalid:9093
+            - name: NTFY_DIRECT
+              value: "true"
+            - name: NTFY_TOPIC
+              value: wassim-rca-ae47c51eb01cd276
+            - name: NTFY_BASE_URL
+              value: https://ntfy.sh
             - name: TARGET_NAMESPACE
               value: sock-shop
             - name: POLL_INTERVAL_S
@@ -91,24 +98,8 @@ spec:
       port: 8090
       targetPort: 8090
       protocol: TCP
----
-# PodMonitor pour Prometheus operator-managee
-apiVersion: monitoring.coreos.com/v1
-kind: PodMonitor
-metadata:
-  name: rca-watcher
-  namespace: monitoring
-  labels:
-    release: monitoring
-    app: rca-watcher
-spec:
-  namespaceSelector:
-    matchNames: [ rca-sandbox ]
-  selector:
-    matchLabels:
-      app: rca-watcher
-  podMetricsEndpoints:
-    - port: http
-      path: /metrics
-      interval: 15s
-      scrapeTimeout: 10s
+# NOTE : la PodMonitor / ServiceMonitor d'origine necessite le CRD du
+# Prometheus operator (monitoring.coreos.com/v1) qui n'est pas installe
+# sur ce cluster. Le scrape passe via les annotations Prometheus standard
+# `prometheus.io/scrape` posees sur le pod ci-dessus (cf. metadata.annotations
+# du template). Decommenter ce bloc si la CRD est ajoutee plus tard.
