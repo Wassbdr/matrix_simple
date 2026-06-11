@@ -265,8 +265,9 @@ def maybe_fire_alert(ranked: List[Tuple[str, float, int]], err_rate: float) -> O
     # available: AM additionally renders a richer body via /ntfy-relay.
     ntfy_sent = False
     if NTFY_DIRECT:
-        emoji = "🔥" if severity == "critical" else "⚠️"
-        title = f"{emoji} STA root cause: {top_svc} ({severity})"
+        # No emoji in HTTP Title header (latin-1 only). Tags do it client-side.
+        prefix = "CRITICAL" if severity == "critical" else "ALERT"
+        title = f"[{prefix}] STA root cause: {top_svc}"
         body = (
             f"**Top-1 candidate**: `{top_svc}` (score `{top_score:.3f}`)\n\n"
             f"- cluster error rate: `{err_rate:.1%}`\n"
@@ -433,8 +434,10 @@ async def ntfy_relay(req: Request):
         alertname = labels.get("alertname", "alert")
         rc = labels.get("root_cause", "")
         rc_part = f" | {rc}" if rc and rc != "-" else ""
-        emoji = "✅" if resolved else ("🔥" if severity == "critical" else "⚠️")
-        title = f"{emoji} {alertname}{rc_part} ({severity})"
+        # HTTP headers are ISO-8859-1 only -- no emoji in Title. Emojis are
+        # rendered client-side via the Tags header (handled by _emit_ntfy).
+        prefix = "RESOLVED" if resolved else ("CRITICAL" if severity == "critical" else "ALERT")
+        title = f"[{prefix}] {alertname}{rc_part}"
         body_md = _format_alert_body(a, common)
         click = a.get("generatorURL") or None
         if _emit_ntfy(title, body_md, severity, click_url=click, resolved=resolved):
