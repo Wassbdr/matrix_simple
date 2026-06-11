@@ -31,7 +31,9 @@ from fastapi.responses import HTMLResponse
 from prometheus_client import Counter, Gauge
 from prometheus_fastapi_instrumentator import Instrumentator
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+from serving.logging_config import configure_logging
+
+configure_logging()
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------

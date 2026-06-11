@@ -34,6 +34,12 @@ spec:
               value: /app/checkpoints/sta_sockshop_v1
             - name: DEFAULT_TOP_K
               value: "3"
+          # The image no longer embeds the model bundle: it is provided by
+          # the model-bundle volume below (MLflow initContainer planned).
+          volumeMounts:
+            - name: model-bundle
+              mountPath: /app/checkpoints/sta_sockshop_v1
+              readOnly: true
           resources:
             requests:
               cpu: "100m"
@@ -64,6 +70,13 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
+      volumes:
+        # Bundle staged on the node (kubectl cp / scp into this path).
+        # Will be replaced by an emptyDir + MLflow-download initContainer.
+        - name: model-bundle
+          hostPath:
+            path: /opt/rca/bundles/sta_sockshop_v1
+            type: Directory
 ---
 apiVersion: v1
 kind: Service

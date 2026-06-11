@@ -25,10 +25,11 @@ ENV PATH=/root/.local/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     MODEL_BUNDLE=/app/checkpoints/sta_sockshop_v1
 
-# Copy only what the service needs
+# Copy only what the service needs. The model bundle is NOT baked into the
+# image: it is mounted at $MODEL_BUNDLE (volume or initContainer download),
+# decoupling the model lifecycle from the image lifecycle.
 COPY rca_pipeline/ /app/rca_pipeline/
 COPY serving/serve.py /app/serving/serve.py
-COPY checkpoints/sta_sockshop_v1/ /app/checkpoints/sta_sockshop_v1/
 
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \

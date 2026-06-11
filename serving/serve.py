@@ -19,17 +19,19 @@ from __future__ import annotations
 import logging
 import os
 import time
+import uuid
 from typing import List, Optional
 
 import numpy as np
-from fastapi import FastAPI, HTTPException
-from prometheus_client import Counter, Histogram
+from fastapi import FastAPI, HTTPException, Request
+from prometheus_client import Counter, Gauge, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
 
 from rca_pipeline.model_bundle import LoadedBundle, load_bundle, predict
+from serving.logging_config import configure_logging
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+configure_logging()
 logger = logging.getLogger(__name__)
 
 BUNDLE_PATH = os.environ.get("MODEL_BUNDLE", "/app/checkpoints/sta_sockshop_v1")
@@ -52,10 +54,35 @@ PREDICT_LATENCY = Histogram(
     "End-to-end /predict latency including normalization.",
     buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0),
 )
+# Identifies the served model in dashboards and shadow comparisons.
+MODEL_INFO = Gauge(
+    "rca_model_info",
+    "Static info about the loaded model bundle (value is always 1).",
+    ["git_commit", "created_at", "num_nodes", "k"],
+)
 
 Instrumentator().instrument(app).expose(app)
 
 _BUNDLE: Optional[LoadedBundle] = None
+
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    request_id = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]
+    t0 = time.time()
+    response = await call_next(request)
+    response.headers["x-request-id"] = request_id
+    if request.url.path not in ("/metrics", "/health", "/ready"):
+        logger.info(
+            "request",
+            extra={
+                "request_id": request_id,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "latency_ms": round((time.time() - t0) * 1000.0, 2),
+            },
+        )
+    return response
 
 
 @app.on_event("startup")
@@ -67,11 +94,19 @@ def _load() -> None:
     t0 = time.time()
     _BUNDLE = load_bundle(BUNDLE_PATH)
     cfg = _BUNDLE.metadata["config"]
+    card = _BUNDLE.metadata.get("model_card", {})
+    MODEL_INFO.labels(
+        git_commit=(card.get("git_commit") or "unknown")[:12],
+        created_at=card.get("created_at_utc", "unknown"),
+        num_nodes=str(cfg["num_nodes"]),
+        k=str(cfg["k"]),
+    ).set(1)
     n_params = sum(p.numel() for p in _BUNDLE.model.parameters())
     logger.info(
         "Loaded bundle from %s in %.2fs (N=%d F=%d H=%d k=%d, %d params)",
         BUNDLE_PATH, time.time() - t0, cfg["num_nodes"], cfg["num_features"],
         cfg["hidden_dim"], cfg["k"], n_params,
+        extra={"bundle_commit": (card.get("git_commit") or "unknown")[:12]},
     )
 
 
@@ -124,7 +159,7 @@ def ready():
     try:
         predict(_BUNDLE, zero, top_k=1)
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Smoke predict failed: {exc}")
+        raise HTTPException(status_code=503, detail=f"Smoke predict failed: {exc}") from exc
     return {"status": "ready"}
 
 
@@ -146,7 +181,7 @@ def predict_endpoint(req: PredictRequest):
         arr = np.asarray(req.window, dtype=np.float32)
     except (TypeError, ValueError) as exc:
         PREDICT_COUNTER.labels(status="bad_request").inc()
-        raise HTTPException(status_code=400, detail=f"window not array-like: {exc}")
+        raise HTTPException(status_code=400, detail=f"window not array-like: {exc}") from exc
     if arr.ndim != 3:
         PREDICT_COUNTER.labels(status="bad_request").inc()
         raise HTTPException(
@@ -172,7 +207,7 @@ def predict_endpoint(req: PredictRequest):
     except Exception as exc:
         PREDICT_COUNTER.labels(status="error").inc()
         logger.exception("predict failed")
-        raise HTTPException(status_code=500, detail=f"predict failed: {exc}")
+        raise HTTPException(status_code=500, detail=f"predict failed: {exc}") from exc
     elapsed = time.time() - t0
     PREDICT_LATENCY.observe(elapsed)
     PREDICT_COUNTER.labels(status="ok").inc()
