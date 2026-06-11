@@ -81,6 +81,9 @@ W = WINDOW_SECONDS // STEP_SECONDS
 
 _STATE_LOCK = threading.Lock()
 _RECENT: Deque[dict] = deque(maxlen=RECENT_BUFFER)
+# Alerts pushed by Alertmanager via /ntfy-relay (the dashboard's source of truth
+# for "active alerts": webhook-driven, no polling required).
+_WEBHOOK_ALERTS: Deque[dict] = deque(maxlen=RECENT_BUFFER)
 
 # ---------------------------------------------------------------------------
 # Prometheus client metrics
@@ -329,18 +332,29 @@ def api_recent():
 
 @app.get("/api/alerts")
 def api_alerts():
-    """Proxy the operator Alertmanager active alerts (filtered to RCA only)."""
+    """Active RCA alerts. Primary source: Alertmanager webhook (`/ntfy-relay`)
+    pushes payloads directly into `_WEBHOOK_ALERTS`. If that buffer is empty,
+    fall back to a one-shot poll of the AM v2 API (best-effort)."""
+    with _STATE_LOCK:
+        firing = [a for a in _WEBHOOK_ALERTS if a.get("status") != "resolved"]
+    if firing:
+        return {"count": len(firing), "alerts": firing, "source": "webhook"}
     try:
         r = requests.get(f"{ALERTMANAGER_URL}/api/v2/alerts", timeout=5)
         r.raise_for_status()
         alerts = r.json()
-    except requests.RequestException as exc:
-        raise HTTPException(status_code=502, detail=f"AM unreachable: {exc}") from exc
-    rca = [
-        a for a in alerts
-        if a.get("labels", {}).get("alertname", "").startswith("RCAStaServe")
-    ]
-    return {"count": len(rca), "alerts": rca}
+        rca = [a for a in alerts
+               if a.get("labels", {}).get("alertname", "").startswith("RCAStaServe")]
+        return {"count": len(rca), "alerts": rca, "source": "alertmanager"}
+    except requests.RequestException:
+        return {"count": 0, "alerts": [], "source": "webhook"}
+
+
+@app.get("/api/webhook-alerts")
+def api_webhook_alerts():
+    """Full webhook history (firing + resolved) for the dashboard timeline."""
+    with _STATE_LOCK:
+        return {"items": list(_WEBHOOK_ALERTS)}
 
 
 @app.get("/api/info")
@@ -428,6 +442,13 @@ async def ntfy_relay(req: Request):
     alerts = body.get("alerts", []) or []
     resolved = (status == "resolved")
     delivered = 0
+    received_at = time.time()
+    with _STATE_LOCK:
+        for a in alerts:
+            entry = dict(a)
+            entry["status"] = status
+            entry["receivedAt"] = received_at
+            _WEBHOOK_ALERTS.append(entry)
     for a in alerts:
         labels = a.get("labels", {})
         severity = labels.get("severity", "warning")
@@ -516,6 +537,11 @@ _DASHBOARD_HTML = """<!doctype html>
   </section>
 
   <section class="card full">
+    <h2>Webhook history (Alertmanager &rarr; /ntfy-relay)</h2>
+    <div id="webhookHistory"><div class="small">Loading...</div></div>
+  </section>
+
+  <section class="card full">
     <h2>Recent polls (last <span id="recentN">0</span>)</h2>
     <table>
       <thead>
@@ -566,31 +592,59 @@ function fmtScore(s) {
 async function refreshAlerts() {
   try {
     const d = await fetchJSON("/api/alerts");
+    const src = d.source === "webhook"
+      ? '<span class="badge up">via webhook</span>'
+      : '<span class="badge">via AM poll</span>';
     if (d.count === 0) {
       document.getElementById("alerts").innerHTML =
-        '<div class="small">Aucune alerte RCA active. <span class="badge ok">ok</span></div>';
+        '<div class="small">Aucune alerte RCA active. <span class="badge ok">ok</span> ' + src + '</div>';
+    } else {
+      const rows = d.alerts.map(a => {
+        const L = a.labels || {};
+        const sev = (L.severity || "warning").toLowerCase();
+        const rc = L.root_cause || "-";
+        const t = a.receivedAt || a.startsAt;
+        return `<tr>
+          <td><span class="pill ${sev}">${sev}</span></td>
+          <td><code>${rc}</code></td>
+          <td>${L.alertname || "-"}</td>
+          <td><span class="timestamp">${fmtTime(t)}</span></td>
+        </tr>`;
+      }).join("");
+      document.getElementById("alerts").innerHTML =
+        '<div class="small" style="margin-bottom:8px">' + src + '</div>' +
+        `<table>
+           <thead><tr><th>sev</th><th>root cause</th><th>alertname</th><th>time</th></tr></thead>
+           <tbody>${rows}</tbody>
+         </table>`;
+    }
+  } catch (e) {
+    document.getElementById("alerts").innerHTML = '<div class="small">/api/alerts error: ' + e + '</div>';
+  }
+  try {
+    const h = await fetchJSON("/api/webhook-alerts");
+    const items = (h.items || []).slice().reverse().slice(0, 20);
+    const el = document.getElementById("webhookHistory");
+    if (!el) return;
+    if (items.length === 0) {
+      el.innerHTML = '<div class="small">Aucun webhook recu pour le moment.</div>';
       return;
     }
-    const rows = d.alerts.map(a => {
-      const L = a.labels || {};
-      const A = a.annotations || {};
-      const sev = (L.severity || "warning").toLowerCase();
-      const rc = L.root_cause || "-";
-      return `<tr>
-        <td><span class="pill ${sev}">${sev}</span></td>
-        <td><code>${rc}</code></td>
-        <td>${L.alertname || "-"}</td>
-        <td><span class="timestamp">${fmtTime(a.startsAt)}</span></td>
-      </tr>`;
-    }).join("");
-    document.getElementById("alerts").innerHTML =
-      `<table>
-         <thead><tr><th>sev</th><th>root cause</th><th>alertname</th><th>startsAt</th></tr></thead>
-         <tbody>${rows}</tbody>
-       </table>`;
-  } catch (e) {
-    document.getElementById("alerts").innerHTML = '<div class="small">AM unreachable: ' + e + '</div>';
-  }
+    el.innerHTML = '<table><thead><tr><th>received</th><th>status</th><th>sev</th><th>root cause</th><th>alertname</th></tr></thead><tbody>' +
+      items.map(a => {
+        const L = a.labels || {};
+        const sev = (L.severity || "warning").toLowerCase();
+        const st = a.status || "firing";
+        const pill = st === "resolved" ? 'ok' : sev;
+        return `<tr>
+          <td class="timestamp">${fmtTime(a.receivedAt)}</td>
+          <td><span class="pill ${pill}">${st}</span></td>
+          <td><span class="pill ${sev}">${sev}</span></td>
+          <td><code>${L.root_cause || "-"}</code></td>
+          <td>${L.alertname || "-"}</td>
+        </tr>`;
+      }).join("") + '</tbody></table>';
+  } catch (e) {}
 }
 
 async function refreshBundle() {
