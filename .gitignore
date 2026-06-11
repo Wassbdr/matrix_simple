@@ -37,9 +37,8 @@ rca_pipeline/benchmark*.json
 rca_pipeline/ablation_*.json
 rca_pipeline/benchmark_real_*.json
 
-# RCAEval downloaded data + caches (keep code, ignore huge data)
-rcaeval/data/
-rcaeval/**/.mm_cache/
+# RCAEval checkout (external benchmark code + data, never versioned here)
+rcaeval/
 
 # Logs
 port_forward.log
