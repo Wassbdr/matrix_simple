@@ -83,6 +83,7 @@ class BenchmarkRealConfig(_YamlConfig):
     mm_traces_only: Optional[bool] = False
     mm_trace_prior: Optional[bool] = False
     ensemble: Optional[bool] = False
+    cascade_prior_gamma: Optional[float] = 0.0
     enable_drift: Optional[bool] = False
     drift_delta: Optional[float] = 0.002
     drift_cooldown_steps: Optional[int] = 30

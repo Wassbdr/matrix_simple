@@ -695,6 +695,8 @@ def _run_single_dataset(
     sta_runs, gat_runs, late_gib_runs = [], [], []
     sta_raw_runs, gat_raw_runs = [], []
     sta_f_runs, gat_f_runs = [], []
+    cascade_gamma = float(getattr(args, "cascade_prior_gamma", 0.0) or 0.0)
+    sta_prior_runs, gat_prior_runs = [], []
     drift_train_stats = []
     drift_test_stats = []
     mm_skipped_seeds: List[int] = []
@@ -810,6 +812,23 @@ def _run_single_dataset(
         if r_gat_raw:
             gat_raw_runs.append(r_gat_raw)
 
+        if cascade_gamma > 0:
+            # Post-hoc propagation-prior blend: eval functions iterate the
+            # same filtered test list, so per-case logits align with windows.
+            from rca_pipeline.cascade_prior import apply_cascade_prior
+            test_anom = [d for d in test_data if d.root_cause[0] in name_to_idx]
+            for raw, prior_runs in ((r_sta_raw, sta_prior_runs), (r_gat_raw, gat_prior_runs)):
+                if not raw:
+                    continue
+                yt, yp = raw
+                if len(yp) != len(test_anom):
+                    continue
+                blended = [
+                    apply_cascade_prior(z, d.x, edge_index, cascade_gamma)
+                    for z, d in zip(yp, test_anom)
+                ]
+                prior_runs.append((list(yt), blended))
+
         if getattr(args, "include_late_gib", False):
             r_lgib = train_and_eval_late_gib(
                 train_data, test_data, node_names, edge_index, device,
@@ -896,6 +915,26 @@ def _run_single_dataset(
 
     _add_ci("STA-MM" if args.use_mm else "STA")
     _add_ci("GATv2-MM" if args.use_mm else "GATv2")
+
+    if cascade_gamma > 0:
+        for prior_runs, base_key in ((sta_prior_runs, "STA"), (gat_prior_runs, "GATv2")):
+            if not prior_runs:
+                continue
+            key = f"{base_key}+cascade"
+            prior_m = rca_metrics.compute_with_std(prior_runs)
+            rca_metrics.print_summary(
+                prior_m, model_name=f"{key} γ={cascade_gamma} ({ds_name})",
+                reference=RCAEVAL_PUBLISHED_BASELINES.get("BARO"))
+            ds_results[key] = prior_m
+            per_seed_p = [rca_metrics.compute(yt, yp) for (yt, yp) in prior_runs]
+            ds_results[key]["ci95"] = {
+                k: bootstrap_ci([float(r[k]) for r in per_seed_p], n_boot=2000, alpha=0.05, seed=0)
+                for k in RCAEvalMetrics.METRIC_KEYS
+            }
+            ds_results[key]["cascade_prior_gamma"] = cascade_gamma
+            _attach_per_root_metrics(
+                ds_results, base_key, key, prior_runs, node_names, rca_metrics, ds_name,
+            )
 
     if getattr(args, "ensemble", False) and sta_runs and gat_runs:
         from rca_pipeline.ensemble import (
@@ -1068,6 +1107,9 @@ def main():
                         help="When --use-mm is set, ignore logs if traces are present with signal (safe default)")
     parser.add_argument("--ensemble", action="store_true",
                         help="Also report a post-hoc STA+GATv2 soft-vote ensemble (no retraining)")
+    parser.add_argument("--cascade-prior-gamma", type=float, default=0.0,
+                        help="Blend weight for the propagation prior (quiet node, loud "
+                             "neighbors); 0 disables. Validate per-scenario before adopting.")
     parser.add_argument("--enable-drift", action="store_true",
                         help="Enable ADWIN drift cooldown filter before train/eval")
     parser.add_argument("--drift-delta", type=float, default=0.002,
