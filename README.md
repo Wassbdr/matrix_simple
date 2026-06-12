@@ -1,6 +1,7 @@
 # STA: A Select-Then-Analyze Framework for Scalable Root Cause Analysis in Microservice Architectures
 
 [![CI](https://github.com/Wassbdr/matrix_simple/actions/workflows/ci.yml/badge.svg)](https://github.com/Wassbdr/matrix_simple/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/Wassbdr/matrix_simple/branch/main/graph/badge.svg)](https://codecov.io/gh/Wassbdr/matrix_simple)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -194,6 +195,21 @@ python -m rca_pipeline.benchmark_real \
     --sta-contrastive-warmup 0 \
     --output-json /tmp/bench_real.json
 ```
+
+### Configuration files (YAML)
+
+Every entry point also accepts `--config <yaml>` with pydantic validation
+(`rca_pipeline/config.py`); explicit CLI flags override YAML values. Versioned
+configs live in [`configs/`](configs/), e.g. the RCAEval run above is:
+
+```bash
+python -m rca_pipeline.benchmark_real \
+    --config configs/benchmark_real.yaml \
+    --output-json /tmp/bench_real.json
+```
+
+Unknown keys fail loudly, and the real-data warmup guardrail (§ below) is
+enforced at config load time. See `docs/OPERATIONS.md` for the full runbook.
 
 ---
 

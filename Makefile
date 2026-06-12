@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint format audit benchmark-smoke benchmark-paper clean report report-clean figures paper
+.PHONY: help install dev test coverage lint format audit benchmark-smoke benchmark-paper clean report report-clean figures paper
 
 PYTHON ?= python
 
@@ -6,7 +6,8 @@ help:
 	@echo "Targets:"
 	@echo "  make install          Install runtime dependencies (editable)"
 	@echo "  make dev              Install dev dependencies + pre-commit hooks"
-	@echo "  make test             Run pytest unit tests"
+	@echo "  make test             Run pytest unit tests (rca_pipeline + serving)"
+	@echo "  make coverage         Run tests with the coverage gate"
 	@echo "  make lint             Run ruff linter"
 	@echo "  make format           Run ruff formatter"
 	@echo "  make audit            Run pre-publication audit"
@@ -24,10 +25,13 @@ dev:
 	pre-commit install || echo "pre-commit not installed; skipping hook install"
 
 test:
-	$(PYTHON) -m pytest -q rca_pipeline/tests
+	$(PYTHON) -m pytest -q
+
+coverage:
+	$(PYTHON) -m pytest --cov --cov-report=term
 
 lint:
-	$(PYTHON) -m ruff check rca_pipeline
+	$(PYTHON) -m ruff check rca_pipeline serving conftest.py
 
 format:
 	$(PYTHON) -m ruff format rca_pipeline
