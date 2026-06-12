@@ -1062,7 +1062,8 @@ def main():
         default="sock-shop",
         help="Namespace Kubernetes à interroger dans Loki (défaut: sock-shop).",
     )
-    args = parser.parse_args()
+    from rca_pipeline.config import BenchmarkRealConfig, parse_args_with_config
+    args = parse_args_with_config(parser, BenchmarkRealConfig)
 
     if args.mm_logs_only and args.mm_traces_only:
         raise SystemExit("--mm-logs-only and --mm-traces-only are mutually exclusive.")

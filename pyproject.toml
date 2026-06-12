@@ -27,6 +27,9 @@ dependencies = [
   "requests>=2.31.0",
   "networkx>=3.1.0",
   "matplotlib>=3.7.0",
+  # YAML + validated config layer for all CLI entry points (rca_pipeline/config.py)
+  "pydantic>=2.9.0",
+  "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -49,7 +52,6 @@ hpo = [
 serve = [
   "fastapi>=0.115.0",
   "uvicorn>=0.30.0",
-  "pydantic>=2.9.0",
   "prometheus-fastapi-instrumentator>=7.0.0",
 ]
 

@@ -1635,4 +1635,5 @@ if __name__ == "__main__":
                         choices=["conv", "s4"],
                         help="Temporal encoder type for STA deep path")
 
-    main(parser.parse_args())
+    from rca_pipeline.config import BenchmarkSimConfig, parse_args_with_config
+    main(parse_args_with_config(parser, BenchmarkSimConfig))

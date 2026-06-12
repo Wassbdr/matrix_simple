@@ -114,10 +114,14 @@ def main():
     parser.add_argument("--storage",
                         default="sqlite:///results_transmission/hpo_sta_sockshop.db",
                         help="Optuna storage URL.")
-    parser.add_argument("--output-json", required=True)
+    # required-ness checked after parsing so the value may come from --config
+    parser.add_argument("--output-json", default=None)
     parser.add_argument("--timeout-seconds", type=int, default=None,
                         help="Wall-clock timeout for the whole study.")
-    args = parser.parse_args()
+    from rca_pipeline.config import HPOConfig, parse_args_with_config
+    args = parse_args_with_config(parser, HPOConfig)
+    if args.output_json is None:
+        parser.error("--output-json is required (CLI flag or --config)")
 
     device = torch.device("cpu")
     logger.info("Loading dataset from %s", args.dataset_dir)

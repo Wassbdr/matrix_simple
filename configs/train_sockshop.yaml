@@ -1,0 +1,9 @@
+# Train + persist the serving bundle for sock-shop (ObservIT cluster data).
+# hpo_json must point to a completed HPO run output.
+dataset_dir: datasets/sockshop_runs
+topology: sock_shop
+window_size: 12
+seeds: "42,123,7,1337,2025"
+hpo_json: results_transmission/hpo_sta_sockshop.json
+output_bundle: checkpoints/sta_sockshop_v1
+no_warmup: true

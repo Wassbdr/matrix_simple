@@ -1,0 +1,8 @@
+# Optuna HPO for STA on sock-shop cluster data.
+dataset_dir: datasets/sockshop_runs
+topology: sock_shop
+window_size: 12
+seed: 42
+n_trials: 50
+study_name: sta_sockshop_n14
+output_json: results_transmission/hpo_sta_sockshop.json

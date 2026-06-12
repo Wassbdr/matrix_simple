@@ -1,0 +1,9 @@
+# CI smoke benchmark: tiny simulated run (BA N=20, 2 seeds, few epochs).
+# Used by .github/workflows/ci.yml. Keys = argparse dests of rca_pipeline.benchmark.
+sizes: "20"
+seeds: "42,123"
+supervised_epochs: 5
+late_contrastive_epochs: 3
+sta_warmup_epochs: 2
+sta_k_anneal_epochs: 3
+baseline_epochs: 5

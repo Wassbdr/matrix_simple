@@ -1,0 +1,8 @@
+# Canonical RCAEval real-data benchmark settings (README §5).
+# Guardrail: sta_contrastive_warmup must stay 0 on real data (README §5.4);
+# setting it >0 without allow_real_warmup=true fails validation.
+dataset: all
+seeds: "42,123,7"
+epochs: 100
+sta_contrastive_warmup: 0
+rcaeval_root: rcaeval

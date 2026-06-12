@@ -149,12 +149,17 @@ def main():
     parser.add_argument("--dataset-dir", default="datasets/sockshop_runs")
     parser.add_argument("--topology", default="sock_shop")
     parser.add_argument("--window-size", type=int, default=12)
-    parser.add_argument("--hpo-json", required=True)
+    # required-ness checked after parsing so the values may come from --config
+    parser.add_argument("--hpo-json", default=None)
     parser.add_argument("--seeds", default="42,123,7,1337,2025")
-    parser.add_argument("--output-bundle", required=True)
+    parser.add_argument("--output-bundle", default=None)
     parser.add_argument("--no-warmup", action="store_true",
                         help="Force contrastive_warmup=0 (real-data guardrail).")
-    args = parser.parse_args()
+    from rca_pipeline.config import TrainConfig, parse_args_with_config
+    args = parse_args_with_config(parser, TrainConfig)
+    for required in ("hpo_json", "output_bundle"):
+        if getattr(args, required) is None:
+            parser.error(f"--{required.replace('_', '-')} is required (CLI flag or --config)")
 
     device = torch.device("cpu")
     seeds = [int(s) for s in args.seeds.split(",")]
