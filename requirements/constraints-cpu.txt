@@ -1,0 +1,14 @@
+# Canonical ABI pins for the CPU stack — single source of truth.
+#
+# torch 2.0.1 is built against NumPy 1.x; numpy>=2 breaks at import time
+# (_ARRAY_API not found / dtype inference errors). Every consumer (CI, the
+# serving Dockerfiles, local installs) must apply this file with `-c`:
+#
+#   pip install torch==2.0.1 --index-url https://download.pytorch.org/whl/cpu
+#   pip install -e ".[dev]" -c requirements/constraints-cpu.txt
+#
+# The CPU wheel index must be passed on the install command (constraints
+# files cannot carry index options).
+torch==2.0.1
+torch_geometric==2.4.0
+numpy<2.0

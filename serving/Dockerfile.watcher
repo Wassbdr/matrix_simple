@@ -3,6 +3,7 @@
 
 FROM python:3.11-slim AS builder
 WORKDIR /build
+COPY requirements/constraints-cpu.txt .
 COPY serving/requirements-watcher.txt .
 RUN pip install --user --no-cache-dir -r requirements-watcher.txt
 
@@ -16,6 +17,7 @@ ENV PATH=/root/.local/bin:$PATH \
     PYTHONUNBUFFERED=1
 
 COPY serving/rca_watcher.py /app/serving/rca_watcher.py
+COPY serving/logging_config.py /app/serving/logging_config.py
 
 EXPOSE 8090
 HEALTHCHECK --interval=20s --timeout=5s --start-period=20s --retries=3 \

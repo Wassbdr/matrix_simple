@@ -6,6 +6,7 @@
 FROM python:3.11-slim AS builder
 
 WORKDIR /build
+COPY requirements/constraints-cpu.txt .
 COPY serving/requirements.txt .
 RUN apt-get update && apt-get install -y --no-install-recommends gcc && \
     rm -rf /var/lib/apt/lists/* && \
@@ -30,6 +31,7 @@ ENV PATH=/root/.local/bin:$PATH \
 # decoupling the model lifecycle from the image lifecycle.
 COPY rca_pipeline/ /app/rca_pipeline/
 COPY serving/serve.py /app/serving/serve.py
+COPY serving/logging_config.py /app/serving/logging_config.py
 
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
