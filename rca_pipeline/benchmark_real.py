@@ -712,8 +712,13 @@ def _run_single_dataset(
     sta_runs, gat_runs, late_gib_runs = [], [], []
     sta_raw_runs, gat_raw_runs = [], []
     sta_f_runs, gat_f_runs = [], []
-    cascade_gamma = float(getattr(args, "cascade_prior_gamma", 0.0) or 0.0)
-    sta_prior_runs, gat_prior_runs = [], []
+    cascade_gammas = [
+        g for g in (
+            float(tok) for tok in str(getattr(args, "cascade_prior_gamma", "0") or "0").split(",")
+        ) if g > 0
+    ]
+    sta_prior_runs: Dict[float, List] = {g: [] for g in cascade_gammas}
+    gat_prior_runs: Dict[float, List] = {g: [] for g in cascade_gammas}
     drift_train_stats = []
     drift_test_stats = []
     mm_skipped_seeds: List[int] = []
@@ -830,9 +835,10 @@ def _run_single_dataset(
         if r_gat_raw:
             gat_raw_runs.append(r_gat_raw)
 
-        if cascade_gamma > 0:
+        if cascade_gammas:
             # Post-hoc propagation-prior blend: eval functions iterate the
             # same filtered test list, so per-case logits align with windows.
+            # The gamma sweep is free — one trained model, several blends.
             from rca_pipeline.cascade_prior import apply_cascade_prior
             test_anom = [d for d in test_data if d.root_cause[0] in name_to_idx]
             for raw, prior_runs in ((r_sta_raw, sta_prior_runs), (r_gat_raw, gat_prior_runs)):
@@ -841,11 +847,12 @@ def _run_single_dataset(
                 yt, yp = raw
                 if len(yp) != len(test_anom):
                     continue
-                blended = [
-                    apply_cascade_prior(z, d.x, edge_index, cascade_gamma)
-                    for z, d in zip(yp, test_anom)
-                ]
-                prior_runs.append((list(yt), blended))
+                for g in cascade_gammas:
+                    blended = [
+                        apply_cascade_prior(z, d.x, edge_index, g)
+                        for z, d in zip(yp, test_anom)
+                    ]
+                    prior_runs[g].append((list(yt), blended))
 
         if getattr(args, "include_late_gib", False):
             r_lgib = train_and_eval_late_gib(
@@ -935,14 +942,15 @@ def _run_single_dataset(
     _add_ci("STA-MM" if args.use_mm else "STA")
     _add_ci("GATv2-MM" if args.use_mm else "GATv2")
 
-    if cascade_gamma > 0:
-        for prior_runs, base_key in ((sta_prior_runs, "STA"), (gat_prior_runs, "GATv2")):
+    for g in cascade_gammas:
+        for prior_by_gamma, base_key in ((sta_prior_runs, "STA"), (gat_prior_runs, "GATv2")):
+            prior_runs = prior_by_gamma.get(g, [])
             if not prior_runs:
                 continue
-            key = f"{base_key}+cascade"
+            key = f"{base_key}+cascade@{g}"
             prior_m = rca_metrics.compute_with_std(prior_runs)
             rca_metrics.print_summary(
-                prior_m, model_name=f"{key} γ={cascade_gamma} ({ds_name})",
+                prior_m, model_name=f"{key} ({ds_name})",
                 reference=RCAEVAL_PUBLISHED_BASELINES.get("BARO"))
             ds_results[key] = prior_m
             per_seed_p = [rca_metrics.compute(yt, yp) for (yt, yp) in prior_runs]
@@ -950,7 +958,7 @@ def _run_single_dataset(
                 k: bootstrap_ci([float(r[k]) for r in per_seed_p], n_boot=2000, alpha=0.05, seed=0)
                 for k in RCAEvalMetrics.METRIC_KEYS
             }
-            ds_results[key]["cascade_prior_gamma"] = cascade_gamma
+            ds_results[key]["cascade_prior_gamma"] = g
             _attach_per_root_metrics(
                 ds_results, base_key, key, prior_runs, node_names, rca_metrics, ds_name,
             )
@@ -1134,9 +1142,11 @@ def main():
                         help="When --use-mm is set, ignore logs if traces are present with signal (safe default)")
     parser.add_argument("--ensemble", action="store_true",
                         help="Also report a post-hoc STA+GATv2 soft-vote ensemble (no retraining)")
-    parser.add_argument("--cascade-prior-gamma", type=float, default=0.0,
-                        help="Blend weight for the propagation prior (quiet node, loud "
-                             "neighbors); 0 disables. Validate per-scenario before adopting.")
+    parser.add_argument("--cascade-prior-gamma", type=str, default="0",
+                        help="Blend weight(s) for the propagation prior (quiet node, loud "
+                             "neighbors); comma-separated sweep allowed (e.g. 0.2,0.3,0.5) — "
+                             "the blend is post-hoc so extra gammas cost nothing. 0 disables. "
+                             "Validate per-scenario before adopting.")
     parser.add_argument("--enable-drift", action="store_true",
                         help="Enable ADWIN drift cooldown filter before train/eval")
     parser.add_argument("--drift-delta", type=float, default=0.002,

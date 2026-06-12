@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 
 import yaml
 from pydantic import BaseModel, ConfigDict, model_validator
@@ -84,7 +84,8 @@ class BenchmarkRealConfig(_YamlConfig):
     mm_traces_only: Optional[bool] = False
     mm_trace_prior: Optional[bool] = False
     ensemble: Optional[bool] = False
-    cascade_prior_gamma: Optional[float] = 0.0
+    # Single gamma or comma-separated sweep (e.g. "0.2,0.3,0.5")
+    cascade_prior_gamma: Optional[Union[float, str]] = 0.0
     enable_drift: Optional[bool] = False
     drift_delta: Optional[float] = 0.002
     drift_cooldown_steps: Optional[int] = 30
