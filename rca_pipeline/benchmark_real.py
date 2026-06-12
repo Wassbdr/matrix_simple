@@ -897,6 +897,36 @@ def _run_single_dataset(
     _add_ci("STA-MM" if args.use_mm else "STA")
     _add_ci("GATv2-MM" if args.use_mm else "GATv2")
 
+    if getattr(args, "ensemble", False) and sta_runs and gat_runs:
+        from rca_pipeline.ensemble import ensemble_runs, expected_calibration_error
+        ens_runs = ensemble_runs(sta_runs, gat_runs, mode="soft")
+        if ens_runs:
+            ens_m = rca_metrics.compute_with_std(ens_runs)
+            ens_name = "Ensemble-MM" if args.use_mm else "Ensemble"
+            rca_metrics.print_summary(ens_m, model_name=f"{ens_name} STA+GATv2 ({ds_name})",
+                                      reference=RCAEVAL_PUBLISHED_BASELINES.get("BARO"))
+            ds_results[ens_name] = ens_m
+            per_seed_ens = [rca_metrics.compute(yt, yp) for (yt, yp) in ens_runs]
+            ds_results[ens_name]["ci95"] = {
+                k: bootstrap_ci([float(r[k]) for r in per_seed_ens], n_boot=2000, alpha=0.05, seed=0)
+                for k in RCAEvalMetrics.METRIC_KEYS
+            }
+            # Descriptive test-set calibration (no fitting → no leakage).
+            ds_results[ens_name]["ece"] = {
+                "sta": float(np.mean([
+                    expected_calibration_error(yp, yt) for (yt, yp) in sta_runs
+                ])),
+                "gatv2": float(np.mean([
+                    expected_calibration_error(yp, yt) for (yt, yp) in gat_runs
+                ])),
+                "ensemble": float(np.mean([
+                    expected_calibration_error(yp, yt) for (yt, yp) in ens_runs
+                ])),
+            }
+            _attach_per_root_metrics(
+                ds_results, "Ensemble", ens_name, ens_runs, node_names, rca_metrics, ds_name,
+            )
+
     if args.enable_drift:
         if sta_raw_runs:
             ds_results["STA_raw"] = rca_metrics.compute_with_std(sta_raw_runs)
@@ -1008,6 +1038,8 @@ def main():
                         help="When --use-mm is set, use metrics+traces only (ignore logs)")
     parser.add_argument("--mm-trace-prior", action="store_true",
                         help="When --use-mm is set, ignore logs if traces are present with signal (safe default)")
+    parser.add_argument("--ensemble", action="store_true",
+                        help="Also report a post-hoc STA+GATv2 soft-vote ensemble (no retraining)")
     parser.add_argument("--enable-drift", action="store_true",
                         help="Enable ADWIN drift cooldown filter before train/eval")
     parser.add_argument("--drift-delta", type=float, default=0.002,
