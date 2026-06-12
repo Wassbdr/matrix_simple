@@ -86,11 +86,21 @@ prior(v) = mean(anomaly(neighbors(v))) * (1 - anomaly(v))
 p_final  = (1-γ) softmax(model) + γ softmax(prior/τ)
 ```
 
-**Command**: `python -m rca_pipeline.benchmark_real --observit-csv
-datasets/sockshop_runs_full --observit-topology sock_shop --seeds
-42,123,7,1337,2025 --epochs 100 --sta-contrastive-warmup 0
---cascade-prior-gamma 0.3 --output-json <out>` then
-`python -m rca_pipeline.analyze_per_scenario` on the output.
+**Command** (the gamma sweep is post-hoc — one training, several blends):
+
+```bash
+python -m rca_pipeline.benchmark_real \
+    --observit-csv datasets/sockshop_runs_full \
+    --observit-window 12 --observit-topology sock_shop \
+    --seeds 42,123,7,1337,2025 --epochs 100 \
+    --sta-contrastive-warmup 0 --deterministic \
+    --cascade-prior-gamma 0.2,0.3,0.5 \
+    --output-json /tmp/observit_cascade_sweep.json
+```
+
+then compare the `STA+cascade@γ` / `GATv2+cascade@γ` per-root entries
+against the baseline `STA` / `GATv2` ones (the cascade scenario maps to
+root cause `orders-db` in `analyze_per_scenario.CHAOS_SCENARIOS`).
 
 **Acceptance:** cascade scenario Avg@1 ≥ 0.15 for STA+cascade AND no
 regression on the four hard/gray scenarios (per-root breakdown).
