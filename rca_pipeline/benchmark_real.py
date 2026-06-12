@@ -407,6 +407,12 @@ def train_and_eval_sta(
             raise ValueError(f"unknown warmup_mode: {warmup_mode}")
         opt_warm = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
         target_rate = k / N
+        # k == N (small real topologies, e.g. RCAEval N=5): there is no
+        # bottleneck to regularize, and KL(p || Bernoulli(1-eps)) blows up the
+        # (1-p)*log((1-p)/eps) term — selector logits saturate and supervised
+        # training can never recover (the §5.4 collapse, isolated by ablation:
+        # GIB-only warmup reproduces Avg@1=0.20, NCE-only does not).
+        gib_active = target_rate < 1.0
         model.set_temperature(2.0)
         for ep in range(contrastive_warmup):
             model.train()
@@ -446,11 +452,15 @@ def train_and_eval_sta(
             z_pos = z_a + torch.randn_like(z_a) * 0.05
             if warmup_mode == "class_aware":
                 l_nce = class_aware_info_nce_loss(z_a, z_pos, y_sup[idx_a], temperature=0.07)
-                l_gib = variational_gib_loss(M_a, target_rate)
+                m_all = M_a
             else:
                 z_n = _embed(idx_n, M_n, sel_n)
                 l_nce = info_nce_loss(z_a, z_pos, z_n, temperature=0.07)
-                l_gib = variational_gib_loss(torch.cat([M_a, M_n], dim=0), target_rate)
+                m_all = torch.cat([M_a, M_n], dim=0)
+            if gib_active:
+                l_gib = variational_gib_loss(m_all, target_rate)
+            else:
+                l_gib = torch.tensor(0.0, device=device)
             beta = min(1.0, ep / max(contrastive_warmup // 2, 1)) * 0.3
 
             loss = l_nce + beta * l_gib

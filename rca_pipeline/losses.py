@@ -157,8 +157,13 @@ def variational_gib_loss(
     Returns:
         Scalar KL-divergence loss (mean over batch and nodes).
     """
-    p = M_soft.clamp(eps, 1.0 - eps)
-    q = torch.tensor(target_rate, device=p.device).clamp(eps, 1.0 - eps)
+    # Float32 cannot represent 1 - 1e-8 (== 1.0 exactly), so a clamp at
+    # 1-eps with the default eps is a no-op near 1 and KL(p || Bern(1))
+    # evaluates to inf with NaN gradients (the §5.4 warmup collapse on
+    # k == N topologies). Clamp with a float32-representable margin.
+    margin = max(eps, 1e-6)
+    p = M_soft.clamp(margin, 1.0 - margin)
+    q = torch.tensor(target_rate, device=p.device).clamp(margin, 1.0 - margin)
 
     kl = p * torch.log(p / q) + (1.0 - p) * torch.log((1.0 - p) / (1.0 - q))
     return kl.mean()

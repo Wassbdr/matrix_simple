@@ -65,11 +65,59 @@ reproduce the collapse.
 |---|---|
 | warmup=0 (canonical baseline) | 0.967 |
 | warmup=10, legacy negatives | 0.200 ±0.000 (= chance on N=5: total selector collapse) |
-| warmup=10, class-aware negatives | _pending_ |
+| warmup=10, class-aware negatives | 0.200 ±0.000 — **also collapses** |
 
-The legacy reproduction confirms the mechanism: ±0.000 std across seeds
-means the selector converges to the same degenerate solution every time —
-this is not noise, it is the InfoNCE objective fighting the labels.
+The ±0.000 std (exactly chance level, all seeds) shows the selector
+converges to the same degenerate solution every time. The class-aware
+negative masking does **not** fix it — same-class InfoNCE conflict was a
+plausible but wrong hypothesis. Component ablation (one term zeroed at a
+time, 1 seed, TrainTicket):
+
+| Ablation (warmup=10) | Avg@1 | MRR |
+|---|---|---|
+| baseline warmup=0 | 0.950 | 0.975 |
+| full (NCE + GIB + temperature) | **0.200** | 0.457 |
+| NCE zeroed → GIB + temperature | **0.200** | 0.457 |
+| GIB zeroed → NCE + temperature | 0.950 | 0.975 |
+| both losses zeroed → temperature only | 0.950 | 0.975 |
+
+**The culprit is the variational GIB term, not InfoNCE.** On RCAEval
+N=5, `get_optimal_k(5) = 5`, so `target_rate = k/N = 1.0`. The intended
+clamp `q = clamp(target_rate, eps, 1-eps)` with `eps=1e-8` is a **no-op in
+float32** (`1.0 - 1e-8 == 1.0` exactly; float32 epsilon ≈ 1.2e-7), so
+`KL(p ‖ Bernoulli(1))` evaluates to `inf` with **NaN gradients**: one
+optimizer step NaN-poisons the weights, every subsequent forward returns
+NaN logits, and ranking NaN gives a constant order — exact chance level,
+±0.000 across seeds.
+
+**Fix (two layers):**
+1. `variational_gib_loss` now clamps with a float32-representable margin
+   (`1e-6`) — no more inf/NaN for any target rate (regression-tested in
+   `tests/test_gib_saturation.py`).
+2. `benchmark_real.train_and_eval_sta` skips the GIB term entirely when
+   `k >= N`: with everything selected there is no bottleneck to regularize,
+   and even a finite KL toward Bernoulli(≈1) still saturates the selector.
+   On topologies with k < N (e.g. ObservIT N=14) the term keeps its
+   intended role.
+
+The class-aware InfoNCE stays as the default warmup objective
+(theoretically sounder on labeled pools), now decoupled from the collapse.
+
+**Validation A/B with the fix (TrainTicket, 3 seeds, epochs=100, warmup=10):**
+
+| Variant | Avg@1 STA |
+|---|---|
+| warmup=0 (canonical baseline) | 0.967 ±0.024 |
+| warmup=10 before fix (either NCE mode) | 0.200 ±0.000 |
+| warmup=10 fixed, class-aware NCE | **0.967 ±0.024** (= baseline) |
+| warmup=10 fixed, legacy NCE | 0.933 ±0.024 |
+
+Conclusions: (1) the collapse is eliminated; (2) class-aware negatives do
+matter — legacy stays 3.4 pp under baseline, confirming the same-class
+conflict as a real but secondary effect; (3) warmup is now *safe* but
+*neutral* on TrainTicket (no gain over warmup=0). The warmup=0 guardrail
+remains the canonical default for real data; the footgun is defused and
+warmup-based research (e.g. multimodal pretraining) is unblocked.
 
 ## 3. Cascade propagation prior — _pending ObservIT validation_
 
