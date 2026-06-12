@@ -70,6 +70,36 @@ def ensemble_runs(
     return out
 
 
+def disagreement_rate(runs_a: Sequence[Run], runs_b: Sequence[Run]) -> float:
+    """Fraction of paired test cases where the two models' top-1 differ."""
+    total, differ = 0, 0
+    for (yt_a, logits_a), (yt_b, logits_b) in zip(runs_a, runs_b):
+        if list(yt_a) != list(yt_b) or len(logits_a) != len(logits_b):
+            continue
+        for za, zb in zip(logits_a, logits_b):
+            total += 1
+            if int(np.argmax(za)) != int(np.argmax(zb)):
+                differ += 1
+    return differ / total if total else 0.0
+
+
+def oracle_top1(runs_a: Sequence[Run], runs_b: Sequence[Run]) -> float:
+    """Top-1 accuracy of a perfect per-case router (upper bound for routing).
+
+    For each case the oracle picks whichever model ranks the true root cause
+    first; this bounds what any cascade/confidence routing scheme can reach.
+    """
+    total, hits = 0, 0
+    for (yt_a, logits_a), (yt_b, logits_b) in zip(runs_a, runs_b):
+        if list(yt_a) != list(yt_b) or len(logits_a) != len(logits_b):
+            continue
+        for y, za, zb in zip(yt_a, logits_a, logits_b):
+            total += 1
+            if int(np.argmax(za)) == int(y) or int(np.argmax(zb)) == int(y):
+                hits += 1
+    return hits / total if total else 0.0
+
+
 # ---------------------------------------------------------------------------
 # Calibration
 # ---------------------------------------------------------------------------

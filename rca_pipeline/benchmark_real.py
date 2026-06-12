@@ -898,7 +898,12 @@ def _run_single_dataset(
     _add_ci("GATv2-MM" if args.use_mm else "GATv2")
 
     if getattr(args, "ensemble", False) and sta_runs and gat_runs:
-        from rca_pipeline.ensemble import ensemble_runs, expected_calibration_error
+        from rca_pipeline.ensemble import (
+            disagreement_rate,
+            ensemble_runs,
+            expected_calibration_error,
+            oracle_top1,
+        )
         ens_runs = ensemble_runs(sta_runs, gat_runs, mode="soft")
         if ens_runs:
             ens_m = rca_metrics.compute_with_std(ens_runs)
@@ -926,6 +931,29 @@ def _run_single_dataset(
             _attach_per_root_metrics(
                 ds_results, "Ensemble", ens_name, ens_runs, node_names, rca_metrics, ds_name,
             )
+            # Routing headroom diagnostics: how often the models disagree,
+            # what a perfect per-case router would score (oracle), and how
+            # sensitive the soft vote is to the mixing weight.
+            weight_sweep = {}
+            for w in (0.25, 0.5, 0.75):
+                runs_w = ensemble_runs(sta_runs, gat_runs, mode="soft", weight_a=w)
+                weight_sweep[f"w_sta={w}"] = float(np.mean([
+                    rca_metrics.compute(yt, yp)["avg1"] for (yt, yp) in runs_w
+                ]))
+            conf_runs = ensemble_runs(sta_runs, gat_runs, mode="confidence")
+            ds_results[ens_name]["ensemble_analysis"] = {
+                "disagreement_rate_top1": float(disagreement_rate(sta_runs, gat_runs)),
+                "oracle_top1": float(oracle_top1(sta_runs, gat_runs)),
+                "soft_vote_avg1_by_weight": weight_sweep,
+                "confidence_vote_avg1": float(np.mean([
+                    rca_metrics.compute(yt, yp)["avg1"] for (yt, yp) in conf_runs
+                ])) if conf_runs else None,
+            }
+            ana = ds_results[ens_name]["ensemble_analysis"]
+            print(f"  [ensemble] top-1 disagreement={ana['disagreement_rate_top1']:.3f}  "
+                  f"oracle={ana['oracle_top1']:.3f}  "
+                  f"conf-vote avg1={ana['confidence_vote_avg1']:.3f}  "
+                  f"weight sweep={ {k: round(v, 3) for k, v in weight_sweep.items()} }")
 
     if args.enable_drift:
         if sta_raw_runs:
