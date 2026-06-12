@@ -859,7 +859,8 @@ def _run_single_dataset(
                     continue
                 for g in cascade_gammas:
                     blended = [
-                        apply_cascade_prior(z, d.x, edge_index, g)
+                        apply_cascade_prior(z, d.x, edge_index, g,
+                                            tau=float(getattr(args, 'cascade_prior_tau', 0.25)))
                         for z, d in zip(yp, test_anom)
                     ]
                     prior_runs[g].append((list(yt), blended))
@@ -970,7 +971,7 @@ def _run_single_dataset(
             }
             ds_results[key]["cascade_prior_gamma"] = g
             _attach_per_root_metrics(
-                ds_results, base_key, key, prior_runs, node_names, rca_metrics, ds_name,
+                ds_results, key, key, prior_runs, node_names, rca_metrics, ds_name,
             )
 
     if getattr(args, "ensemble", False) and sta_runs and gat_runs:
@@ -1152,6 +1153,10 @@ def main():
                         help="When --use-mm is set, ignore logs if traces are present with signal (safe default)")
     parser.add_argument("--ensemble", action="store_true",
                         help="Also report a post-hoc STA+GATv2 soft-vote ensemble (no retraining)")
+    parser.add_argument("--cascade-prior-tau", type=float, default=0.25,
+                        help="Sharpness of the propagation prior before blending "
+                             "(lower = sharper; the prior must compete with near "
+                             "one-hot model probabilities).")
     parser.add_argument("--cascade-prior-gamma", type=str, default="0",
                         help="Blend weight(s) for the propagation prior (quiet node, loud "
                              "neighbors); comma-separated sweep allowed (e.g. 0.2,0.3,0.5) — "

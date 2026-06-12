@@ -86,6 +86,7 @@ class BenchmarkRealConfig(_YamlConfig):
     ensemble: Optional[bool] = False
     # Single gamma or comma-separated sweep (e.g. "0.2,0.3,0.5")
     cascade_prior_gamma: Optional[Union[float, str]] = 0.0
+    cascade_prior_tau: Optional[float] = 0.25
     enable_drift: Optional[bool] = False
     drift_delta: Optional[float] = 0.002
     drift_cooldown_steps: Optional[int] = 30
