@@ -75,6 +75,7 @@ class BenchmarkRealConfig(_YamlConfig):
     hidden_dim: Optional[int] = 32
     sta_contrastive_warmup: Optional[int] = 0
     allow_real_warmup: Optional[bool] = False
+    sta_warmup_mode: Optional[Literal["class_aware", "legacy"]] = "class_aware"
     rcaeval_root: Optional[str] = "rcaeval"
     max_cases: Optional[int] = None
     use_mm: Optional[bool] = False

@@ -52,6 +52,40 @@ def info_nce_loss(
     return loss
 
 
+def class_aware_info_nce_loss(
+    z: torch.Tensor,
+    z_positive: torch.Tensor,
+    labels: torch.Tensor,
+    temperature: float = 0.07,
+) -> torch.Tensor:
+    """InfoNCE where negatives are restricted to *different-class* samples.
+
+    Motivation (real-data warmup collapse, README §5.4): on real datasets the
+    warmup pool contains only anomalous windows of a handful of root-cause
+    classes. Plain InfoNCE then pushes apart windows that share the anchor's
+    root cause, destroying the selector before supervised training starts
+    (TrainTicket Avg@1 73% -> 0% with warmup=10). Masking same-class pairs
+    out of the negative set removes that conflict.
+
+    Args:
+        z          : [batch, dim] anchor embeddings
+        z_positive : [batch, dim] augmented views of the anchors
+        labels     : [batch] class (root-cause) index per sample
+        temperature: softmax temperature
+    """
+    z = F.normalize(z, dim=-1)
+    z_positive = F.normalize(z_positive, dim=-1)
+
+    pos_sim = torch.sum(z * z_positive, dim=-1, keepdim=True) / temperature
+    sim = torch.mm(z, z.t()) / temperature
+    same_class = labels.unsqueeze(0) == labels.unsqueeze(1)  # includes self
+    sim = sim.masked_fill(same_class, float("-inf"))
+
+    logits = torch.cat([pos_sim, sim], dim=-1)
+    targets = torch.zeros(logits.size(0), dtype=torch.long, device=logits.device)
+    return F.cross_entropy(logits, targets)
+
+
 def asymmetric_gib_loss(
     probs_healthy: torch.Tensor,
     probs_anomalous: torch.Tensor,

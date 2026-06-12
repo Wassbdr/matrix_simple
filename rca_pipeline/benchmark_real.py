@@ -29,7 +29,7 @@ from rca_pipeline.drift_detector import make_k8s_drift_detector
 from rca_pipeline.graph_builder import GraphBuilder
 from rca_pipeline.k_selection import get_optimal_k
 from rca_pipeline.loaders.rcaeval_loader import SUPPORTED_DATASETS, RCAEvalLoader
-from rca_pipeline.losses import info_nce_loss, variational_gib_loss
+from rca_pipeline.losses import class_aware_info_nce_loss, info_nce_loss, variational_gib_loss
 from rca_pipeline.metrics_rcaeval import (
     RCAEVAL_PUBLISHED_BASELINES,
     RCAEvalMetrics,
@@ -365,6 +365,7 @@ def train_and_eval_sta(
     hidden_dim=32, epochs=100, seed=42, use_mm=False,
     use_logs: bool = True, use_traces: bool = True,
     contrastive_warmup: int = 10,
+    warmup_mode: str = "class_aware",
 ):
     set_all_seeds(seed)
     name_to_idx = {n: i for i, n in enumerate(node_names)}
@@ -396,7 +397,14 @@ def train_and_eval_sta(
     ei = edge_index.to(device)
 
     # ---- Contrastive warmup (InfoNCE on Z_subgraph + variational GIB) ----
+    # warmup_mode="legacy" reproduces the documented real-data collapse
+    # (README §5.4): anchors AND negatives are random halves of the same
+    # all-anomalous pool, so most negatives share the anchor's root cause
+    # and InfoNCE tears same-class embeddings apart. "class_aware" masks
+    # same-class pairs out of the negative set (losses.class_aware_info_nce_loss).
     if contrastive_warmup > 0 and x_sup.size(0) >= 4:
+        if warmup_mode not in ("class_aware", "legacy"):
+            raise ValueError(f"unknown warmup_mode: {warmup_mode}")
         opt_warm = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
         target_rate = k / N
         model.set_temperature(2.0)
@@ -405,35 +413,44 @@ def train_and_eval_sta(
             perm = torch.randperm(x_sup.size(0), device=device)
             half = x_sup.size(0) // 2
             idx_a, idx_n = perm[:half], perm[half:]
+            if warmup_mode == "class_aware":
+                idx_a = perm  # full batch as anchors; negatives masked by class
 
             opt_warm.zero_grad()
             if use_mm:
                 xla = (x_logs_sup[idx_a] if x_logs_sup is not None else None) if use_logs else None
                 xta = (x_traces_sup[idx_a] if x_traces_sup is not None else None) if use_traces else None
                 _, M_a, _, sel_a = model(x_sup[idx_a], xla, xta, ei)
-                xln = (x_logs_sup[idx_n] if x_logs_sup is not None else None) if use_logs else None
-                xtn = (x_traces_sup[idx_n] if x_traces_sup is not None else None) if use_traces else None
-                _, M_n, _, sel_n = model(x_sup[idx_n], xln, xtn, ei)
             else:
                 _, M_a, _, sel_a = model(x_sup[idx_a], ei)
-                _, M_n, _, sel_n = model(x_sup[idx_n], ei)
+            if warmup_mode == "legacy":
+                if use_mm:
+                    xln = (x_logs_sup[idx_n] if x_logs_sup is not None else None) if use_logs else None
+                    xtn = (x_traces_sup[idx_n] if x_traces_sup is not None else None) if use_traces else None
+                    _, M_n, _, sel_n = model(x_sup[idx_n], xln, xtn, ei)
+                else:
+                    _, M_n, _, sel_n = model(x_sup[idx_n], ei)
 
             # Mask-weighted embeddings (aligned with train_sta.py / train_sta_compact)
-            B_a, B_n_sz = idx_a.size(0), idx_n.size(0)
-            if hasattr(model, 'light_encoder'):
-                h_a_full = model.light_encoder(x_sup[idx_a].view(B_a * N, F_, -1)).view(B_a, N, -1)
-                h_n_full = model.light_encoder(x_sup[idx_n].view(B_n_sz * N, F_, -1)).view(B_n_sz, N, -1)
-            elif hasattr(model, 'metric_encoder'):
-                h_a_full = model.metric_encoder(x_sup[idx_a].view(B_a * N, F_, -1)).view(B_a, N, -1)
-                h_n_full = model.metric_encoder(x_sup[idx_n].view(B_n_sz * N, F_, -1)).view(B_n_sz, N, -1)
-            else:
-                h_a_full = sel_a.unsqueeze(-1).expand(B_a, N, 1)
-                h_n_full = sel_n.unsqueeze(-1).expand(B_n_sz, N, 1)
-            z_a = (h_a_full * M_a.unsqueeze(-1)).sum(1) / (M_a.sum(1, keepdim=True) + 1e-8)
-            z_n = (h_n_full * M_n.unsqueeze(-1)).sum(1) / (M_n.sum(1, keepdim=True) + 1e-8)
+            def _embed(idx, M, sel):
+                b = idx.size(0)
+                if hasattr(model, 'light_encoder'):
+                    h = model.light_encoder(x_sup[idx].view(b * N, F_, -1)).view(b, N, -1)
+                elif hasattr(model, 'metric_encoder'):
+                    h = model.metric_encoder(x_sup[idx].view(b * N, F_, -1)).view(b, N, -1)
+                else:
+                    h = sel.unsqueeze(-1).expand(b, N, 1)
+                return (h * M.unsqueeze(-1)).sum(1) / (M.sum(1, keepdim=True) + 1e-8)
+
+            z_a = _embed(idx_a, M_a, sel_a)
             z_pos = z_a + torch.randn_like(z_a) * 0.05
-            l_nce = info_nce_loss(z_a, z_pos, z_n, temperature=0.07)
-            l_gib = variational_gib_loss(torch.cat([M_a, M_n], dim=0), target_rate)
+            if warmup_mode == "class_aware":
+                l_nce = class_aware_info_nce_loss(z_a, z_pos, y_sup[idx_a], temperature=0.07)
+                l_gib = variational_gib_loss(M_a, target_rate)
+            else:
+                z_n = _embed(idx_n, M_n, sel_n)
+                l_nce = info_nce_loss(z_a, z_pos, z_n, temperature=0.07)
+                l_gib = variational_gib_loss(torch.cat([M_a, M_n], dim=0), target_rate)
             beta = min(1.0, ep / max(contrastive_warmup // 2, 1)) * 0.3
 
             loss = l_nce + beta * l_gib
@@ -801,6 +818,7 @@ def _run_single_dataset(
             hidden_dim=args.hidden_dim, epochs=args.epochs, seed=seed,
             use_mm=args.use_mm, use_logs=use_logs, use_traces=use_traces,
             contrastive_warmup=args.sta_contrastive_warmup,
+            warmup_mode=getattr(args, "sta_warmup_mode", "class_aware"),
         )
         if r_sta_raw:
             sta_raw_runs.append(r_sta_raw)
@@ -853,6 +871,7 @@ def _run_single_dataset(
                     hidden_dim=args.hidden_dim, epochs=args.epochs, seed=seed,
                     use_mm=args.use_mm, use_logs=use_logs, use_traces=use_traces,
                     contrastive_warmup=args.sta_contrastive_warmup,
+                    warmup_mode=getattr(args, "sta_warmup_mode", "class_aware"),
                 )
                 if r_sta_f:
                     sta_f_runs.append(r_sta_f)
@@ -1091,6 +1110,14 @@ def main():
         "--allow-real-warmup",
         action="store_true",
         help="Acknowledge real-data warmup risk and allow sta-contrastive-warmup > 0.",
+    )
+    parser.add_argument(
+        "--sta-warmup-mode",
+        type=str,
+        default="class_aware",
+        choices=["class_aware", "legacy"],
+        help="Warmup InfoNCE negatives: class_aware masks same-root-cause pairs "
+             "(fix for the real-data collapse); legacy reproduces the old behavior.",
     )
     parser.add_argument("--rcaeval-root", type=str, default="rcaeval")
     parser.add_argument("--max-cases", type=int, default=None,
