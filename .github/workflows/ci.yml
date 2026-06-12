@@ -17,40 +17,75 @@ jobs:
         python-version: ["3.9", "3.11"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements/constraints-cpu.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          # CPU torch wheel; ABI pins (incl. numpy<2) come from the constraints file.
           pip install torch==2.0.1 --index-url https://download.pytorch.org/whl/cpu
           pip install torch_geometric==2.4.0
-          pip install -e ".[dev]"
-          # torch 2.0.1 is built against NumPy 1.x; pin numpy<2 to avoid the
-          # NumPy 2.x ABI break (_ARRAY_API not found / dtype inference errors).
-          pip install "numpy<2"
+          pip install -e ".[dev,serve]" -c requirements/constraints-cpu.txt
 
       - name: Lint (ruff)
-        run: python -m ruff check rca_pipeline
+        run: python -m ruff check rca_pipeline serving conftest.py
 
-      - name: Unit tests
-        run: python -m pytest -q rca_pipeline/tests
+      - name: Unit tests + coverage gate
+        run: python -m pytest --cov --cov-report=xml
 
-      - name: Smoke benchmark (simulated, N=20, 2 seeds)
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.11'
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
+
+      - name: Smoke benchmark (simulated, from versioned config)
         run: |
           python -m rca_pipeline.benchmark \
-            --sizes 20 \
-            --seeds 42,123 \
-            --supervised-epochs 5 \
-            --late-contrastive-epochs 3 \
-            --sta-warmup-epochs 2 \
-            --sta-k-anneal-epochs 3 \
-            --baseline-epochs 5 \
-            --output-json /tmp/smoke_sim.json
+            --config configs/benchmark_sim_smoke.yaml \
+            --output-json smoke_sim.json
+
+      - name: Upload smoke benchmark results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: smoke-benchmark-py${{ matrix.python-version }}
+          path: smoke_sim.json
+          retention-days: 14
 
       # validation_protocol (smoke/long/paper) requires RCAEval data not available in CI.
       # Run locally: RCA_VAL_PRESET=smoke RCA_VAL_STA_WARMUP=0 python -m rca_pipeline.validation_protocol
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build serve image (no push)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: serving/Dockerfile
+          push: false
+          cache-from: type=gha,scope=serve
+          cache-to: type=gha,mode=max,scope=serve
+
+      - name: Build watcher image (no push)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: serving/Dockerfile.watcher
+          push: false
+          cache-from: type=gha,scope=watcher
+          cache-to: type=gha,mode=max,scope=watcher

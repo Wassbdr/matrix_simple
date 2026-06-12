@@ -134,6 +134,9 @@ class PredictedCandidate(BaseModel):
 
 
 class PredictResponse(BaseModel):
+    # "model_version" intentionally shadows pydantic's protected "model_" namespace
+    model_config = {"protected_namespaces": ()}
+
     model_version: str
     candidates: List[PredictedCandidate]
     latency_ms: float
