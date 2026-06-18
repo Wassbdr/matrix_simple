@@ -153,6 +153,41 @@ root cause `orders-db` in `analyze_per_scenario.CHAOS_SCENARIOS`).
 **Acceptance:** cascade scenario Avg@1 ≥ 0.15 for STA+cascade AND no
 regression on the four hard/gray scenarios (per-root breakdown).
 
+**Mechanism validated on the real sock_shop N=14 topology** (no training
+needed — `cascade_prior` is post-hoc; this isolates the prior from model
+noise). Injecting the documented cascade signature (root cause `orders-db`
+metric-quiet, neighbors `orders`/`front-end` loud) into a local-evidence
+model that ranks the loudest node first:
+
+| Node | anomaly | prior |
+|---|---|---|
+| orders-db (root cause) | 0.026 | **0.974** |
+| orders (loud symptom) | 1.000 | 0.000 |
+| front-end | 0.748 | 0.053 |
+| payment | 0.010 | 0.865 |
+
+| γ (τ=0.1) | top-1 | `orders-db` rank | p(orders-db) |
+|---|---|---|---|
+| 0.0 (model only) | orders | 3 | 0.000 |
+| 0.3 | orders | 2 | 0.221 |
+| 0.5 | orders | 2 | 0.369 |
+| 0.7 | **orders-db** | **1** | 0.516 |
+
+The prior correctly assigns the highest score to the quiet root cause and
+recovers it to top-1 at γ≈0.7. (`payment` also scores high — it is a leaf
+neighbor of the loud `orders`; in a real cascade its own metrics would not
+be flat, so the model term keeps it down. This is exactly why the blend,
+not the prior alone, is the right tool.)
+
+**Status — full benchmark blocked by host RAM, not by the method.** The
+N=14 ObservIT benchmark (5 seeds × 100 epochs × {STA, GATv2}) OOM-kills on
+this machine: a full sock-shop microservice stack (locust, recommendation/
+reviews servers, watcher) already occupies ~7 GB of the 8 GB, leaving
+< 500 MB. The validation command above is ready to run once memory frees
+up (close the stack, or `wsl --shutdown` then relaunch). Until then the
+mechanism is verified analytically; the end-to-end per-scenario numbers
+remain pending.
+
 ## 4. 10-seed robustness
 
 `results_transmission/paper_benchmark_real_10seed.json` already provides
