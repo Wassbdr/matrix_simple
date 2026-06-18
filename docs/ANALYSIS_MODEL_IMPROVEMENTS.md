@@ -195,3 +195,28 @@ remain pending.
 true`; STA Avg@1: TrainTicket 0.945, SockShop 0.805, Online Boutique 0.670).
 Final step of this campaign: re-run the winning variants of §2–§3 at 10
 seeds to quantify their gains at the same standard.
+
+Same RAM blocker as §3: deferred until a machine with free memory. Command:
+
+```bash
+# warmup fix (§2) and cascade prior (§3), 10 seeds, real datasets
+python -m rca_pipeline.benchmark_real --config configs/benchmark_real.yaml \
+    --seeds 42,123,7,1337,2025,314,555,888,999,4242 \
+    --output-json /tmp/bench_real_10seed_improved.json
+python -m rca_pipeline.benchmark_real \
+    --observit-csv datasets/sockshop_runs_full --observit-topology sock_shop \
+    --seeds 42,123,7,1337,2025,314,555,888,999,4242 --epochs 100 \
+    --sta-contrastive-warmup 0 --deterministic \
+    --cascade-prior-tau 0.1 --cascade-prior-gamma 0.5,0.7 \
+    --output-json /tmp/observit_cascade_10seed.json
+```
+
+## Reproducibility note
+
+All §1 numbers are from fresh 3-seed RCAEval runs (data under
+`rcaeval/data/`). §2 numbers are direct A/B runs on TrainTicket. §3 is
+validated analytically on the real `sock_shop` topology
+(`tests/test_cascade_prior_sockshop.py`) because the full N=14 training
+benchmark exceeds available host RAM. The frozen
+`results_transmission/` artifacts were never modified; every command writes
+to `/tmp` or a new file.
