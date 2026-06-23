@@ -1,0 +1,125 @@
+# MLflow tracking server + model registry for the RCA pipeline.
+#
+# Deliberately simple for a single-user demo cluster: SQLite backend store +
+# local artifact store, both on ONE PVC. SQLite is single-writer, so:
+#   - replicas: 1
+#   - strategy: Recreate (never two pods writing the DB at once)
+# The "what I'd do at scale" path (Postgres backend + object-store artifacts)
+# is documented in docs/OPERATIONS.md.
+#
+# Apply:  kubectl apply -f deploy/mlflow/mlflow.yaml
+# UI:     kubectl -n mlops port-forward svc/mlflow 5000:5000
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlops
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mlflow-data
+  namespace: mlops
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 5Gi
+---
+# Basic-auth credentials. Replace before any non-sandbox use; in a real
+# setup this comes from a sealed-secret / external secret store, never git.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mlflow-basic-auth
+  namespace: mlops
+type: Opaque
+stringData:
+  MLFLOW_TRACKING_USERNAME: rca
+  MLFLOW_TRACKING_PASSWORD: change-me-in-cluster
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+  namespace: mlops
+  labels:
+    app: mlflow
+    component: tracking
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate           # SQLite single-writer: no rolling overlap
+  selector:
+    matchLabels:
+      app: mlflow
+  template:
+    metadata:
+      labels:
+        app: mlflow
+        component: tracking
+    spec:
+      securityContext:
+        fsGroup: 1000          # PVC writable by the non-root mlflow user
+      containers:
+        - name: mlflow
+          image: ghcr.io/mlflow/mlflow:v2.16.2
+          command: ["mlflow", "server"]
+          args:
+            - "--host=0.0.0.0"
+            - "--port=5000"
+            - "--backend-store-uri=sqlite:////mlflow/mlflow.db"
+            - "--artifacts-destination=/mlflow/artifacts"
+            - "--serve-artifacts"
+            - "--app-name=basic-auth"
+          ports:
+            - containerPort: 5000
+              name: http
+          envFrom:
+            - secretRef:
+                name: mlflow-basic-auth
+          volumeMounts:
+            - name: data
+              mountPath: /mlflow
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          # TCP probes, not httpGet /health: with --app-name=basic-auth the
+          # /health endpoint can require auth and return 401, which would
+          # crashloop the pod on a probe that has nothing to do with health.
+          readinessProbe:
+            tcpSocket:
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 5000
+            initialDelaySeconds: 45
+            periodSeconds: 20
+            failureThreshold: 6
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: mlflow-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow
+  namespace: mlops
+  labels:
+    app: mlflow
+spec:
+  type: ClusterIP
+  selector:
+    app: mlflow
+  ports:
+    - name: http
+      port: 5000
+      targetPort: 5000

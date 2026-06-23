@@ -1,0 +1,32 @@
+# Keep the Docker build context small: never ship data, checkpoints, venvs,
+# or git/CI cruft into any image. Without this, rcaeval/data/ alone (GBs)
+# is streamed into every build.
+.git
+.github
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.mypy_cache
+
+# Data / models / generated artifacts
+rcaeval
+datasets
+checkpoints
+rca_pipeline/checkpoints
+rca_pipeline/datasets
+rca_pipeline/validation_runs
+*.pt
+benchmark*.json
+*.optuna.db
+
+# Docs and heavy non-build assets
+docs
+results_transmission
+k8s
+deploy
+scripts
+*.md
+!README.md
