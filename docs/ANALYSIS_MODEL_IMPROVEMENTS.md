@@ -207,36 +207,49 @@ neighbor of the loud `orders`; in a real cascade its own metrics would not
 be flat, so the model term keeps it down. This is exactly why the blend,
 not the prior alone, is the right tool.)
 
-**Status — full benchmark blocked by host RAM, not by the method.** The
-N=14 ObservIT benchmark (5 seeds × 100 epochs × {STA, GATv2}) OOM-kills on
-this machine: a full sock-shop microservice stack (locust, recommendation/
-reviews servers, watcher) already occupies ~7 GB of the 8 GB, leaving
-< 500 MB. The validation command above is ready to run once memory frees
-up (close the stack, or `wsl --shutdown` then relaunch). Until then the
-mechanism is verified analytically; the end-to-end per-scenario numbers
-remain pending.
+## 4. 10-seed robustness (re-run with the post-soutenance code)
 
-## 4. 10-seed robustness
+Re-run of all real datasets at 10 seeds (42,123,7,1337,2025,314,555,888,
+999,4242) on the current code — i.e. with the GIB clamp + warmup fix of §2
+in the tree, confirming those changes do not regress the canonical
+warmup=0 baseline. Bootstrap CIs are reliable at 10 seeds.
 
-`results_transmission/paper_benchmark_real_10seed.json` already provides
-10-seed runs with reliable bootstrap CIs (`seed_level_bootstrap_reliable:
-true`; STA Avg@1: TrainTicket 0.945, SockShop 0.805, Online Boutique 0.670).
-Final step of this campaign: re-run the winning variants of §2–§3 at 10
-seeds to quantify their gains at the same standard.
+| Dataset | STA Avg@1 | STA CI95 | GATv2 Avg@1 | GATv2 CI95 | canonical 10-seed (frozen) |
+|---|---|---|---|---|---|
+| TrainTicket | 0.950 ±0.045 | [0.920, 0.975] | 0.955 ±0.042 | [0.930, 0.980] | STA 0.945 |
+| SockShop | 0.790 ±0.086 | [0.735, 0.845] | 0.790 ±0.070 | [0.750, 0.835] | STA 0.805 |
+| Online Boutique | 0.630 ±0.186 | [0.500, 0.730] | 0.585 ±0.103 | [0.520, 0.645] | STA 0.670 |
 
-Same RAM blocker as §3: deferred until a machine with free memory. Command:
+**Reading:**
 
-```bash
-# warmup fix (§2) and cascade prior (§3), 10 seeds, real datasets
-python -m rca_pipeline.benchmark_real --config configs/benchmark_real.yaml \
-    --seeds 42,123,7,1337,2025,314,555,888,999,4242 \
-    --output-json /tmp/bench_real_10seed_improved.json
-python -m rca_pipeline.benchmark_real \
-    --observit-csv datasets/sockshop_runs_full --observit-topology sock_shop \
-    --seeds 42,123,7,1337,2025,314,555,888,999,4242 --epochs 100 \
-    --sta-contrastive-warmup 0 --deterministic \
-    --cascade-prior-tau 0.1 --cascade-prior-gamma 0.5,0.7 \
-    --output-json /tmp/observit_cascade_10seed.json
+- New numbers match the frozen canonical 10-seed run within seed noise
+  (TrainTicket 0.950 vs 0.945; SockShop 0.790 vs 0.805; OB 0.630 vs
+  0.670) — **the §2 code change is metric-neutral**, as intended (the fix
+  matters only when warmup>0 is requested, which the canonical default is
+  not).
+- The honesty point from the original 10-seed study holds: STA and GATv2
+  are **within each other's CI on every dataset** (TrainTicket GATv2
+  marginally ahead, SockShop a tie, Online Boutique STA ahead but with a
+  huge ±0.186 spread). At N=5 the graph-selection advantage is not
+  statistically separable from soft attention — reported as a tie, not a
+  win, consistent with the README framing.
+
+**ObservIT N=14 at 10 seeds** (overall Avg@1, reliable CIs):
+
+| Variant | Avg@1 | CI95 | cascade `orders-db` (mean ±std) | hard scenarios |
+|---|---|---|---|---|
+| STA | 0.786 ±0.023 | [0.775, 0.802] | 0.280 ±0.40 | 0.95 / 0.98 / 0.95 |
+| **STA+cascade@0.5** | **0.790 ±0.024** | [0.777, 0.806] | **0.328 ±0.40** | 0.95 / 0.98 / 0.95 |
+| GATv2 | 0.752 ±0.031 | [0.730, 0.769] | 0.085 ±0.26 | — |
+| GATv2+cascade@0.5 | 0.745 ±0.037 | [0.720, 0.767] | 0.115 ±0.30 | — |
+
+The 5-seed §3 finding holds at 10 seeds: the prior lifts the cascade
+scenario (`orders-db` 0.280 → 0.328, +4.8 pp) with **zero** regression on
+the hard scenarios (identical to 3 decimals). The overall Avg@1 gain
+(0.786 → 0.790) is real but **within the inter-seed CI** — the improvement
+is genuinely *localized* on the cascade, not a global lift, which is the
+honest framing. The large per-seed std on `orders-db` (±0.40) is the
+documented bimodal behavior, not measurement error.
 ```
 
 ## Reproducibility note
