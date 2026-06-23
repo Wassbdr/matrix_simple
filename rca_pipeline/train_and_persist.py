@@ -33,6 +33,7 @@ from typing import Dict, List, Optional
 import numpy as np
 import torch
 
+from rca_pipeline import tracking
 from rca_pipeline.benchmark_real import (
     _clone_pyg_data,
     train_and_eval_sta,
@@ -251,20 +252,46 @@ def main():
         "hpo_param_importances": hpo.get("param_importances"),
     }
 
-    save_bundle(
-        bundle_dir=args.output_bundle,
-        model=best_model,
-        node_names=node_names,
-        edge_index=edge_index,
-        scaler_mean=best_scaler.mean_,
-        scaler_scale=best_scaler.scale_,
-        num_features=data_list[0].x.size(1),
-        hidden_dim=hidden_dim,
-        k=k_target,
-        training_info=training_info,
-        hpo_provenance=hpo_provenance,
-    )
-    logger.info("Bundle saved: %s", args.output_bundle)
+    # Wrap the persist + registry step in an MLflow run (no-op offline).
+    with tracking.run(experiment="sta-sockshop", run_name="train_and_persist") as run_id:
+        tracking.log_params({
+            "hidden_dim": hidden_dim, "k": k_target, "epochs": epochs,
+            "contrastive_warmup": contrastive_warmup, "seeds": seeds,
+            "topology": args.topology, "n_windows": len(data_list),
+            "hpo_study_name": hpo.get("study_name"),
+        })
+        tracking.log_metrics({
+            "avg1_mean": training_info["avg1_mean"],
+            "avg1_std": training_info["avg1_std"],
+            "mrr_mean": training_info["mrr_mean"],
+            "mrr_std": training_info["mrr_std"],
+            "best_mrr": float(best_mrr),
+        })
+
+        save_bundle(
+            bundle_dir=args.output_bundle,
+            model=best_model,
+            node_names=node_names,
+            edge_index=edge_index,
+            scaler_mean=best_scaler.mean_,
+            scaler_scale=best_scaler.scale_,
+            num_features=data_list[0].x.size(1),
+            hidden_dim=hidden_dim,
+            k=k_target,
+            training_info=training_info,
+            hpo_provenance=hpo_provenance,
+            mlflow_run_id=run_id,
+        )
+        logger.info("Bundle saved: %s", args.output_bundle)
+
+        # Register the bundle as a model version (alias=challenger); the
+        # bundle dir IS the artifact (no pyfunc wrapping).
+        version = tracking.register_model(
+            args.output_bundle, name="sta-sockshop", alias="challenger",
+        )
+        if version is not None:
+            logger.info("Registered sta-sockshop v%s (alias=challenger)", version)
+
     logger.info("Best seed=%d MRR=%.4f Avg@1=%.4f",
                 best_seed, best_mrr,
                 next(r["avg1"] for r in per_seed if r["seed"] == best_seed))

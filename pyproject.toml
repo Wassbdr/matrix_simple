@@ -48,6 +48,11 @@ k8s = [
 hpo = [
   "optuna>=3.6.0",
 ]
+# Experiment tracking + model registry (MLflow). Optional: the tracking
+# wrapper (rca_pipeline/tracking.py) is a no-op when mlflow is absent.
+tracking = [
+  "mlflow>=2.15.0",
+]
 # Inference serving (REST API + Prometheus metrics)
 serve = [
   "fastapi>=0.115.0",

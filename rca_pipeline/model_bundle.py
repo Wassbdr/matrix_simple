@@ -56,6 +56,7 @@ def save_bundle(
     k: int,
     training_info: Dict[str, Any],
     hpo_provenance: Optional[Dict[str, Any]] = None,
+    mlflow_run_id: Optional[str] = None,
 ) -> None:
     """Persist a model + everything needed to serve it later."""
     p = Path(bundle_dir)
@@ -91,6 +92,10 @@ def save_bundle(
     }
     if hpo_provenance is not None:
         metadata["hpo_provenance"] = hpo_provenance
+    if mlflow_run_id is not None:
+        # Cross-link bundle <-> MLflow run for end-to-end lineage; surfaced
+        # by the serving /info endpoint.
+        metadata["model_card"]["mlflow_run_id"] = mlflow_run_id
 
     (p / "metadata.json").write_text(json.dumps(metadata, indent=2))
     logger.info("Saved bundle to %s (%d files)", bundle_dir, len(list(p.iterdir())))

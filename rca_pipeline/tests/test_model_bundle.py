@@ -56,6 +56,22 @@ def test_metadata_provenance_fields(tmp_path):
         assert field in card
     assert bundle.metadata["hpo_provenance"] == {"source": "test"}
     assert bundle.metadata["training"]["seeds"] == [42]
+    # run_id is omitted when not provided (offline training)
+    assert "mlflow_run_id" not in card
+
+
+def test_mlflow_run_id_cross_link(tmp_path):
+    torch.manual_seed(0)
+    model = SelectThenAnalyze(num_features=F, hidden_dim=H, num_nodes=N, k=K)
+    save_bundle(
+        str(tmp_path), model=model, node_names=NODE_NAMES, edge_index=EDGE_INDEX,
+        scaler_mean=np.zeros(F, dtype=np.float32),
+        scaler_scale=np.ones(F, dtype=np.float32),
+        num_features=F, hidden_dim=H, k=K,
+        training_info={"avg1_mean": 0.5}, mlflow_run_id="abc123def456",
+    )
+    bundle = load_bundle(str(tmp_path))
+    assert bundle.metadata["model_card"]["mlflow_run_id"] == "abc123def456"
 
 
 def test_predict_ranking_shape_and_order(tmp_path):
