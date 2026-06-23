@@ -1,0 +1,84 @@
+{{- define "rca.serveDeployment" -}}
+{{- $root := index . 0 -}}
+{{- $variant := index . 1 -}}   {{/* "" for champion, "shadow" for challenger */}}
+{{- $alias := index . 2 -}}
+{{- $name := ternary "rca-sta-serve" "rca-sta-serve-shadow" (eq $variant "") -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Values.namespace }}
+  labels:
+    app: {{ $name }}
+    component: inference
+    variant: {{ ternary "champion" "shadow" (eq $variant "") }}
+spec:
+  replicas: {{ $root.Values.serve.replicas }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+        component: inference
+        variant: {{ ternary "champion" "shadow" (eq $variant "") }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      {{- if $root.Values.mlflow.trackingUri }}
+      initContainers:
+        {{- include "rca.fetchBundleInit" (list $root $alias) | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: serve
+          image: {{ include "rca.image" (list $root "serve") }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          ports:
+            - { containerPort: 8080, name: http }
+          env:
+            - { name: MODEL_BUNDLE, value: {{ $root.Values.model.bundlePath | quote }} }
+            - { name: DEFAULT_TOP_K, value: {{ $root.Values.serve.defaultTopK | quote }} }
+            - { name: LOG_FORMAT, value: {{ $root.Values.serve.logFormat | quote }} }
+          volumeMounts:
+            - name: model-bundle
+              mountPath: {{ $root.Values.model.bundlePath }}
+          resources: {{- toYaml $root.Values.serve.resources | nindent 12 }}
+          startupProbe:
+            httpGet: { path: /health, port: 8080 }
+            periodSeconds: 5
+            failureThreshold: 24
+          livenessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: { path: /ready, port: 8080 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+      volumes:
+        - name: model-bundle
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Values.namespace }}
+  labels:
+    app: {{ $name }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ $name }}
+  ports:
+    - { name: http, port: 8080, targetPort: 8080 }
+{{- end -}}
+
+{{ include "rca.serveDeployment" (list . "" .Values.model.registry.alias) }}
+{{- if .Values.shadow.enabled }}
+---
+{{ include "rca.serveDeployment" (list . "shadow" .Values.shadow.alias) }}
+{{- end }}

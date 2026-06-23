@@ -1,0 +1,61 @@
+{{- if .Values.watcher.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rca-watcher
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: rca-watcher
+    component: watcher
+spec:
+  replicas: {{ .Values.watcher.replicas }}
+  selector:
+    matchLabels:
+      app: rca-watcher
+  template:
+    metadata:
+      labels:
+        app: rca-watcher
+        component: watcher
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8090"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: watcher
+          image: {{ include "rca.image" (list . "watcher") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - { containerPort: 8090, name: http }
+          env:
+            - { name: LOG_FORMAT, value: json }
+            - name: INFERENCE_URL
+              value: "http://rca-sta-serve.{{ .Values.namespace }}.svc.cluster.local:8080"
+            {{- range $k, $v := .Values.watcher.env }}
+            - { name: {{ $k }}, value: {{ $v | quote }} }
+            {{- end }}
+            {{- if .Values.shadow.enabled }}
+            - name: SHADOW_INFERENCE_URL
+              value: "http://rca-sta-serve-shadow.{{ .Values.namespace }}.svc.cluster.local:8080"
+            {{- end }}
+          resources: {{- toYaml .Values.watcher.resources | nindent 12 }}
+          livenessProbe:
+            httpGet: { path: /health, port: 8090 }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rca-watcher
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: rca-watcher
+spec:
+  type: ClusterIP
+  selector:
+    app: rca-watcher
+  ports:
+    - { name: http, port: 8090, targetPort: 8090 }
+{{- end }}

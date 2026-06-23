@@ -1,0 +1,80 @@
+{{- if .Values.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: rca-sta-serve-rules
+  namespace: monitoring
+  labels:
+    app: rca-sta-serve
+    component: inference
+    release: monitoring
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: rca-sta-serve.health
+      interval: 30s
+      rules:
+        - alert: RCAStaServeDown
+          expr: absent(up{namespace="{{ .Values.namespace }}", app="rca-sta-serve"} == 1)
+          for: 2m
+          labels: { severity: critical, component: rca-sta-serve }
+          annotations:
+            summary: "STA inference service down or not scraped"
+            description: "rca-sta-serve in {{ .Values.namespace }} unreachable by Prometheus for >2m."
+
+        - alert: RCAStaServeHighErrorRate
+          expr: |
+            sum(rate(rca_predictions_total{status!="ok"}[5m]))
+              / sum(rate(rca_predictions_total[5m])) > 0.05
+          for: 5m
+          labels: { severity: warning, component: rca-sta-serve }
+          annotations:
+            summary: "/predict error rate > 5% over 5m"
+            description: "More than 5% of /predict calls returned an error."
+
+        - alert: RCAStaServeHighLatency
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(rca_predict_latency_seconds_bucket[5m])) by (le)) > 0.5
+          for: 10m
+          labels: { severity: warning, component: rca-sta-serve }
+          annotations:
+            summary: "/predict p95 latency > 500ms over 10m"
+            description: "p95 end-to-end /predict latency exceeds 500ms."
+
+    - name: rca-sta-serve.mlops
+      interval: 1m
+      rules:
+        - alert: RCADataDriftSustained
+          expr: rca_drift_share > {{ .Values.drift.shareThreshold }}
+          for: 12h
+          labels: { severity: warning, component: rca-drift }
+          annotations:
+            summary: "Sustained data drift (> {{ .Values.drift.shareThreshold }} of features) for 12h"
+            description: "Evidently drift share exceeds the threshold; consider retraining."
+
+        - alert: RCARetrainJobFailed
+          expr: kube_job_status_failed{namespace="{{ .Values.namespace }}", job_name=~"rca-retrain.*"} > 0
+          for: 5m
+          labels: { severity: warning, component: rca-retrain }
+          annotations:
+            summary: "RCA retraining job failed"
+            description: "A rca-retrain Job reported a failed pod. Inspect kubectl logs."
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: rca-sta-serve
+  namespace: monitoring
+  labels:
+    release: monitoring
+    app: rca-sta-serve
+spec:
+  namespaceSelector:
+    matchNames: ["{{ .Values.namespace }}"]
+  selector:
+    matchExpressions:
+      - { key: component, operator: In, values: ["inference"] }
+  podMetricsEndpoints:
+    - { port: http, path: /metrics, interval: 15s, scrapeTimeout: 10s }
+{{- end }}

@@ -1,0 +1,60 @@
+{{- if .Values.retrain.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: rca-retrain
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: rca-retrain
+    component: retrain
+spec:
+  schedule: {{ .Values.retrain.schedule | quote }}
+  suspend: {{ .Values.retrain.suspend }}     # default true: manual trigger via
+                                             # kubectl create job --from=cronjob/rca-retrain
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: rca-retrain
+            component: retrain
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: retrain
+              image: {{ include "rca.image" (list . "train") }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command:
+                - python
+                - -m
+                - rca_pipeline.train_and_persist
+                - --config=/config/train.yaml
+                - --output-bundle=/tmp/bundle
+              env:
+                - { name: LOG_FORMAT, value: json }
+                - name: MLFLOW_TRACKING_URI
+                  value: {{ .Values.mlflow.trackingUri | quote }}
+                {{- if .Values.mlflow.authSecret }}
+                - name: MLFLOW_TRACKING_USERNAME
+                  valueFrom:
+                    secretKeyRef: { name: {{ .Values.mlflow.authSecret }}, key: MLFLOW_TRACKING_USERNAME, optional: true }
+                - name: MLFLOW_TRACKING_PASSWORD
+                  valueFrom:
+                    secretKeyRef: { name: {{ .Values.mlflow.authSecret }}, key: MLFLOW_TRACKING_PASSWORD, optional: true }
+                {{- end }}
+              volumeMounts:
+                - { name: train-config, mountPath: /config }
+                - { name: dataset, mountPath: /data, readOnly: true }
+              resources: {{- toYaml .Values.retrain.resources | nindent 16 }}
+          volumes:
+            - name: train-config
+              configMap:
+                name: {{ .Values.retrain.configMap }}
+            - name: dataset
+              persistentVolumeClaim:
+                claimName: rca-dataset
+{{- end }}

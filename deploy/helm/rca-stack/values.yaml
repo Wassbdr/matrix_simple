@@ -1,0 +1,67 @@
+namespace: rca-sandbox
+
+image:
+  registry: ghcr.io
+  owner: wassbdr          # GHCR packages are public; no imagePullSecrets
+  tag: latest             # CD overrides with the commit sha
+  pullPolicy: IfNotPresent
+
+# Model source. The serve pod runs an initContainer (train image) that
+# downloads models:/<registry.name>@<registry.alias> into an emptyDir.
+model:
+  bundlePath: /app/checkpoints/sta_sockshop_v1
+  registry:
+    name: sta-sockshop
+    alias: champion       # serve tracks the champion; shadow tracks challenger
+
+mlflow:
+  # Empty disables the initContainer (falls back to a baked/volume bundle).
+  trackingUri: "http://mlflow.mlops.svc.cluster.local:5000"
+  authSecret: mlflow-basic-auth   # in the rca-sandbox ns; optional
+
+serve:
+  replicas: 1
+  defaultTopK: 3
+  logFormat: json
+  resources:
+    requests: { cpu: "100m", memory: "256Mi" }
+    limits:   { cpu: "1000m", memory: "1Gi" }
+
+watcher:
+  enabled: true
+  replicas: 1
+  resources:
+    requests: { cpu: "50m", memory: "128Mi" }
+    limits:   { cpu: "500m", memory: "512Mi" }
+  env:
+    PROMETHEUS_URL: "http://prometheus-server.monitoring-metrics.svc.cluster.local"
+    TARGET_NAMESPACE: sock-shop
+    POLL_INTERVAL_S: "60"
+
+# Shadow deployment (M2.6): a second serve tracking the challenger alias.
+shadow:
+  enabled: false
+  alias: challenger
+
+prometheusRule:
+  enabled: true
+
+retrain:
+  enabled: true
+  schedule: "0 3 * * 0"   # weekly Sun 03:00; suspended by default
+  suspend: true
+  configMap: rca-train-config
+  resources:
+    requests: { cpu: "1", memory: "2Gi" }
+    limits:   { cpu: "2", memory: "4Gi" }
+
+drift:
+  enabled: true
+  schedule: "0 */6 * * *"
+  suspend: false
+  lookbackHours: 6
+  shareThreshold: 0.3
+  pushgateway: "http://prometheus-pushgateway.monitoring-metrics.svc.cluster.local:9091"
+  resources:
+    requests: { cpu: "200m", memory: "512Mi" }
+    limits:   { cpu: "1", memory: "1Gi" }

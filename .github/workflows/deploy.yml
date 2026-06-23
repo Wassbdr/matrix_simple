@@ -1,0 +1,53 @@
+name: Deploy to cluster
+
+# Pull-side deployment of the rca-stack Helm chart. The cluster has private
+# IPs unreachable from GitHub-hosted runners, so this runs on a SELF-HOSTED
+# runner with cluster access.
+#
+# SECURITY (public repo): never trigger on pull_request — a self-hosted
+# runner executing fork PR code is remote code execution. Only main pushes
+# and manual dispatch are allowed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/helm/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (default: sha-<commit>)"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-cluster
+  cancel-in-progress: false
+
+jobs:
+  helm-upgrade:
+    runs-on: [self-hosted, rca-cluster]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Resolve image tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=sha-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: helm upgrade --install
+        run: |
+          helm upgrade --install rca-stack deploy/helm/rca-stack \
+            --namespace rca-sandbox --create-namespace \
+            --set image.tag=${{ steps.tag.outputs.tag }} \
+            --wait --timeout 5m
+
+      - name: Rollout status
+        run: kubectl -n rca-sandbox rollout status deploy/rca-sta-serve --timeout=2m

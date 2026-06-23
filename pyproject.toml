@@ -53,6 +53,12 @@ hpo = [
 tracking = [
   "mlflow>=2.15.0",
 ]
+# Batch data-drift monitoring (Evidently). The drift job degrades to a
+# built-in PSI fallback when evidently is absent.
+monitoring = [
+  "evidently>=0.4.0",
+  "pyarrow>=14.0.0",
+]
 # Inference serving (REST API + Prometheus metrics)
 serve = [
   "fastapi>=0.115.0",

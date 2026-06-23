@@ -1,0 +1,52 @@
+{{- if .Values.drift.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: rca-drift
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: rca-drift
+    component: drift
+spec:
+  schedule: {{ .Values.drift.schedule | quote }}
+  suspend: {{ .Values.drift.suspend }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: rca-drift
+            component: drift
+        spec:
+          restartPolicy: Never
+          initContainers:
+            {{- include "rca.fetchBundleInit" (list . .Values.model.registry.alias) | nindent 12 }}
+          containers:
+            - name: drift
+              image: {{ include "rca.image" (list . "train") }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command:
+                - python
+                - -m
+                - rca_pipeline.monitoring.drift_job
+                - --reference={{ .Values.model.bundlePath }}/reference_windows.parquet
+                - --lookback-hours={{ .Values.drift.lookbackHours }}
+                - --prometheus-url={{ .Values.watcher.env.PROMETHEUS_URL }}
+                - --namespace={{ .Values.watcher.env.TARGET_NAMESPACE }}
+                - --pushgateway={{ .Values.drift.pushgateway }}
+              env:
+                - { name: LOG_FORMAT, value: json }
+                - name: MLFLOW_TRACKING_URI
+                  value: {{ .Values.mlflow.trackingUri | quote }}
+              volumeMounts:
+                - name: model-bundle
+                  mountPath: {{ .Values.model.bundlePath }}
+              resources: {{- toYaml .Values.drift.resources | nindent 16 }}
+          volumes:
+            - name: model-bundle
+              emptyDir: {}
+{{- end }}
