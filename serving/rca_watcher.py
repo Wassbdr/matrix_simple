@@ -48,6 +48,10 @@ INFERENCE_URL = os.environ.get(
     "INFERENCE_URL",
     "http://rca-sta-serve.rca-sandbox.svc.cluster.local:8080",
 )
+# Shadow deployment (M2.6): when set, each window is also sent to the
+# challenger endpoint and the two top-1 rankings are compared. Alerts still
+# come from the champion (INFERENCE_URL) only.
+SHADOW_INFERENCE_URL = os.environ.get("SHADOW_INFERENCE_URL", "")
 ALERTMANAGER_URL = os.environ.get(
     "ALERTMANAGER_URL",
     "http://monitoring-kube-prometheus-alertmanager.monitoring.svc.cluster.local:9093",
@@ -100,6 +104,13 @@ WATCHER_LAST_TOP_SCORE = Gauge("rca_watcher_last_top_score",
                                 "Score of the top-1 candidate at the last poll")
 WATCHER_LAST_ERROR_RATE = Gauge("rca_watcher_last_observed_error_rate",
                                  "Cluster-wide error rate at the last poll")
+# Shadow comparison metrics (M2.6). agreement_top1 is a moving indicator of
+# how often champion and challenger pick the same root cause.
+WATCHER_SHADOW_AGREE = Counter("rca_watcher_shadow_top1_agree_total",
+                                "Polls where champion and challenger top-1 matched",
+                                ["agree"])
+WATCHER_SHADOW_SCORE_DELTA = Gauge("rca_watcher_shadow_top1_score_delta",
+                                    "champion top-1 score minus challenger top-1 score")
 
 
 # ---------------------------------------------------------------------------
@@ -199,19 +210,47 @@ def observed_error_rate() -> float:
 # Inference call
 # ---------------------------------------------------------------------------
 
-def call_predict(window: np.ndarray) -> Optional[List[Tuple[str, float, int]]]:
+def call_predict(
+    window: np.ndarray,
+    url: str = INFERENCE_URL,
+) -> Optional[List[Tuple[str, float, int]]]:
     payload = {"window": window.tolist(), "top_k": TOP_K}
     try:
-        r = requests.post(f"{INFERENCE_URL}/predict", json=payload, timeout=10)
+        r = requests.post(f"{url}/predict", json=payload, timeout=10)
     except requests.RequestException as exc:
-        logger.warning("predict request failed: %s", exc)
+        logger.warning("predict request to %s failed: %s", url, exc)
         return None
     if r.status_code != 200:
-        logger.warning("predict returned %d: %s", r.status_code, r.text[:200])
+        logger.warning("predict %s returned %d: %s", url, r.status_code, r.text[:200])
         return None
     body = r.json()
     cands = body.get("candidates", [])
     return [(c["service"], float(c["score"]), int(c["rank"])) for c in cands]
+
+
+def compare_shadow(
+    champion: List[Tuple[str, float, int]],
+    window: np.ndarray,
+) -> None:
+    """POST the same window to the challenger and record agreement metrics.
+
+    No-op when SHADOW_INFERENCE_URL is unset. Never raises into the poll loop.
+    """
+    if not SHADOW_INFERENCE_URL or not champion:
+        return
+    challenger = call_predict(window, url=SHADOW_INFERENCE_URL)
+    if not challenger:
+        return
+    champ_top, champ_score = champion[0][0], champion[0][1]
+    chall_top, chall_score = challenger[0][0], challenger[0][1]
+    agree = champ_top == chall_top
+    WATCHER_SHADOW_AGREE.labels(agree=str(agree).lower()).inc()
+    WATCHER_SHADOW_SCORE_DELTA.set(champ_score - chall_score)
+    logger.info(
+        "shadow compare",
+        extra={"champion_top1": champ_top, "challenger_top1": chall_top,
+               "agree": agree, "score_delta": round(champ_score - chall_score, 4)},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -780,6 +819,10 @@ def watch_loop():
                             top[0], top[1], err * 100.0)
                 WATCHER_POLLS.labels(status="ok").inc()
                 alert = maybe_fire_alert(ranked, err)
+                try:
+                    compare_shadow(ranked, window)
+                except Exception as exc:   # shadow must never break the loop
+                    logger.warning("shadow compare failed: %s", exc)
             _push_recent(ts, ranked, err, alert)
         except Exception:
             logger.exception("poll failed")

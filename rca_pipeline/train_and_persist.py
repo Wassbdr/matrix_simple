@@ -145,6 +145,27 @@ def _train_and_capture(
     return model
 
 
+def _export_reference_windows(data_list, bundle_dir: str) -> None:
+    """Write reference_windows.parquet: one row per (window, node), columns
+    are the time-averaged features. The drift job compares this against the
+    same transform of live Prometheus windows."""
+    from pathlib import Path
+
+    rows = np.concatenate(
+        [d.x.mean(dim=2).cpu().numpy() for d in data_list], axis=0  # [N,F] per window
+    )
+    n_features = rows.shape[1]
+    cols = [f"f{i}" for i in range(n_features)]
+    try:
+        import pandas as pd
+        Path(bundle_dir).mkdir(parents=True, exist_ok=True)
+        out = Path(bundle_dir) / "reference_windows.parquet"
+        pd.DataFrame(rows, columns=cols).to_parquet(out, index=False)
+        logger.info("Reference windows exported: %s (%d rows)", out, len(rows))
+    except Exception as exc:  # pyarrow optional; never fail training on it
+        logger.warning("Could not export reference_windows.parquet: %s", exc)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset-dir", default="datasets/sockshop_runs")
@@ -251,6 +272,11 @@ def main():
         "hpo_best_params": hpo.get("best_params"),
         "hpo_param_importances": hpo.get("param_importances"),
     }
+
+    # Export a feature reference for batch drift monitoring (M2.7): the
+    # per-node, per-feature time-average of every training window. Lives
+    # inside the bundle so the reference is versioned with the model.
+    _export_reference_windows(data_list, args.output_bundle)
 
     # Wrap the persist + registry step in an MLflow run (no-op offline).
     with tracking.run(experiment="sta-sockshop", run_name="train_and_persist") as run_id:

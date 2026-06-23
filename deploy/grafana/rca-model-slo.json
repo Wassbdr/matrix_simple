@@ -1,0 +1,83 @@
+{
+  "title": "RCA STA — Model SLOs",
+  "uid": "rca-sta-slo",
+  "tags": ["rca", "mlops"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Served model (commit / created)",
+      "type": "table",
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "rca_model_info", "format": "table", "instant": true, "refId": "A" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "/predict latency p95 / p99 (s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum(rate(rca_predict_latency_seconds_bucket[5m])) by (le))", "legendFormat": "p95", "refId": "A" },
+        { "expr": "histogram_quantile(0.99, sum(rate(rca_predict_latency_seconds_bucket[5m])) by (le))", "legendFormat": "p99", "refId": "B" }
+      ],
+      "thresholds": [{ "value": 0.5, "colorMode": "critical", "op": "gt" }]
+    },
+    {
+      "id": 3,
+      "title": "Prediction rate & error ratio",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [
+        { "expr": "sum(rate(rca_predictions_total[5m]))", "legendFormat": "predictions/s", "refId": "A" },
+        { "expr": "sum(rate(rca_predictions_total{status!=\"ok\"}[5m])) / clamp_min(sum(rate(rca_predictions_total[5m])), 1e-9)", "legendFormat": "error ratio", "refId": "B" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Shadow top-1 agreement (champion vs challenger)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1 } },
+      "targets": [
+        { "expr": "sum(rate(rca_watcher_shadow_top1_agree_total{agree=\"true\"}[15m])) / clamp_min(sum(rate(rca_watcher_shadow_top1_agree_total[15m])), 1e-9)", "legendFormat": "agreement", "refId": "A" },
+        { "expr": "rca_watcher_shadow_top1_score_delta", "legendFormat": "score delta", "refId": "B" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Data drift share",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1 } },
+      "targets": [
+        { "expr": "rca_drift_share", "legendFormat": "drift share", "refId": "A" }
+      ],
+      "thresholds": [{ "value": 0.3, "colorMode": "warning", "op": "gt" }]
+    },
+    {
+      "id": 6,
+      "title": "Retrain job status (failed pods)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 12 },
+      "targets": [
+        { "expr": "sum(kube_job_status_failed{namespace=\"rca-sandbox\", job_name=~\"rca-retrain.*\"})", "refId": "A" }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Watcher alerts fired (by root cause)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "targets": [
+        { "expr": "sum(increase(rca_watcher_alerts_total[1h])) by (root_cause)", "legendFormat": "{{root_cause}}", "refId": "A" }
+      ]
+    }
+  ]
+}
