@@ -88,16 +88,70 @@ Alertmanager and/or directly to ntfy. Alertmanager webhooks received on
 `/ntfy-relay` feed the dashboard (`/dashboard`) and `/api/alerts`
 (`source: webhook`, with AM polling as fallback).
 
-## 7. Rollback (current state)
+## 7. MLOps lifecycle (Phase 2)
 
-Bundles are directories: keep previous versions side by side and point
-`MODEL_BUNDLE` (or the k8s volume) at the previous one, then restart the pod.
-Phase 2 replaces this with MLflow registry aliases (`@champion`/`@challenger`)
-and `helm rollback`.
+End-to-end: HPO → train+register → gate → deploy → monitor → drift → retrain.
+
+### MLflow (tracking + registry)
+`deploy/mlflow/mlflow.yaml` runs MLflow 2.16 in namespace `mlops`, SQLite +
+artifacts on one PVC, `replicas: 1` + `Recreate` (SQLite single-writer),
+basic-auth. UI: `kubectl -n mlops port-forward svc/mlflow 5000:5000`.
+
+Training is tracking-aware but offline-capable: `rca_pipeline/tracking.py`
+is a complete no-op unless `MLFLOW_TRACKING_URI` is set. With it set,
+`train_and_persist` logs params/metrics, logs the bundle dir *as the
+artifact* (no pyfunc wrapping), registers model `sta-sockshop` with alias
+`challenger`, and writes the run_id into the bundle's `metadata.json`
+(surfaced by serving `/info`).
+
+### Images & CD
+`.github/workflows/release.yml` builds+pushes `rca-sta-{serve,watcher,train}`
+to GHCR (public, sha+semver) on main/tags. `docker/train.Dockerfile` is the
+training/retraining/initContainer image. `.dockerignore` keeps data out of
+the build context. `deploy.yml` runs `helm upgrade` on a **self-hosted**
+runner (cluster has private IPs) — `main`/`workflow_dispatch` only, never
+`pull_request`.
+
+### Serving pulls the model by alias
+The serve pod's initContainer runs `serving/fetch_bundle.py` to download
+`models:/sta-sockshop@champion` into an emptyDir at `MODEL_BUNDLE`. Deleting
+the pod re-pulls the current champion. Roll back by moving the alias and
+restarting, or `helm rollback`.
+
+### Retraining (continuous training)
+Helm CronJob `rca-retrain` (suspended by default):
+```
+kubectl create job --from=cronjob/rca-retrain retrain-manual-$(date +%s) -n rca-sandbox
+```
+It runs `train_and_persist` against the dataset PVC, logging a new
+`@challenger`. Promotion is a deliberate human-in-the-loop gate:
+```
+python -m rca_pipeline.promote --model sta-sockshop --metric mrr_mean   # verdict
+python -m rca_pipeline.promote --model sta-sockshop --apply             # move @champion
+```
+
+### Shadow comparison (canary substitute)
+`--set shadow.enabled=true` deploys `rca-sta-serve-shadow` tracking
+`@challenger`. The watcher POSTs each window to both and exports
+`rca_watcher_shadow_top1_agree_total` / `_score_delta`. Drive traffic with a
+Chaos Mesh session, then read agreement/latency in Grafana before promoting.
+
+### Drift detection
+CronJob `rca-drift` (every 6h) runs `rca_pipeline/monitoring/drift_job.py`:
+Evidently `DataDriftPreset` (PSI fallback without the extra) comparing the
+bundle's `reference_windows.parquet` to the last N hours from Prometheus,
+pushing `rca_drift_share` to Pushgateway. Alert `RCADataDriftSustained`
+(`> 0.3 for 12h`) → ntfy: **alert, do not auto-retrain** — trigger manually.
+
+### Dashboard
+Import `deploy/grafana/rca-model-slo.json`: latency p95/p99, prediction/error
+rate, model commit, shadow agreement, drift share, retrain status, alert
+timeline.
 
 ## 8. Scaling notes (deliberate simplifications)
 
-- MLflow (Phase 2) will run on SQLite + PVC: single writer, 1 replica,
-  `Recreate` strategy. At scale: Postgres backend + object-store artifacts.
-- CD will use a self-hosted runner on `workflow_dispatch`/`main` only
-  (public repo: never run self-hosted on `pull_request`). At scale: Argo CD.
+- MLflow on SQLite + PVC (1 replica, `Recreate`). At scale: Postgres backend
+  + object-store artifacts (documented path, not implemented).
+- CD via a self-hosted runner on `workflow_dispatch`/`main` only. At scale:
+  Argo CD (pull-based GitOps, no runner exposure).
+- Promotion is manual. At scale: automated gate + canary traffic-split.
