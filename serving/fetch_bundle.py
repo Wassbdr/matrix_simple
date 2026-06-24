@@ -28,11 +28,16 @@ def fetch(model: str, alias: str, dest: str, artifact_path: str = "bundle") -> s
         raise SystemExit("MLFLOW_TRACKING_URI is not set; cannot fetch the bundle.")
     import mlflow
 
-    uri = f"models:/{model}@{alias}"
-    logger.info("Resolving %s", uri)
-    # download_artifacts on a models:/ URI fetches the whole logged artifact
-    # tree; the bundle was logged under artifact_path="bundle".
-    local = mlflow.artifacts.download_artifacts(artifact_uri=f"{uri}/{artifact_path}")
+    # Resolve the alias to a concrete version first. Passing a sub-path on a
+    # `models:/name@alias/...` URI to download_artifacts is NOT supported by
+    # the 2.x server (it tries the legacy stages API and 404s on the literal
+    # name "name@alias"). Resolve, then download from the run's artifact tree.
+    client = mlflow.MlflowClient()
+    mv = client.get_model_version_by_alias(model, alias)
+    logger.info("Resolved %s@%s -> version %s (run %s)", model, alias, mv.version, mv.run_id)
+    local = mlflow.artifacts.download_artifacts(
+        run_id=mv.run_id, artifact_path=artifact_path
+    )
 
     dest_path = Path(dest)
     if dest_path.exists():
