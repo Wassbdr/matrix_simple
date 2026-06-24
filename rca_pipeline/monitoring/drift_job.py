@@ -127,19 +127,51 @@ def push_metrics(gateway: str, drift_share: float, n_drifted: int) -> None:
     logger.info("Pushed drift metrics to %s (share=%.3f)", gateway, drift_share)
 
 
+def _fetch_current(
+    prometheus_url: str,
+    namespace: str,
+    lookback_hours: int,
+    sub_window_minutes: int = 6,
+    window_size: int = 12,
+) -> np.ndarray:
+    """Build the current sample with the same unit as the reference: one row
+    per (node, sub-window). The lookback is sliced into ``sub_window_minutes``
+    chunks; each chunk's [W,N,F] is time-averaged to [N,F] and stacked, so the
+    current sample has ``n_sub_windows * N`` rows — comparable to the
+    reference's per-(node, training-window) rows (otherwise a single window
+    gives only N≈14 points, far too few for a stable PSI)."""
+    import time
+
+    from rca_pipeline.prometheus_connector import PrometheusConnector
+
+    conn = PrometheusConnector(prometheus_url=prometheus_url, namespace=namespace)
+    end = time.time()
+    span = lookback_hours * 3600
+    step = sub_window_minutes * 60
+    n_sub = max(1, span // step)
+
+    rows = []
+    for i in range(n_sub):
+        w_end = end - i * step
+        w_start = w_end - step
+        x, pods = conn.fetch_window(w_start, w_end, window_size=window_size)
+        if x.shape[1] == 0:  # no pods discovered in this slice
+            continue
+        rows.append(_flatten_windows(np.transpose(x, (1, 2, 0))))  # [W,N,F]->[N,F]
+    if not rows:
+        raise SystemExit("No current data fetched from Prometheus over the lookback.")
+    return np.concatenate(rows, axis=0)  # [n_sub * N, F]
+
+
 def run(reference_path: str, lookback_hours: int, pushgateway: Optional[str],
         prometheus_url: Optional[str], namespace: str) -> Dict[str, object]:
     import pandas as pd
 
     reference = _flatten_windows(pd.read_parquet(reference_path).values)
 
-    if prometheus_url:
-        from rca_pipeline.prometheus_connector import PrometheusConnector
-        conn = PrometheusConnector(prometheus_url=prometheus_url, namespace=namespace)
-        x, _ = conn.fetch_latest_window(window_seconds=lookback_hours * 3600, window_size=30)
-        current = _flatten_windows(np.transpose(x, (1, 2, 0)))  # [W,N,F] -> [N,F]
-    else:
+    if not prometheus_url:
         raise SystemExit("--prometheus-url is required to fetch current data.")
+    current = _fetch_current(prometheus_url, namespace, lookback_hours)
 
     res = evidently_drift(reference, current) or fallback_drift(reference, current)
     logger.info("Drift: share=%.3f (%d/%d features, method=%s)",

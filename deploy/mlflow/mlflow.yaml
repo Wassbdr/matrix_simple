@@ -61,7 +61,10 @@ spec:
         component: tracking
     spec:
       securityContext:
-        fsGroup: 1000          # PVC writable by the non-root mlflow user
+        # The official mlflow image runs as root, which can already write the
+        # PVC. fsGroup is set so the mount stays group-writable if a future
+        # image switches to a non-root uid (gid 1000) — harmless under root.
+        fsGroup: 1000
       containers:
         - name: mlflow
           image: ghcr.io/mlflow/mlflow:v2.16.2

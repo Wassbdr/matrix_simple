@@ -73,8 +73,34 @@ spec:
   namespaceSelector:
     matchNames: ["{{ .Values.namespace }}"]
   selector:
-    matchExpressions:
-      - { key: component, operator: In, values: ["inference"] }
+    # Champion only: the shadow pod also has component=inference, and the SLO
+    # alerts aggregate rca_predictions_total / latency without a per-pod
+    # filter, so scraping the challenger here would let a slow/buggy shadow
+    # trip RCAStaServeHighLatency/HighErrorRate on the healthy champion.
+    matchLabels:
+      variant: champion
   podMetricsEndpoints:
     - { port: http, path: /metrics, interval: 15s, scrapeTimeout: 10s }
+{{- if .Values.shadow.enabled }}
+---
+# Separate PodMonitor for the shadow: its metrics carry a distinct
+# `variant=shadow` target label so the dashboard can show them without
+# polluting the champion SLO aggregates.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: rca-sta-serve-shadow
+  namespace: monitoring
+  labels:
+    release: monitoring
+    app: rca-sta-serve-shadow
+spec:
+  namespaceSelector:
+    matchNames: ["{{ .Values.namespace }}"]
+  selector:
+    matchLabels:
+      variant: shadow
+  podMetricsEndpoints:
+    - { port: http, path: /metrics, interval: 15s, scrapeTimeout: 10s }
+{{- end }}
 {{- end }}
