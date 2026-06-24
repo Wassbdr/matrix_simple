@@ -79,6 +79,9 @@ spec:
             - "--artifacts-destination=/mlflow/artifacts"
             - "--serve-artifacts"
             - "--app-name=basic-auth"
+            # Single gunicorn worker: SQLite is single-writer anyway, and 4
+            # default workers OOM-killed the pod at 512Mi on a loaded cluster.
+            - "--workers=1"
           ports:
             - containerPort: 5000
               name: http
@@ -91,10 +94,10 @@ spec:
           resources:
             requests:
               cpu: "100m"
-              memory: "256Mi"
+              memory: "384Mi"
             limits:
               cpu: "500m"
-              memory: "512Mi"
+              memory: "1Gi"
           # TCP probes, not httpGet /health: with --app-name=basic-auth the
           # /health endpoint can require auth and return 401, which would
           # crashloop the pod on a probe that has nothing to do with health.
