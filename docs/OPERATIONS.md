@@ -102,7 +102,19 @@ is a complete no-op unless `MLFLOW_TRACKING_URI` is set. With it set,
 `train_and_persist` logs params/metrics, logs the bundle dir *as the
 artifact* (no pyfunc wrapping), registers model `sta-sockshop` with alias
 `challenger`, and writes the run_id into the bundle's `metadata.json`
-(surfaced by serving `/info`).
+(surfaced by serving `/info`). Validated end-to-end on the cluster
+(run → register → alias → fetch by run_id → run_id cross-link intact).
+
+**Basic-auth gotcha**: `--app-name=basic-auth` keeps the server's *own*
+user DB, bootstrapped with `admin`/`password`. `MLFLOW_TRACKING_USERNAME/
+PASSWORD` are *client* creds — they must name a user that exists server-side.
+The `mlflow-basic-auth` secret therefore aligns on the built-in admin in the
+sandbox; for real use, create a dedicated user (auth API/UI) and rotate.
+
+**Alias fetch gotcha**: `download_artifacts("models:/name@alias/sub")` is not
+supported by the 2.x server. Resolve the alias to a version first
+(`get_model_version_by_alias`) then download by `run_id` — this is what
+`serving/fetch_bundle.py` and `promote.py` do.
 
 ### Images & CD
 `.github/workflows/release.yml` builds+pushes `rca-sta-{serve,watcher,train}`
