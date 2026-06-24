@@ -22,7 +22,10 @@ metadata:
   namespace: mlops
 spec:
   accessModes: ["ReadWriteOnce"]
-  storageClassName: standard
+  # No storageClassName: use the cluster's default StorageClass, so the chart
+  # is portable (RKE2 local-path, Harvester, etc.) instead of hard-coding one
+  # cluster's class name. Override with `kubectl ... -p` if a specific class
+  # (e.g. faster SSD) is required.
   resources:
     requests:
       storage: 5Gi
