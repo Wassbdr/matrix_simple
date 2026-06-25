@@ -152,6 +152,40 @@ Load generation:     Locust
 
 ---
 
+## MLOps Pipeline
+
+Beyond the research code, the model ships with a production-grade lifecycle
+(full runbook in [`docs/OPERATIONS.md`](docs/OPERATIONS.md)):
+
+```
+HPO ─▶ train_and_persist ─▶ MLflow run + model registry (sta-sockshop@challenger)
+                                      │
+              promote.py (manual gate) ▼
+                              sta-sockshop@champion
+                                      │
+   serve initContainer fetches @champion ▼      drift CronJob (Evidently/PSI)
+              FastAPI /predict  ◀── bundle      shadow deploy (champion vs challenger)
+                     │                                   │
+                     └────────▶ Prometheus + Grafana SLO dashboard ◀──┘
+```
+
+- **Tracking + registry**: `rca_pipeline/tracking.py` (no-op offline) logs
+  params/metrics and registers the bundle *as the artifact*; the run_id is
+  cross-linked into the bundle and surfaced by `/info`.
+- **Serving**: `serving/serve.py` (FastAPI, structured JSON logs, Prometheus
+  metrics) pulls the model by registry alias via an initContainer.
+- **CT**: retrain CronJob → `@challenger` → `promote.py` gate → `@champion`.
+- **Monitoring**: Evidently drift job, shadow comparison, Grafana SLOs.
+- **Delivery**: GHCR images (`release.yml`), Helm chart `deploy/helm/rca-stack`,
+  self-hosted CD (`deploy.yml`).
+
+Validated end-to-end on a live cluster: a real 5-seed champion
+(Avg@1 0.786 / MRR 0.871) was trained, registered, promoted, and fetched by
+alias. Post-defense model experiments are in
+[`docs/ANALYSIS_MODEL_IMPROVEMENTS.md`](docs/ANALYSIS_MODEL_IMPROVEMENTS.md).
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -314,14 +348,36 @@ network delay/loss, pod kill).
 │   ├── prometheus_connector.py    # Live Prometheus scraper
 │   ├── loki_connector.py          # Live Loki log fetcher
 │   ├── metrics_rcaeval.py         # Avg@k, MRR, NDCG, bootstrap CI
-│   ├── drift_detector.py          # K8s concept-drift detection
+│   ├── drift_detector.py          # K8s concept-drift detection (online ADWIN)
+│   ├── ensemble.py                # Post-hoc STA+GATv2 vote + calibration
+│   ├── cascade_prior.py           # Inference-time cascade propagation prior
+│   ├── config.py                  # YAML + pydantic config layer
+│   ├── tracking.py                # MLflow wrapper (no-op offline)
+│   ├── promote.py                 # Challenger→champion promotion gate
+│   ├── train_and_persist.py       # Train + register the serving bundle
+│   ├── model_bundle.py            # Portable bundle (model/scaler/metadata)
+│   ├── monitoring/drift_job.py    # Batch data-drift (Evidently/PSI)
 │   ├── common.py                  # Seeds, splits, env info
-│   └── tests/                     # pytest test suite (14 test files)
+│   └── tests/                     # pytest test suite
+├── serving/                       # FastAPI service + watcher
+│   ├── serve.py                   # /predict /health /ready /info /metrics
+│   ├── rca_watcher.py             # Polling loop + alerts + shadow compare
+│   ├── fetch_bundle.py            # Pull model by registry alias (initContainer)
+│   ├── logging_config.py          # Structured JSON logging
+│   └── Dockerfile*                # serve + watcher images
+├── deploy/                        # Phase-2 MLOps manifests
+│   ├── mlflow/                    # MLflow on K8s (SQLite + PVC)
+│   ├── helm/rca-stack/            # Serve/watcher/CronJobs Helm chart
+│   └── grafana/rca-model-slo.json # Model-SLO dashboard
+├── docker/train.Dockerfile        # Training/retraining/initContainer image
+├── configs/                       # Versioned YAML run configs
 ├── results_transmission/          # Canonical pre-publication artifacts
 │   ├── canonical_results_manifest.json       # SHA-256 verified snapshot
 │   ├── canonical_results_manifest.json.sha256
 │   └── comparability_matrix.json             # Comparability verdicts vs. baselines
 ├── docs/
+│   ├── OPERATIONS.md              # MLOps runbook (Phase 2)
+│   ├── ANALYSIS_MODEL_IMPROVEMENTS.md  # Post-defense model experiments
 │   ├── PAPER_BENCHMARKS.md        # Detailed benchmark commentary
 │   ├── ANALYSIS_SIM_VS_REAL.md
 │   ├── ANALYSIS_MULTIMODAL.md
@@ -329,6 +385,7 @@ network delay/loss, pod kill).
 ├── k8s/
 │   ├── app/                       # Application manifests
 │   └── chaos/sockshop/            # Chaos Mesh fault injection manifests
+├── .github/workflows/            # CI, GHCR release, self-hosted deploy
 ├── scripts/                       # K8s cluster bootstrap and campaign scripts
 ├── rcaeval/                       # RCAEval data (not versioned, see .gitignore)
 └── pyproject.toml                 # Single dependency source
