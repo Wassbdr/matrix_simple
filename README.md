@@ -12,12 +12,12 @@ the dependency graph is large, alerts are noisy, and faults propagate non-linear
 We propose a spatio-temporal GNN pipeline that combines a Late-Bottleneck STGCN with a
 Graph Information Bottleneck (GIB) for full-graph analysis, and a complementary
 Select-Then-Analyze (STA) architecture for sublinear inference on large topologies.
-This is a **deliberately honest, reproducible study — not a SOTA claim**. Across three
-RCAEval benchmarks, Barabási-Albert simulations (N = 20–100), a live 14-service Kubernetes
+This is a **deliberately honest, reproducible study**, and it makes no SOTA claim. Across three
+RCAEval benchmarks, Barabási-Albert simulations (N = 20-100), a live 14-service Kubernetes
 cluster, and a 50-service synthetic-but-real deployment, STA keeps inference latency **flat**
 as N grows and holds a **modest** accuracy edge at large N (**+2.4 pp** Avg@1 over GATv2 at
-N = 100, 10 seeds — down from +6.3 pp at 5 seeds). At small graph scale (N ≤ 14) STA, GATv2
-and an **isoperimetric BARO** baseline are within noise — BARO even **wins on Online Boutique**.
+N = 100, 10 seeds, down from +6.3 pp at 5 seeds). At small graph scale (N ≤ 14) STA, GATv2
+and an **isoperimetric BARO** baseline are within noise. BARO even **wins on Online Boutique**.
 We also report a robust **negative result** on multimodal fusion and a fully **deployed**
 operational stack (HPO → bundle → FastAPI service + live alerting on the cluster). All code,
 benchmark scripts, chaos manifests, 10-seed and isoperimetric-baseline JSONs (SHA-256-verified)
@@ -33,7 +33,7 @@ and Docker images are released to support reproducibility.
 > the JSON artifacts under `results_transmission/`. SHA-256 of every artifact is in
 > `results_transmission/paper_benchmark.sha256`.
 
-### RCAEval — Real-World Datasets (metrics-only, 5 seeds)
+### RCAEval: Real-World Datasets (metrics-only, 5 seeds)
 
 Source: `results_transmission/paper_benchmark_real.json`
 
@@ -45,14 +45,14 @@ Source: `results_transmission/paper_benchmark_real.json`
 
 > **Comparability note (read this before citing a "beats baselines" claim).** The
 > published RCAEval baseline numbers (BARO 71%, CausaRank 52%, MicroRCA 49%) use a
-> *different* split/preprocessing. We re-ran BARO **isoperimetrically** — same cases,
+> *different* split/preprocessing. We re-ran BARO **isoperimetrically**, same cases,
 > candidate node set, per-seed split and metric functions (`baseline_baro.py`,
 > `results_transmission/baselines_rcaeval_ourprotocol.json`). Under identical
 > conditions BARO is far stronger (Avg@1 **0.80 / 0.84 / 0.86** on TT / SS / OB): our
 > models **win on TrainTicket, tie on SockShop, and lose on Online Boutique**. We make
 > **no uniform SOTA claim** over BARO. See `docs/COMPARABILITY_MATRIX.md`.
 
-### RCAEval — Multimodal Strict (metrics + traces, 5 seeds)
+### RCAEval: Multimodal Strict (metrics + traces, 5 seeds)
 
 Source: `results_transmission/paper_benchmark_real_mm.json`
 
@@ -65,7 +65,7 @@ Source: `results_transmission/paper_benchmark_real_mm.json`
 > ships with 0% trace coverage, and `--mm-strict` requires a real signal on every modality. The
 > JSON records this as `mm_dataset_status: "skipped_with_reason"`.
 
-### Simulated Benchmark — Barabási-Albert Graphs (5 seeds, N = 20 / 50 / 100)
+### Simulated Benchmark: Barabási-Albert Graphs (5 seeds, N = 20 / 50 / 100)
 
 Source: `results_transmission/paper_benchmark_sim.json`
 
@@ -81,7 +81,7 @@ Source: `results_transmission/paper_benchmark_sim.json`
 > STA scales gracefully: at N = 100 it leads top-1 by **+5 to +9 pts** over O(N²) full-graph
 > models while keeping inference under **3.5 ms**.
 
-### ObservIT Live Cluster — Sock-Shop with Chaos Mesh (5 seeds, 5 chaos scenarios)
+### ObservIT Live Cluster: Sock-Shop with Chaos Mesh (5 seeds, 5 chaos scenarios)
 
 Source: `results_transmission/paper_benchmark_observit.json`, `paper_benchmark_observit_mm.json`
 
@@ -97,9 +97,9 @@ Source: `results_transmission/paper_benchmark_observit.json`, `paper_benchmark_o
 > K8s cluster; logs queried live from Loki via port-forward. Multimodal logs **halve
 > seed-to-seed variance** for STA (σ 4.3 → 2.1 on Avg@1).
 
-### Reproducibility caveats — read before citing
+### Reproducibility caveats: read before citing
 
-- **5 seeds primary; 10-seed robustness check released.** The headline tables use 5 deterministic seeds, for which `ci95.<metric>.seed_level_bootstrap_reliable` is `false` (too tight to publish), so the tables report **±1σ across seeds**. We also ran the 10-seed set (`42,123,7,1337,2025,314,555,888,999,4242`, the `paper` preset in `validation_protocol.py`); there the flag is **`true`** for all metrics. Artifacts: `results_transmission/paper_benchmark_*_10seed.json` (hashes in `paper_benchmark_10seed.sha256`). At 10 seeds, STA's synthetic N=100 lead over GATv2 **shrinks from +6.2 to +2.4 pp** (still positive), STA still clearly beats Late-STGCN+GIB, and TrainTicket tightens to a ~1 pp STA/GATv2 tie — consistent with the *within-noise at small N* claim. We keep the 5-seed numbers as primary for continuity with the frozen canonical artifacts.
+- **5 seeds primary; 10-seed robustness check released.** The headline tables use 5 deterministic seeds, for which `ci95.<metric>.seed_level_bootstrap_reliable` is `false` (too tight to publish), so the tables report **±1σ across seeds**. We also ran the 10-seed set (`42,123,7,1337,2025,314,555,888,999,4242`, the `paper` preset in `validation_protocol.py`); there the flag is **`true`** for all metrics. Artifacts: `results_transmission/paper_benchmark_*_10seed.json` (hashes in `paper_benchmark_10seed.sha256`). At 10 seeds, STA's synthetic N=100 lead over GATv2 **shrinks from +6.2 to +2.4 pp** (still positive), STA still clearly beats Late-STGCN+GIB, and TrainTicket tightens to a ~1 pp STA/GATv2 tie, consistent with the *within-noise at small N* claim. We keep the 5-seed numbers as primary for continuity with the frozen canonical artifacts.
 - **SockShop multimodal is skipped, not failed.** The public RCAEval SockShop release has 0% trace coverage; `--mm-strict` honors that and refuses to silently substitute zeros. This is logged transparently in `paper_benchmark_real_mm.json` under `sockshop.config.mm_dataset_status`.
 - **Older reference values in legacy artifacts are stale.** Some `reference_top1` fields under `rca_pipeline/benchmark_full_prepublish.json` come from a short-epoch run and disagree with this 5-seed deterministic run. The numbers above are the canonical ones; please cite `paper_benchmark_*.json` only.
 - **Determinism is per-seed, not bit-for-bit across machines.** The pipeline runs with `torch.use_deterministic_algorithms(True)` and CuDNN deterministic mode on, so within one machine each seed is reproducible; absolute numbers may shift by <0.5pp on different CUDA / PyTorch versions.
@@ -147,7 +147,7 @@ Failure injection:   Chaos Mesh (CPU stress, network delay/loss, pod kill)
 Load generation:     Locust
 ```
 
-**Complexity:** Late Bottleneck O(N²), STA O(N + k²) with k = 10–15% of N.
+**Complexity:** Late Bottleneck O(N²), STA O(N + k²) with k = 10-15% of N.
 **Parameters:** Late Bottleneck ~8 600, STA ~15 500 (N=20 scale).
 
 ---
@@ -203,7 +203,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-### Smoke test — verify the install (< 2 min)
+### Smoke test: verify the install (< 2 min)
 
 ```bash
 python -m pytest -q rca_pipeline/tests
@@ -219,7 +219,7 @@ python -m rca_pipeline.benchmark \
 
 ### Reproduce real-world RCAEval benchmark
 
-> Requires RCAEval data under `rcaeval/data/` — see [Data setup](#data-setup).
+> Requires RCAEval data under `rcaeval/data/`. See [Data setup](#data-setup).
 
 ```bash
 python -m rca_pipeline.benchmark_real \
@@ -303,7 +303,7 @@ download raw CSVs, then place them under `rcaeval/data/`.
 The loader at `rca_pipeline/loaders/rcaeval_loader.py` handles parsing and
 graph construction automatically.
 
-### ObservIT — Live Kubernetes collection
+### ObservIT: Live Kubernetes collection
 
 Requires a running cluster with Prometheus, Loki, Jaeger, and Chaos Mesh
 in cluster-scoped mode. Bootstrap scripts:
@@ -441,10 +441,10 @@ If you use this code or results, please cite:
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
 
 ---
 
 ## Contact
 
-Wassim Badraoui — wassim.badraoui@epita.fr
+Wassim Badraoui, wassim.badraoui@epita.fr
