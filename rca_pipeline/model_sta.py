@@ -111,7 +111,7 @@ class STESelector(nn.Module):
           the relabeling convention of pyg_subgraph (ascending order).
     """
 
-    def __init__(self, hidden_dim: int, temperature: float = 1.0) -> None:
+    def __init__(self, hidden_dim: int, temperature: float = 1.0, cond_dim: int = 0) -> None:
         super().__init__()
         self.temperature = temperature
         self.mlp = nn.Sequential(
@@ -119,23 +119,40 @@ class STESelector(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, 1),
         )
+        # Optional FiLM conditioning on an external context vector (e.g. an
+        # anomaly type predicted upstream). cond_dim=0 creates no parameters at
+        # all, so the default model is bit-for-bit the unconditioned one.
+        self.cond_dim = cond_dim
+        if cond_dim > 0:
+            self.film = nn.Linear(cond_dim, 2 * hidden_dim)
+            # Zero init => gamma=beta=0 => identity at initialization: training
+            # starts from the unconditioned selector and can only depart from it.
+            nn.init.zeros_(self.film.weight)
+            nn.init.zeros_(self.film.bias)
 
     def set_temperature(self, t: float) -> None:
         self.temperature = max(t, 0.1)
 
     def forward(
-        self, h: torch.Tensor, k: int
+        self, h: torch.Tensor, k: int, cond: torch.Tensor = None
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Args:
             h: [B, N, H]
             k: number of nodes to select
+            cond: [B, cond_dim] context vector, or None. Requires cond_dim > 0.
         Returns:
             M_ste:          [B, N]  -- STE mask (binary forward, continuous backward)
             M_soft:         [B, N]  -- continuous sigmoid probabilities (for losses)
             top_k_indices:  [B, k]  -- selected node indices (sorted ascending)
             logits:         [B, N]  -- raw logits before sigmoid (for CE loss)
         """
+        if cond is not None:
+            if self.cond_dim <= 0:
+                raise ValueError("cond passed but selector was built with cond_dim=0")
+            gamma, beta = self.film(cond).chunk(2, dim=-1)                  # [B, H] each
+            h = h * (1.0 + gamma.unsqueeze(1)) + beta.unsqueeze(1)          # [B, N, H]
+
         logits = self.mlp(h).squeeze(-1)                                    # [B, N]
 
         if self.training:
@@ -557,18 +574,22 @@ class SelectThenAnalyze(nn.Module):
         gib_temperature: float = 1.0,
         temporal_encoder: str = "conv",
         selector_type: str = "ste",
+        cond_dim: int = 0,
     ) -> None:
         super().__init__()
         self.num_features = num_features
         self.hidden_dim = hidden_dim
         self.num_nodes = num_nodes
         self.k = k
+        self.cond_dim = cond_dim
 
         self.light_encoder = LightEncoder(num_features, hidden_dim)
         if selector_type == "hierarchical":
+            if cond_dim > 0:
+                raise ValueError("cond_dim > 0 is only supported by the STE selector")
             self.selector = HierarchicalSelector(hidden_dim, gib_temperature)
         else:
-            self.selector = STESelector(hidden_dim, gib_temperature)
+            self.selector = STESelector(hidden_dim, gib_temperature, cond_dim=cond_dim)
         self.deep_temporal = get_temporal_encoder(temporal_encoder, num_features, hidden_dim, temporal_kernel)
         self.deep_spatial = DeepSpatialBlock(hidden_dim)
         self.scorer = SubgraphScorer(hidden_dim)
@@ -598,6 +619,7 @@ class SelectThenAnalyze(nn.Module):
         self,
         x: torch.Tensor,
         edge_index: torch.Tensor,
+        cond: torch.Tensor = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         B, N, F_, W = x.shape
         k = self._k_override if self._k_override is not None else self.k
@@ -609,8 +631,9 @@ class SelectThenAnalyze(nn.Module):
         h_light_batched = h_light.view(B, N, -1)                            # [B, N, H]
 
         # ---- Stage 2: STE selection ----
+        selector_kwargs = {} if cond is None else {"cond": cond}
         M_ste, M_soft, top_k_indices, selector_logits = self.selector(
-            h_light_batched, k
+            h_light_batched, k, **selector_kwargs
         )
 
         # ---- Stage 3: Mask features and extract subgraph ----

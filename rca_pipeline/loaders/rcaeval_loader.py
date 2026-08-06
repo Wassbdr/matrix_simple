@@ -600,6 +600,10 @@ class RCAEvalLoader:
                 d.root_cause = [service_part]
                 d.failure_type = "real"
                 d.case_path = str(inst_dir)  # raw case dir (metrics.csv + inject_time.txt)
+                # Injected fault kind (cpu/mem/delay/loss/disk/socket), read from the
+                # case directory name. Unused by the RCA models; consumed by callers
+                # that need the second label (e.g. anomaly typing).
+                d.fault_type = fault
 
                 # Multimodal features
                 if self.extract_multimodal:
