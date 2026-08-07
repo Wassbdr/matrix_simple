@@ -19,8 +19,8 @@ Select-Then-Analyze (STA) architecture for sublinear inference on large topologi
 This is a **deliberately honest, reproducible study**, and it makes no SOTA claim. Across three
 RCAEval benchmarks, Barabási-Albert simulations (N = 20-100), a live 14-service Kubernetes
 cluster, and a 50-service synthetic-but-real deployment, STA keeps inference latency **flat**
-as N grows and holds a **modest** accuracy edge at large N (**+2.4 pp** Avg@1 over GATv2 at
-N = 100, 10 seeds, down from +6.3 pp at 5 seeds). At small graph scale (N ≤ 14) STA, GATv2
+as N grows and holds a **modest** accuracy edge at large N (**+2.3 pp** Avg@1 over GATv2 at
+N = 100, 10 seeds, down from +6.2 pp at 5 seeds). At small graph scale (N ≤ 14) STA, GATv2
 and an **isoperimetric BARO** baseline are within noise. BARO even **wins on Online Boutique**.
 We also report a robust **negative result** on multimodal fusion and a fully **deployed**
 operational stack (HPO → bundle → FastAPI service + live alerting on the cluster). All code,
@@ -103,7 +103,7 @@ Source: `results_transmission/paper_benchmark_observit.json`, `paper_benchmark_o
 
 ### Reproducibility caveats: read before citing
 
-- **5 seeds primary; 10-seed robustness check released.** The headline tables use 5 deterministic seeds, for which `ci95.<metric>.seed_level_bootstrap_reliable` is `false` (too tight to publish), so the tables report **±1σ across seeds**. We also ran the 10-seed set (`42,123,7,1337,2025,314,555,888,999,4242`, the `paper` preset in `validation_protocol.py`); there the flag is **`true`** for all metrics. Artifacts: `results_transmission/paper_benchmark_*_10seed.json` (hashes in `paper_benchmark_10seed.sha256`). At 10 seeds, STA's synthetic N=100 lead over GATv2 **shrinks from +6.2 to +2.4 pp** (still positive), STA still clearly beats Late-STGCN+GIB, and TrainTicket tightens to a ~1 pp STA/GATv2 tie, consistent with the *within-noise at small N* claim. We keep the 5-seed numbers as primary for continuity with the frozen canonical artifacts.
+- **5 seeds primary; 10-seed robustness check released.** The headline tables use 5 deterministic seeds, for which `ci95.<metric>.seed_level_bootstrap_reliable` is `false` (too tight to publish), so the tables report **±1σ across seeds**. We also ran the 10-seed set (`42,123,7,1337,2025,314,555,888,999,4242`, the `paper` preset in `validation_protocol.py`); there the flag is **`true`** for all metrics. Artifacts: `results_transmission/paper_benchmark_*_10seed.json` (hashes in `paper_benchmark_10seed.sha256`). At 10 seeds, STA's synthetic N=100 lead over GATv2 **shrinks from +6.2 to +2.3 pp** (still positive), STA still clearly beats Late-STGCN+GIB, and TrainTicket tightens to a ~1 pp STA/GATv2 gap that **changes sign** (STA 94.5% vs GATv2 95.5%), consistent with the *within-noise at small N* claim. We keep the 5-seed numbers as primary for continuity with the frozen canonical artifacts.
 - **SockShop multimodal is skipped, not failed.** The public RCAEval SockShop release has 0% trace coverage; `--mm-strict` honors that and refuses to silently substitute zeros. This is logged transparently in `paper_benchmark_real_mm.json` under `sockshop.config.mm_dataset_status`.
 - **Older reference values in legacy artifacts are stale.** Some `reference_top1` fields under `rca_pipeline/benchmark_full_prepublish.json` come from a short-epoch run and disagree with this 5-seed deterministic run. The numbers above are the canonical ones; please cite `paper_benchmark_*.json` only.
 - **Determinism is per-seed, not bit-for-bit across machines.** The pipeline runs with `torch.use_deterministic_algorithms(True)` and CuDNN deterministic mode on, so within one machine each seed is reproducible; absolute numbers may shift by <0.5pp on different CUDA / PyTorch versions.

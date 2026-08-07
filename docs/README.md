@@ -75,6 +75,7 @@ un clone frais contient les `.tex` et les figures, pas les PDF.
 | `results_transmission/*_10seed.json` + `paper_benchmark_10seed.sha256` | Contrôle de robustesse à 10 graines. |
 | `results_transmission/baselines_rcaeval_ourprotocol.json` | Re-run isopérimétrique de BARO. |
 | `rca_pipeline/*_prepublish.json` | **Legacy, non canonique.** Issus d'un run à faible nombre d'epochs ; les champs `reference_top1` sont périmés et contredisent le run déterministe 5 graines. Ne pas citer. |
+| `results_transmission/comparability_matrix.json` | Verdicts d'isopérimétrie — mais **généré depuis les `*_prepublish.json` legacy** (3 graines, 90 cas), pas depuis le run canonique. Les verdicts tiennent, la signature de protocole qu'il affiche décrit le run legacy. Cf. [`COMPARABILITY_MATRIX.md`](COMPARABILITY_MATRIX.md). |
 
 Vérification d'intégrité :
 

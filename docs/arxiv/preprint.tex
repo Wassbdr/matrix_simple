@@ -69,9 +69,9 @@ private Kubernetes cluster with Chaos Mesh fault injection; and (iv)~a
 reproducible from released code and seeds. \textbf{(i)}~\STA{}'s $O(N+k^2)$
 design keeps per-query latency \emph{flat} as $N$ grows; its accuracy edge over
 attention/full-graph models is real but \emph{modest and shrinks under
-scrutiny} --- from $+6.3$ to $+2.4$ percentage points (pp) \Avg{1} at $N{=}100$
+scrutiny} --- from $+6.2$ to $+2.3$ percentage points (pp) \Avg{1} at $N{=}100$
 when moving from 5 to 10 seeds, though it holds in direction (and reaches
-$+5.8$ pp on the $N{=}50$ cluster). \textbf{(ii)}~At small graph scale
+$+5.7$ pp on the $N{=}50$ cluster). \textbf{(ii)}~At small graph scale
 $(N{\le}14)$, the public-benchmark regime, \STA{}, \GATv{} and a strong
 statistical baseline are statistically tied. \textbf{(iii)}~Re-running BARO
 \emph{isoperimetrically} (same cases, candidate nodes, per-seed split and
@@ -142,7 +142,7 @@ benchmarked across simulated Barab\'asi--Albert graphs at $N \in \{20,50,100\}$,
 three RCAEval datasets, a live 14-service Kubernetes cluster, and a 50-service
 synthetic-but-real deployment. We go beyond a single point estimate: a
 \emph{10-seed robustness check} (which shrinks \STA{}'s $N{=}100$ lead from
-$+6.3$ to $+2.4$ pp and flips the bootstrap-reliability flag to true) and an
+$+6.2$ to $+2.3$ pp and flips the bootstrap-reliability flag to true) and an
 \emph{isoperimetric re-run of BARO} on identical cases, candidate nodes, split
 and metric functions --- under which BARO is a strong baseline our models do
 \emph{not} uniformly beat (losing on Online Boutique). We explicitly make no
@@ -726,13 +726,13 @@ cascade-heavy production deployments---left as future work.
 \bottomrule
 \end{tabular}
 \caption{ObservIT 50-service cluster, 3 seeds, 137 fault cases. \STA{} leads
-by $+5.8$ pp \Avg{1} with $4.6\times$ lower variance.}
+by $+5.7$ pp \Avg{1} with $4.6\times$ lower spread ($\sigma$).}
 \label{tab:n50}
 \end{table}
 
 Table~\ref{tab:n50} closes the loop on synthetic-to-real transfer: the
 $+5{-}9$ pp \Avg{1} gap of \STA{} over \GATv{} at $N{=}100$ on simulated BA
-graphs replicates on the live $N{=}50$ cluster at $+5.8$ pp, and \STA{}'s
+graphs replicates on the live $N{=}50$ cluster at $+5.7$ pp, and \STA{}'s
 seed-to-seed variance is $4.6\times$ lower ($0.016$ vs.\ $0.074$). Absolute
 \Avg{1} drops to $0.437$ because the cluster is small ($137$ cases, $3$ seeds)
 and the topology is harder than BA (real call patterns include hubs and
@@ -804,7 +804,7 @@ synthetic and RCAEval suites at 10 seeds
 (Table~\ref{tab:robust}). First, the bootstrap CIs become reliable
 (\texttt{seed\_level\_bootstrap\_reliable = true} across all metrics).
 Second, \STA{}'s lead over \GATv{} at $N{=}100$ shrinks from $+6.2$ to
-$+2.4$ pp: the asymptotic advantage holds in direction but is more modest than
+$+2.3$ pp: the asymptotic advantage holds in direction but is more modest than
 the 5-seed point estimate suggested. \STA{} still clearly beats \Late{}, whose
 $N{=}100$ \Avg{1} degrades further to $32.9 \pm 19.0$. At $N{=}5$ the
 conclusion is \emph{reinforced} rather than overturned: on TrainTicket \STA{}
@@ -819,9 +819,9 @@ artifacts and treat the 10-seed run as a robustness check.
 \toprule
 \textbf{Metric (\Avg{1}\,\%)} & \textbf{5 seeds} & \textbf{10 seeds} \\
 \midrule
-Synthetic $N{=}100$, \STA{}   & $55.2 \pm 4.6$ & $52.9 \pm 4.4$ \\
+Synthetic $N{=}100$, \STA{}   & $55.2 \pm 4.6$ & $52.8 \pm 4.4$ \\
 Synthetic $N{=}100$, \GATv{}  & $49.0 \pm 2.9$ & $50.5 \pm 4.5$ \\
-\quad \STA{}$-$\GATv{} gap     & $+6.2$         & $+2.4$ \\
+\quad \STA{}$-$\GATv{} gap     & $+6.2$         & $+2.3$ \\
 TrainTicket, \STA{}           & $96.0 \pm 3.7$ & $94.5 \pm 4.2$ \\
 SockShop, \STA{}              & $85.0 \pm 8.9$ & $80.5 \pm 8.8$ \\
 Online Boutique, \STA{}       & $65.0 \pm 9.5$ & $67.0 \pm 8.1$ \\
@@ -894,7 +894,7 @@ microservice meshes that pushes spatial cost from $O(N^2)$ to $O(N + k^{2})$
 through a Straight-Through Gumbel top-$k$ selector regularized by an
 asymmetric Variational GIB. Under a single 5-seed deterministic protocol,
 \STA{} replicates its synthetic asymptotic advantage on the live
-$N{=}50$ cluster ($+5.8$ pp \Avg{1}, $4.6\times$ lower variance), matches
+$N{=}50$ cluster ($+5.7$ pp \Avg{1}, $4.6\times$ lower spread), matches
 strong attention baselines at small $N$, and exposes a clean architectural
 trade-off vs.\ \GATv{} along the hard/gray vs.\ cascade axis. We also report
 a robust negative result on multimodal fusion: with current public log/trace

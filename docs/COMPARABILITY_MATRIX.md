@@ -2,6 +2,22 @@
 
 Generated at: 2026-06-02T15:33:31.330826+00:00
 
+> **Provenance de ce document — à lire avant de citer la signature de protocole.**
+> `rca_pipeline/comparability_matrix.py` a généré cette matrice à partir de
+> `rca_pipeline/benchmark_real_long_prepublish.json` et
+> `benchmark_real_long_mm_strict_prepublish.json`, c'est-à-dire des artefacts
+> **legacy** que le README déconseille de citer, sur un protocole à **3 graines
+> (42,123,7) et 90 cas** — et non sur le run canonique déterministe à 5 graines
+> dont sortent les tables publiées.
+>
+> Conséquence pratique : les **verdicts** d'isopérimétrie (`partially_comparable`,
+> `not_isoperimeter`) et les valeurs BARO restent valables — le re-run BARO
+> isopérimétrique vit dans `results_transmission/baselines_rcaeval_ourprotocol.json`
+> et est vérifié exact (0,80 / 0,84 / 0,86 sur TT / SS / OB). Mais la table
+> « Protocol Signature (Ours) » ci-dessous décrit le run legacy, pas le run
+> canonique. Régénérer depuis les artefacts 5 graines lèverait l'ambiguïté ;
+> ce n'est pas fait à ce jour.
+
 ## Protocol Signature (Ours)
 
 | Dataset | Mode | Seeds | Epochs | Max cases | Split mode | Drift | Normalized | MM status | Protocol source |
