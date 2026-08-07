@@ -1,6 +1,6 @@
 .PHONY: help install dev test coverage lint format audit benchmark-smoke benchmark-paper clean report report-clean figures paper
 
-PYTHON ?= python
+PYTHON ?= python3
 
 help:
 	@echo "Targets:"
