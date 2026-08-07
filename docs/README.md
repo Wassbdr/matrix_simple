@@ -79,6 +79,10 @@ un clone frais contient les `.tex` et les figures, pas les PDF.
 Vérification d'intégrité :
 
 ```bash
-sha256sum -c results_transmission/paper_benchmark.sha256
+# Attention : les deux manifestes n'ont pas la même convention de chemin.
+# paper_benchmark*.sha256 liste des noms nus → se lance depuis results_transmission/
+(cd results_transmission && sha256sum -c paper_benchmark.sha256)
+(cd results_transmission && sha256sum -c paper_benchmark_10seed.sha256)
+# canonical_results_manifest.json.sha256 liste un chemin depuis la racine
 sha256sum -c results_transmission/canonical_results_manifest.json.sha256
 ```
