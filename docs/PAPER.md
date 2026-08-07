@@ -651,7 +651,7 @@ End-to-end verification on the live cluster:
 | `POST /predict` on a synthetic CPU spike at node `carts` | Top-1 = **`carts`** with score 7.08 (correct), latency ≈ 175 ms (cold) / ≈ 30 ms (warm) |
 | `GET /metrics` from another in-cluster Pod | scraped by `prometheus-server.monitoring-metrics`, counter `rca_predictions_total{app="rca-sta-serve"}` visible in the cluster's Prometheus query API |
 
-The full one-command reproduction (HPO → train → bundle → build → push → deploy → verify) is at `scripts/run_full_demo.sh`; see `serving/README.md` for the step-by-step variant.
+The end-to-end reproduction (HPO → train → bundle → build → push → deploy → verify) is driven by `scripts/run_publication_suite.sh` for the benchmark side and, for the serving side, by the step-by-step runbook in `docs/OPERATIONS.md` and `serving/README.md`.
 
 ### 7.7 Live Alerting Pipeline
 
@@ -899,7 +899,7 @@ Each results table maps to a single, deterministic command (5 seeds, fixed split
 | 3, 4 (RCAEval metrics) | `paper_benchmark_real.json` | `python -m rca_pipeline.benchmark_real --dataset all --seeds 42,123,7,1337,2025 --epochs 100 --sta-contrastive-warmup 0 --output-json <path>` |
 | 5 (RCAEval MM) | `paper_benchmark_real_mm.json` | append `--use-mm --mm-strict` to the above |
 | 6 (ObservIT) | `paper_benchmark_observit.json`, `paper_benchmark_observit_mm.json` | `python -m rca_pipeline.benchmark_real --dataset observit --observit-topology sock_shop ...` |
-| 7–10 (ablations) | `rca_pipeline/ablation_prepublish.json`, `validation_runs/ablation_temporal_real.json` | `python -m rca_pipeline.benchmark_ablation` |
+| 7–10 (ablations) | `rca_pipeline/ablation_prepublish.json`, `rca_pipeline/validation_runs/ablation_temporal_real.json` (generated) | `python -m rca_pipeline.benchmark_ablation` |
 | 11 (ObservIT per-scenario) | derived from `paper_benchmark_observit.json` | `python -m rca_pipeline.analyze_per_scenario --observit results_transmission/paper_benchmark_observit.json --output docs/PER_SCENARIO_BREAKDOWN.md` |
 | 12 (Gray detector synthetic A/B) | `results_transmission/detector_ab_harness.json` | `python -m rca_pipeline.detector_ab_harness --n-trials 500 --seed 42 --boost 3.0 --output-json <path>` |
 | 13 (Gray detector real-cluster A/B) | `results_transmission/gray_detector_real_ab.json` | `python -m rca_pipeline.gray_detector_real_ab --dataset-dir datasets/sockshop_runs --seeds 42,123,7,1337,2025 --epochs 100 --boost 3.0 --output-json <path>` |

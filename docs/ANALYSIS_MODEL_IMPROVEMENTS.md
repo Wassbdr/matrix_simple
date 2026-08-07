@@ -93,7 +93,7 @@ NaN logits, and ranking NaN gives a constant order — exact chance level,
 **Fix (two layers):**
 1. `variational_gib_loss` now clamps with a float32-representable margin
    (`1e-6`) — no more inf/NaN for any target rate (regression-tested in
-   `tests/test_gib_saturation.py`).
+   `rca_pipeline/tests/test_gib_saturation.py`).
 2. `benchmark_real.train_and_eval_sta` skips the GIB term entirely when
    `k >= N`: with everything selected there is no bottleneck to regularize,
    and even a finite KL toward Bernoulli(≈1) still saturates the selector.
@@ -257,7 +257,7 @@ documented bimodal behavior, not measurement error.
 All §1 numbers are from fresh 3-seed RCAEval runs (data under
 `rcaeval/data/`). §2 numbers are direct A/B runs on TrainTicket. §3 is
 validated analytically on the real `sock_shop` topology
-(`tests/test_cascade_prior_sockshop.py`) because the full N=14 training
+(`rca_pipeline/tests/test_cascade_prior_sockshop.py`) because the full N=14 training
 benchmark exceeds available host RAM. The frozen
 `results_transmission/` artifacts were never modified; every command writes
 to `/tmp` or a new file.

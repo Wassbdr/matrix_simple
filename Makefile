@@ -61,9 +61,15 @@ publication-dry-run:
 publication-local:
 	bash scripts/run_publication_suite.sh --skip-observit
 
+# Supprime uniquement du régénérable. Ne touche ni à results_transmission/,
+# ni à datasets/, checkpoints/, rcaeval/ ou .venv/.
 clean:
 	rm -rf .pytest_cache .ruff_cache .mypy_cache build dist *.egg-info
-	find . -type d -name __pycache__ -prune -exec rm -rf {} +
+	find . -type d -name __pycache__ -not -path './.venv/*' -not -path './rcaeval/*' -prune -exec rm -rf {} +
+	rm -f .coverage .coverage.* coverage.xml
+	rm -rf htmlcov
+	rm -f dataset_windows.pt test_integration.pt
+	rm -f benchmark_cascade_sweep2.log port_forward.log
 	rm -f /tmp/benchmark_smoke.json
 
 report:

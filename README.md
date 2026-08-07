@@ -5,6 +5,10 @@
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
+> **Nouveau sur le projet ?** Commencez par [`HANDOVER.md`](HANDOVER.md) — installation,
+> ce qui est reproductible hors ligne, et où sont les résultats canoniques.
+> Index de la documentation : [`docs/README.md`](docs/README.md).
+
 ## Abstract
 
 Identifying the root cause of a failure in a microservice mesh within seconds is hard because
