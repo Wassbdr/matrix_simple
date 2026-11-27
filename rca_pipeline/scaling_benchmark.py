@@ -83,9 +83,11 @@ def _forward_fn(name: str, model: torch.nn.Module, x: torch.Tensor, ei: torch.Te
     return lambda: model(x, ei)
 
 
-def build_untrained(name: str, n: int, num_features: int, hidden: int) -> torch.nn.Module:
+def build_untrained(
+    name: str, n: int, num_features: int, hidden: int, sta_k: int = 16,
+) -> torch.nn.Module:
     if name == "STA":
-        return SelectThenAnalyze(num_features, hidden, n, get_optimal_k(n))
+        return SelectThenAnalyze(num_features, hidden, n, min(n, sta_k))
     if name == "FullGraphGCN":
         return FullGraphGCN(num_features, hidden, n)
     return SpatioTemporalRCA_GAT(num_features, hidden, n)
@@ -208,21 +210,34 @@ def run_size(n: int, args, models: List[str]) -> Dict:
     }
 
 
-def run_latency_only(n: int, models: List[str], repeats: int) -> Dict:
+def run_latency_only(
+    n: int, models: List[str], repeats: int, sta_k: int, profile: bool = False,
+) -> Dict:
     _, ei, _, _ = generate_ba_topology(n, _ba_m(n), 42)
     torch.manual_seed(0)
     x = torch.randn(1, n, 5, 12)
     out = {}
     for name in models:
         torch.manual_seed(0)
-        m = build_untrained(name, n, 5, 32)
-        out[name] = {"latency": measure_latency_ms(_forward_fn(name, m, x, ei), repeats=repeats)}
+        m = build_untrained(name, n, 5, 32, sta_k)
+        fn = _forward_fn(name, m, x, ei)
+        result = {"latency": measure_latency_ms(fn, repeats=repeats)}
+        if profile and name == "STA":
+            activities = [torch.profiler.ProfilerActivity.CPU]
+            with torch.no_grad(), torch.profiler.profile(activities=activities) as profiler:
+                for _ in range(10):
+                    fn()
+            events = sorted(profiler.key_averages(), key=lambda e: -e.self_cpu_time_total)
+            result["profile_self_cpu_ms_per_call"] = {
+                event.key: round(event.self_cpu_time_total / 10_000, 4) for event in events[:8]
+            }
+        out[name] = result
     print(
         f"  latency N={n}: "
         + ", ".join(f"{k}={v['latency']['median_ms']:.2f}ms" for k, v in out.items()),
         flush=True,
     )
-    return {"N": n, "k": get_optimal_k(n), "models": out}
+    return {"N": n, "k": min(n, sta_k), "models": out}
 
 
 def main(argv=None) -> None:
@@ -242,11 +257,13 @@ def main(argv=None) -> None:
     ap.add_argument("--windows-per-class", type=int, default=12)
     ap.add_argument("--anomaly-ratio", type=float, default=0.4)
     ap.add_argument("--latency-repeats", type=int, default=300)
+    ap.add_argument("--latency-k", type=int, default=16, help="Fixed maximum STA candidates in latency runs")
+    ap.add_argument("--profile-latency", action="store_true", help="Record STA CPU operator costs")
     ap.add_argument("--train-threads", type=int, default=0, help="0 = torch default")
     ap.add_argument(
         "--latency-only",
         action="store_true",
-        help="re-measure latency and update it in an existing --output-json",
+        help="measure latency without training; preserve accuracy if --output-json already exists",
     )
     ap.add_argument(
         "--resume",
@@ -258,14 +275,18 @@ def main(argv=None) -> None:
     )
     ap.add_argument("--output-json", default="results/scaling_benchmark.json")
     args = ap.parse_args(argv)
+    if args.latency_k < 1:
+        ap.error("--latency-k must be positive")
     args.seeds = [int(s) for s in args.seeds.split(",") if s]
     models = [m for m in args.models.split(",") if m]
     logging.disable(logging.INFO)
     set_torch_deterministic(True)
 
     if args.latency_only:
-        with open(args.output_json) as fh:
-            out = json.load(fh)
+        out = {"benchmark": "scaling_sta_vs_full_graph", "accuracy": [], "invocations": []}
+        if os.path.exists(args.output_json):
+            with open(args.output_json) as fh:
+                out = json.load(fh)
         out.setdefault("invocations", []).append(
             " ".join(["python -m rca_pipeline.scaling_benchmark", *(argv or sys.argv[1:])])
         )
@@ -295,10 +316,23 @@ def main(argv=None) -> None:
         return
     torch.set_num_threads(1)
     out["latency"] = [
-        run_latency_only(int(n), models, args.latency_repeats)
+        run_latency_only(int(n), models, args.latency_repeats, args.latency_k, args.profile_latency)
         for n in args.latency_sizes.split(",")
         if n
     ]
+    out["latency_config"] = {"sta_k": args.latency_k, "repeats": args.latency_repeats}
+    sizes = [row["N"] for row in out["latency"]]
+    if len(set(sizes)) > 1:
+        out["latency_slope_ms_per_1000_nodes"] = {
+            name: 1000 * float(np.polyfit(
+                sizes, [row["models"][name]["latency"]["median_ms"] for row in out["latency"]], 1,
+            )[0])
+            for name in models
+        }
+        for name, slope in out["latency_slope_ms_per_1000_nodes"].items():
+            print(f"  fitted slope ({name}): {slope:.2f} ms per 1000 nodes")
+    else:
+        out.pop("latency_slope_ms_per_1000_nodes", None)
     out["hardware"] = _hardware()
     _write(out, args.output_json)
     print(f"\nWrote {args.output_json}")
