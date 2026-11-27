@@ -6,6 +6,7 @@ import pytest
 
 from rca_pipeline import rank
 from rca_pipeline.cli import main
+from rca_pipeline.data import DEMO_CASE, DEMO_FILES, demo_case
 
 
 @pytest.fixture()
@@ -54,3 +55,12 @@ def test_cli_subcommand_help(command, option, capsys, monkeypatch):
         main()
     assert exc.value.code == 0
     assert option in capsys.readouterr().out
+
+
+def test_demo_case_rejects_unverified_cache(tmp_path):
+    cache = tmp_path / "demo" / DEMO_CASE
+    cache.mkdir(parents=True)
+    for name in DEMO_FILES:
+        (cache / name).write_text("invalid")
+    with pytest.raises(ValueError, match="sha256 mismatch"):
+        demo_case(tmp_path)

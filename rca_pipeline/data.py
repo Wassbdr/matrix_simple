@@ -22,6 +22,11 @@ HF_INDEX_HASH = "ec0008c90d0c97076bc98370ac824c3c5a49be95d00bd6d6044ea8061861d27
 CASE = re.compile(r"re[123](ob|ss|tt)_[a-z0-9-]+_[a-z0-9]+_[0-9]+")
 COUNTS = {"re1": 375, "re2": 270, "re3": 90}
 TELEMETRY = {"metrics.json", "inject_time.txt", "logs.csv", "traces.csv", "root_cause.txt"}
+DEMO_CASE = "re2ob_checkoutservice_cpu_1"
+DEMO_FILES = {
+    "metrics.parquet": "f46b3d354b234e37c424f54a005329b61aac83d15dcdd46b5642e55f390ab25a",
+    "inject_time.txt": "c17fcaa1047c07738176849000c1b88e1f0ddda57a2a73a42ab0c8c58c83e0a3",
+}
 
 
 def verify(path: Path, expected: dict[str, str]) -> None:
@@ -101,13 +106,39 @@ def huggingface(root: Path, suites: list[str]) -> Path:
     return out
 
 
+def demo_case(root: Path) -> Path:
+    figshare_case = root / "figshare" / "data" / DEMO_CASE
+    if all((figshare_case / name).is_file() for name in ("metrics.json", "inject_time.txt")):
+        return figshare_case
+    dest = root / "demo" / DEMO_CASE
+    dest.mkdir(parents=True, exist_ok=True)
+    base = f"https://huggingface.co/datasets/{HF_REPO}/resolve/{HF_REVISION}/{DEMO_CASE}"
+    for name, checksum in DEMO_FILES.items():
+        path = dest / name
+        if not path.is_file():
+            partial = path.with_suffix(".partial")
+            with urlopen(f"{base}/{name}", timeout=60) as response, partial.open("wb") as stream:
+                shutil.copyfileobj(response, stream)
+            verify(partial, {"sha256": checksum})
+            partial.replace(path)
+        verify(path, {"sha256": checksum})
+    return dest
+
+
 def main(argv: list[str] | None = None, *, prog: str | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__, prog=prog)
     parser.add_argument("--root", type=Path, default=Path.home() / "data" / "rcaeval")
     parser.add_argument("--suites", nargs="+", choices=sorted(COUNTS), default=list(COUNTS))
     parser.add_argument("--source", choices=("auto", "figshare", "hf"), default="auto")
+    parser.add_argument("--demo", action="store_true", help="Fetch only the pinned showcase case metrics.")
     args = parser.parse_args(argv)
     args.root.mkdir(parents=True, exist_ok=True)
+    if args.demo:
+        try:
+            print(demo_case(args.root))
+        except (OSError, ValueError) as exc:
+            parser.exit(1, f"Showcase download failed: {exc}\n")
+        return
     if args.source == "hf":
         print(huggingface(args.root, args.suites))
         return

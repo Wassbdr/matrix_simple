@@ -1,28 +1,22 @@
-# Rendered by showcase/make_showcase.sh (needs the STA service on :8080).
 Output showcase/build/terminal.mp4
 Set Shell "bash"
-Set FontSize 18
+Set FontSize 22
 Set Width 1280
 Set Height 720
-Set Padding 24
+Set Padding 36
 Set Theme "GitHub Dark"
-Set TypingSpeed 35ms
+Set TypingSpeed 45ms
 
 Hide
-Type "source .venv/bin/activate 2>/dev/null; export PS1='$ '; clear"
+Type "export PS1='$ '; clear"
 Enter
 Show
-
-Type "# Live: FastAPI STA service on :8080, model bundle examples/sockshop_demo/bundle"
+Type "# RCAEval Online Boutique: checkoutservice CPU fault"
 Enter
-Sleep 500ms
-Type "python scripts/demo_predict.py   # POST a synthetic Sock Shop incident (seed 42) to /predict"
+Sleep 1s
+Type `rca rank "$SHOWCASE_CASE" --top-k 3`
 Enter
-Sleep 8s
-Hide
-Type "clear"
-Enter
-Show
-Type "python -m rca_pipeline.demo_incident run   # same incident: STA bundle vs BARO, same candidates"
+Sleep 5s
+Type "python showcase/reference.py"
 Enter
 Sleep 8s

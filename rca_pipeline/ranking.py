@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -27,7 +28,9 @@ class Candidate:
 
 class Ranker:
     def __init__(self, bundle: Path = DEFAULT_BUNDLE) -> None:
-        state = torch.load(bundle, map_location="cpu", weights_only=True)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="TypedStorage is deprecated.*", module=r"torch\._utils")
+            state = torch.load(bundle, map_location="cpu", weights_only=True)
         model = SelectThenAnalyze(
             num_features=len(METRICS), hidden_dim=state["hidden_dim"], k=state["k"],
         )

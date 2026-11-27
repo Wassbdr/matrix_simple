@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import logging
 import sys
 from dataclasses import asdict
 
@@ -27,6 +28,7 @@ def main() -> None:
         data(sys.argv[2:], prog="rca data")
         return
     args = parser.parse_args()
+    logging.getLogger("rca_pipeline.model_sta").setLevel(logging.WARNING)
     from rca_pipeline.ranking import rank
 
     try:
