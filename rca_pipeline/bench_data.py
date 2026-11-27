@@ -44,26 +44,39 @@ def cases_in(root: Path) -> list[Case]:
     return cases
 
 
-def read_window(case: Case, rows: int) -> tuple[pd.DataFrame, int]:
+def observation_window(frame: pd.DataFrame, cut: int, rows: int) -> pd.DataFrame:
     if rows <= 0:
         raise ValueError("Observation window must be positive.")
-    cut = int((case.path / "inject_time.txt").read_text().split()[0])
-    parquet = case.path / "metrics.parquet"
-    if parquet.is_file():
-        frame = pd.read_parquet(parquet)
-    else:
-        raw = json.loads((case.path / "metrics.json").read_text())
-        frame = pd.DataFrame({name: dict(points) for name, points in raw.items() if points})
-        frame.index.name = "time"
-        frame = frame.reset_index()
     frame = frame.loc[:, ~frame.columns.str.endswith("_latency-50")]
     frame = frame.drop(columns=["time.1"], errors="ignore").sort_values("time")
     frame = frame.replace([np.inf, -np.inf], np.nan).ffill().fillna(0)
     normal = frame.loc[frame.time < cut].tail(rows)
     incident = frame.loc[frame.time >= cut].head(rows)
     if normal.empty or incident.empty:
-        raise ValueError(f"{case.id} needs samples on both sides of injection ({cut}).")
-    return pd.concat([normal, incident], ignore_index=True), cut
+        raise ValueError(f"Supply samples before and at or after the injection time ({cut}).")
+    return pd.concat([normal, incident], ignore_index=True)
+
+
+def read_metrics(path: Path) -> pd.DataFrame:
+    if path.suffix == ".parquet":
+        return pd.read_parquet(path)
+    if path.suffix == ".csv":
+        return pd.read_csv(path)
+    if path.suffix == ".json":
+        raw = json.loads(path.read_text())
+        if not isinstance(raw, dict):
+            raise ValueError("Use an RCAEval JSON object mapping metric names to [time, value] pairs.")
+        frame = pd.DataFrame({name: dict(points) for name, points in raw.items() if points})
+        frame.index.name = "time"
+        return frame.reset_index()
+    raise ValueError("Pass an RCAEval case directory or a .csv, .json, or .parquet metrics file.")
+
+
+def read_window(case: Case, rows: int) -> tuple[pd.DataFrame, int]:
+    cut = int((case.path / "inject_time.txt").read_text().split()[0])
+    parquet = case.path / "metrics.parquet"
+    path = parquet if parquet.is_file() else case.path / "metrics.json"
+    return observation_window(read_metrics(path), cut, rows), cut
 
 
 def candidates(frame: pd.DataFrame) -> tuple[str, ...]:

@@ -1,7 +1,8 @@
-.PHONY: help install dev test coverage lint format audit benchmark-smoke benchmark-paper clean report report-clean figures paper verify-manifest manifest demo scaling showcase data bench
+.PHONY: help install dev test coverage lint format audit benchmark-smoke benchmark-paper clean report report-clean figures paper verify-manifest manifest demo scaling showcase data bench bundle
 
 PYTHON ?= python3
 RCA_DATA ?= $(HOME)/data/rcaeval
+RCA_CASES ?= $(RCA_DATA)/figshare/data
 
 help:
 	@echo "Targets:"
@@ -10,6 +11,7 @@ help:
 	@echo "  make test             Run pytest unit tests (rca_pipeline + serving)"
 	@echo "  make data             Download the pinned RCAEval datasets"
 	@echo "  make bench            Compare STA with RCAEval references"
+	@echo "  make bundle           Rebuild the packaged STA checkpoint from RE1"
 	@echo "  make coverage         Run tests with the coverage gate"
 	@echo "  make lint             Run ruff linter"
 	@echo "  make format           Run ruff formatter"
@@ -36,10 +38,13 @@ test:
 	$(PYTHON) -m pytest -q
 
 data:
-	$(PYTHON) scripts/download_rcaeval.py --root "$(RCA_DATA)"
+	$(PYTHON) -m rca_pipeline.data --root "$(RCA_DATA)" $(DATA_ARGS)
 
 bench:
 	$(PYTHON) -m rca_pipeline.bench $(BENCH_ARGS)
+
+bundle:
+	$(PYTHON) -m rca_pipeline.train_re1 --data-root "$(RCA_CASES)" --output rca_pipeline/re1.pt
 
 coverage:
 	$(PYTHON) -m pytest --cov --cov-report=term

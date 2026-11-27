@@ -7,7 +7,7 @@ The archive takes about 4.5 GB to download and 38 GB to extract. The downloader 
 If Figshare is unreachable, install `huggingface-hub` and `pyarrow` in the benchmark environment and repeat the command. The fallback fetches the authors' [MIT-licensed Parquet conversion](https://huggingface.co/datasets/phamquiluan/RCAEval) at a pinned revision and verifies the case index. To choose this smaller download directly, run:
 
 ```sh
-python scripts/download_rcaeval.py --source hf --suites re1 re2
+rca data --source hf --suites re1 re2
 ```
 
 Keep the data outside Git. Each directory name encodes the system, injected service, fault and repetition; use it to evaluate, not as a model input. The benchmark reads `metrics.json` (or `metrics.parquet`) and `inject_time.txt`. It uses service metrics only, even on cases with logs or traces.

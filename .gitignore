@@ -137,3 +137,4 @@ results_transmission/hpo_*.db
 
 # Small redistributable demo bundle (synthetic data, rebuilt by `python -m rca_pipeline.demo_incident build`)
 !examples/sockshop_demo/bundle/*.pt
+!rca_pipeline/re1.pt

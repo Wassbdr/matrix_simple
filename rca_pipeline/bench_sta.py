@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -35,6 +36,13 @@ class Incident:
     x: torch.Tensor
     preparation_ms: float
     prior: torch.Tensor | None = None
+
+
+class FittedSTA(NamedTuple):
+    model: SelectThenAnalyze
+    edges: torch.Tensor
+    mean: torch.Tensor
+    scale: torch.Tensor
 
 
 def _downsample(values: np.ndarray) -> np.ndarray:
@@ -100,7 +108,7 @@ def prepare(case: Case, frame: pd.DataFrame, cut: int, variant: str) -> Incident
     return Incident(case, names, torch.from_numpy(x), 1e3 * (time.perf_counter() - start), change)
 
 
-def fit(train: list[Incident], seed: int, epochs: int, variant: str) -> tuple:
+def fit(train: list[Incident], seed: int, epochs: int, variant: str) -> FittedSTA:
     set_all_seeds(seed)
     measurements = torch.cat([sample.x for sample in train])
     mean = measurements.mean(dim=(0, 2)).view(1, -1, 1)
@@ -140,15 +148,12 @@ def fit(train: list[Incident], seed: int, epochs: int, variant: str) -> tuple:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 optimizer.step()
     model.eval()
-    return model, edges, mean, scale
+    return FittedSTA(model, edges, mean, scale)
 
 
 @torch.inference_mode()
-def rank(fitted: tuple, sample: Incident) -> dict:
+def incident_logits(fitted: FittedSTA, sample: Incident) -> tuple[torch.Tensor, torch.Tensor]:
     model, edges, mean, scale = fitted
-    if not sample.names:
-        return {"ranks": [], "status": "failed", "error": "no candidates", "latency_ms": 0.0}
-    start = time.perf_counter()
     model.num_nodes = len(sample.names)
     model.set_k(min(model.k, model.num_nodes))
     x = ((sample.x - mean) / scale).unsqueeze(0)
@@ -159,8 +164,16 @@ def rank(fitted: tuple, sample: Incident) -> dict:
         fused = fused + 0.2 * fused.std(unbiased=False) * (
             (change - change.mean()) / change.std(unbiased=False).clamp_min(1e-6)
         )
+    return fused, top[0]
+
+
+def rank(fitted: FittedSTA, sample: Incident) -> dict:
+    if not sample.names:
+        return {"ranks": [], "status": "failed", "error": "no candidates", "latency_ms": 0.0}
+    start = time.perf_counter()
+    fused, top = incident_logits(fitted, sample)
     ranks = [sample.names[i] for i in fused.argsort(descending=True, stable=True).tolist()]
-    picked = [sample.names[i] for i in top[0].tolist()]
+    picked = [sample.names[i] for i in top.tolist()]
     return {
         "ranks": ranks,
         "status": "ok",

@@ -319,12 +319,12 @@ def run(args: argparse.Namespace) -> None:
     print(f"Wrote {path} and {args.output / 'results.md'}")
 
 
-def main() -> None:
+def main(argv: list[str] | None = None, *, prog: str | None = None) -> None:
     root = Path.home() / "data" / "rcaeval"
     default_data = root / "figshare" / "data"
     if not default_data.exists() and (root / "hf").exists():
         default_data = root / "hf"
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, prog=prog)
     parser.add_argument("--data-root", type=Path, default=default_data)
     parser.add_argument("--cache", type=Path, default=root / "reference-cache")
     parser.add_argument("--output", type=Path, default=Path("benchmarks"))
@@ -340,7 +340,7 @@ def main() -> None:
     parser.add_argument("--split", choices=("dev", "all"), default="all")
     parser.add_argument("--variant", choices=VARIANTS, default="prior")
     parser.add_argument("--skip-references", action="store_true", help="Use cached results only.")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if min(args.rows, args.epochs, args.workers, args.timeout) <= 0 or args.tt_limit < 0:
         parser.error("Rows, epochs, workers and timeout must be positive; TT limit cannot be negative.")
     try:

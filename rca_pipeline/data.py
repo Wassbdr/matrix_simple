@@ -1,5 +1,7 @@
 """Download the pinned public RCAEval release outside the repository."""
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import re
@@ -99,12 +101,12 @@ def huggingface(root: Path, suites: list[str]) -> Path:
     return out
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
+def main(argv: list[str] | None = None, *, prog: str | None = None) -> None:
+    parser = argparse.ArgumentParser(description=__doc__, prog=prog)
     parser.add_argument("--root", type=Path, default=Path.home() / "data" / "rcaeval")
     parser.add_argument("--suites", nargs="+", choices=sorted(COUNTS), default=list(COUNTS))
     parser.add_argument("--source", choices=("auto", "figshare", "hf"), default="auto")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     args.root.mkdir(parents=True, exist_ok=True)
     if args.source == "hf":
         print(huggingface(args.root, args.suites))
