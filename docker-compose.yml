@@ -11,5 +11,6 @@ services:
       - "8080:8080"
     environment:
       MODEL_BUNDLE: /app/checkpoints/sta_sockshop_demo
+      OMP_NUM_THREADS: "1"  # batch-1 inference: one thread avoids CPU oversubscription
     volumes:
       - ./examples/sockshop_demo/bundle:/app/checkpoints/sta_sockshop_demo:ro

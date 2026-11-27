@@ -32,7 +32,7 @@ if [[ "${FULL:-0}" == 1 || ! -f results/scaling_benchmark.json ]]; then
 fi
 python showcase/figures.py
 
-MODEL_BUNDLE=examples/sockshop_demo/bundle python -m uvicorn serving.serve:app --port 8080 \
+OMP_NUM_THREADS=1 MODEL_BUNDLE=examples/sockshop_demo/bundle python -m uvicorn serving.serve:app --port 8080 \
   --log-level warning > showcase/build/uvicorn.log 2>&1 &
 SERVER=$!
 trap 'kill $SERVER 2>/dev/null || true' EXIT
