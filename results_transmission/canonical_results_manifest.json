@@ -1,0 +1,145 @@
+{
+  "manifest_version": "2.0",
+  "generated_at_utc": "2026-11-27T11:10:59+00:00",
+  "built_from_commit": "90f95ea61ea015345af50c2a323ab2c9cba5dc21",
+  "supersedes": "results_transmission/historical/canonical_results_manifest_v1.json",
+  "hardware_for_regenerated_and_generated": "CPU only (no GPU); see each JSON's hardware block",
+  "artifacts": [
+    {
+      "path": "results/scaling_benchmark.json",
+      "status": "generated",
+      "generation_command": "make scaling (three invocations, listed in `invocations`)",
+      "size_bytes": 17665,
+      "sha256": "9f2e969eedc2a436e04c533394f706215a421a09797c189e251bbbead9538462",
+      "invocations": [
+        "python -m rca_pipeline.scaling_benchmark --sizes 14,50,100,200 --train-threads 4 --skip-latency --output-json results/scaling_benchmark.json",
+        "python -m rca_pipeline.scaling_benchmark --sizes 500 --models STA,FullGraphGCN --train-threads 4 --skip-latency --resume --output-json results/scaling_benchmark.json",
+        "python -m rca_pipeline.scaling_benchmark --latency-only --models STA,FullGraphGCN,LateGATv2 --output-json results/scaling_benchmark.json"
+      ]
+    },
+    {
+      "path": "results/sockshop_demo_eval.json",
+      "status": "generated",
+      "generation_command": "python -m rca_pipeline.demo_incident build",
+      "size_bytes": 1227,
+      "sha256": "43a1db668663dbdb0694b9cad88a1551a831a1ae48024af97701173fc91f6e13"
+    },
+    {
+      "path": "examples/sockshop_demo/incident.json",
+      "status": "generated",
+      "generation_command": "python -m rca_pipeline.demo_incident build",
+      "size_bytes": 109887,
+      "sha256": "583d0f28158dadc6c694ff2f91216198eab3d400fbb30294e6fa417343f0639c"
+    },
+    {
+      "path": "examples/sockshop_demo/bundle/model.pt",
+      "status": "generated",
+      "generation_command": "python -m rca_pipeline.demo_incident build",
+      "size_bytes": 76076,
+      "sha256": "efe6b026a35eed9df91cdeb16b1d3060a2110691d5512e8e1b11ce649757cece"
+    },
+    {
+      "path": "examples/sockshop_demo/bundle/scaler.pt",
+      "status": "generated",
+      "generation_command": "python -m rca_pipeline.demo_incident build",
+      "size_bytes": 995,
+      "sha256": "57cf6b9c15c9d0bb36a36b9b4c0044a18e1d696e10e48e23dd600c3cbe814890"
+    },
+    {
+      "path": "examples/sockshop_demo/bundle/metadata.json",
+      "status": "generated",
+      "generation_command": "python -m rca_pipeline.demo_incident build",
+      "size_bytes": 1517,
+      "sha256": "efd0cce2fb2e007cfdad1f0eadd666bbb069a8041e072085b32fcbe272dec474"
+    },
+    {
+      "path": "results/regenerated/benchmark_full.json",
+      "status": "regenerated",
+      "replaces": "rca_pipeline/benchmark_full_prepublish.json",
+      "source_commit": "07b7bc1",
+      "generation_command": "git worktree add ../regen 07b7bc1 && cd ../regen && python -m rca_pipeline.benchmark --output-json rca_pipeline/benchmark_full_prepublish.json",
+      "size_bytes": 29583,
+      "sha256": "9eeca628d5c78c8d50b9c9ba66ce303218fe80adf557d69268de21fd194c030c"
+    },
+    {
+      "path": "results/regenerated/ablation.json",
+      "status": "regenerated",
+      "replaces": "rca_pipeline/ablation_prepublish.json",
+      "source_commit": "07b7bc1",
+      "generation_command": "git worktree add ../regen 07b7bc1 && cd ../regen && python -m rca_pipeline.benchmark_ablation --output-json rca_pipeline/ablation_prepublish.json",
+      "size_bytes": 22249,
+      "sha256": "fba1b619509e0a7a2ff97ea3bc103ceaf263343c2f201defde9af1d37e003dc5"
+    },
+    {
+      "path": "results_transmission/warmup_real_trainticket_w0.json",
+      "status": "unchanged",
+      "generation_command": "python -m rca_pipeline.benchmark_real --dataset trainticket --seeds 42,123,7 --epochs 20 --max-cases 20 --enable-drift --sta-contrastive-warmup 0 --output-json results_transmission/warmup_real_trainticket_w0.json",
+      "size_bytes": 5772,
+      "sha256": "31118d80bb9f29bc6fb1d8163ef2ddd57ec5d61a08016b4ff96fb732217e7bbb"
+    },
+    {
+      "path": "results_transmission/warmup_real_trainticket_w10.json",
+      "status": "unchanged",
+      "generation_command": "python -m rca_pipeline.benchmark_real --dataset trainticket --seeds 42,123,7 --epochs 20 --max-cases 20 --enable-drift --sta-contrastive-warmup 10 --allow-real-warmup --output-json results_transmission/warmup_real_trainticket_w10.json",
+      "size_bytes": 5784,
+      "sha256": "0603cb74ae3c2bd0a2e7d027804a95fabfc7c7c6ec250f056b66f1214d49d05f"
+    },
+    {
+      "path": "results_transmission/smoke_pre_submission_check.json",
+      "status": "unchanged",
+      "generation_command": "python -m rca_pipeline.benchmark_real --dataset trainticket --seeds 42 --epochs 1 --max-cases 10 --sta-contrastive-warmup 0 --output-json results_transmission/smoke_pre_submission_check.json",
+      "size_bytes": 7101,
+      "sha256": "4db31318ba8e0ebda5cdbe563a3b53d509887c2b48186078187487c4a6f5022c"
+    },
+    {
+      "path": "results_transmission/comparability_matrix.json",
+      "status": "edited",
+      "notes": "edited in d6ff3b8 (isoperimetric BARO) after the v1 manifest; v1 bytes restored from 00d220c under results_transmission/historical/",
+      "generation_command": "python -m rca_pipeline.comparability_matrix --repo-root . --output-md docs/COMPARABILITY_MATRIX.md --output-json results_transmission/comparability_matrix.json (needs the RCAEval prepublish runs listed in `missing`)",
+      "size_bytes": 5121,
+      "sha256": "cab49e1d3e74a4357439150b12ec8f28966f616c3bb12e342759ae6bea9341e5"
+    },
+    {
+      "path": "docs/COMPARABILITY_MATRIX.md",
+      "status": "edited",
+      "notes": "edited in d6ff3b8 and 55ea6a5 after the v1 manifest; v1 bytes restored from 00d220c under results_transmission/historical/",
+      "generation_command": "see results_transmission/comparability_matrix.json",
+      "size_bytes": 4380,
+      "sha256": "7e7da11eb9074890d453c5270817d43ede54d1fd400d59b5883e7cc1a9db92a1"
+    },
+    {
+      "path": "results_transmission/historical/comparability_matrix_00d220c.json",
+      "status": "historical",
+      "generation_command": "git show 00d220c:results_transmission/comparability_matrix.json",
+      "size_bytes": 3831,
+      "sha256": "a25df0c5ecd723cacc494d4f2e7e7552e46435e545db1a3d39b1d459dd50ff12"
+    },
+    {
+      "path": "results_transmission/historical/COMPARABILITY_MATRIX_00d220c.md",
+      "status": "historical",
+      "generation_command": "git show 00d220c:docs/COMPARABILITY_MATRIX.md",
+      "size_bytes": 2281,
+      "sha256": "d03f78ec69abdcc4b28a7a551ee53966fd4116648ea386452973debcec3a76f1"
+    },
+    {
+      "path": "results_transmission/historical/canonical_results_manifest_v1.json",
+      "status": "historical",
+      "generation_command": "git show 07b7bc1:results_transmission/canonical_results_manifest.json",
+      "size_bytes": 6236,
+      "sha256": "adf3902b0cca27caf3ff8d980f82fe1944dd91218841fa6132407768c568c8f8"
+    }
+  ],
+  "missing": [
+    {
+      "path": "rca_pipeline/benchmark_real_long_prepublish.json",
+      "reason": "never committed (matched by .gitignore `rca_pipeline/benchmark*.json`), absent from every branch and from `git log --all`; regeneration needs the RCAEval RE2 dataset (external download, not redistributed here) and ~100 epochs x 3 seeds x 3 systems.",
+      "generation_command": "python -m rca_pipeline.benchmark_real --dataset all --seeds 42,123,7 --epochs 100 --max-cases 90 --sta-contrastive-warmup 0 --output-json rca_pipeline/benchmark_real_long_prepublish.json"
+    },
+    {
+      "path": "rca_pipeline/benchmark_real_long_mm_strict_prepublish.json",
+      "reason": "same as benchmark_real_long_prepublish.json (RCAEval data required).",
+      "generation_command": "python -m rca_pipeline.benchmark_real --dataset all --seeds 42,123,7 --epochs 100 --max-cases 90 --sta-contrastive-warmup 0 --use-mm --mm-strict --output-json rca_pipeline/benchmark_real_long_mm_strict_prepublish.json"
+    }
+  ],
+  "verify": "make verify-manifest"
+}
