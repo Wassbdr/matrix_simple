@@ -1,13 +1,68 @@
-# STA: A Select-Then-Analyze Framework for Scalable Root Cause Analysis in Microservice Architectures
+# STA: root-cause analysis for microservice incidents
+
+**STA ranks which microservice caused an incident from its metrics, for SREs and on-call
+engineers: it scores all N services, then runs a graph model on the k most suspect ones only,
+and stays more accurate than a full-graph GCN from 14 to 500 services at comparable CPU latency (1-7 ms).**
+
+![demo: /predict on a synthetic Sock Shop incident, then latency vs N](showcase/demo.gif)
 
 [![CI](https://github.com/Wassbdr/matrix_simple/actions/workflows/ci.yml/badge.svg)](https://github.com/Wassbdr/matrix_simple/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/Wassbdr/matrix_simple/branch/main/graph/badge.svg)](https://codecov.io/gh/Wassbdr/matrix_simple)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> **Nouveau sur le projet ?** Commencez par [`HANDOVER.md`](HANDOVER.md) — installation,
-> ce qui est reproductible hors ligne, et où sont les résultats canoniques.
-> Index de la documentation : [`docs/README.md`](docs/README.md).
+## Run it
+
+```bash
+git clone https://github.com/Wassbdr/matrix_simple.git && cd matrix_simple
+docker compose up -d --build          # FastAPI service + bundled Sock Shop model on :8080
+python3 scripts/demo_predict.py       # POST the demo incident to /predict (stdlib only)
+```
+
+Without Docker: `pip install torch==2.0.1 --index-url https://download.pytorch.org/whl/cpu &&
+pip install -e ".[serve]" -c requirements/constraints-cpu.txt && make demo`.
+
+## Key results
+
+<!-- results:start -->
+- **Accuracy holds as the graph grows:** from N=14 to N=500 services STA keeps top-1 between 0.51 and 0.72; the full-graph GCN ranges 0.13-0.61 and is beaten at every N (N=500: 0.51 vs 0.46). The full-graph GATv2 is close to STA up to N=200.
+- **CPU latency grows with N for every model, STA included:** STA 1.0 -> 6.6 ms, GCN 0.6 -> 6.9 ms from N=14 to N=2000. The O(N) selector dominates at batch 1, so STA only matches the sparse GCN from N=2000. Setup: Intel(R) Xeon(R) Processor, 1 thread, batch 1, torch 2.0.1+cpu CPU.
+
+| N services | k | top-1 STA | top-1 full-graph GCN | top-1 full-graph GATv2 | random | STA ms | GCN ms |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 14 | 5 | 0.72 ± 0.01 | 0.61 ± 0.02 | 0.70 ± 0.06 | 0.071 | 1.0 | 0.6 |
+| 50 | 8 | 0.59 ± 0.03 | 0.21 ± 0.11 | 0.54 ± 0.03 | 0.020 | 1.2 | 0.8 |
+| 100 | 15 | 0.59 ± 0.02 | 0.13 ± 0.05 | 0.54 ± 0.06 | 0.010 | 1.3 | 0.9 |
+| 200 | 20 | 0.57 ± 0.02 | 0.37 ± 0.12 | 0.56 ± 0.03 | 0.005 | 1.6 | 1.2 |
+| 500 | 50 | 0.51 ± 0.04 | 0.46 ± 0.05 | not run | 0.002 | 2.4 | 2.1 |
+| 1000 |  |  |  |  |  | 3.8 | 3.8 |
+| 2000 |  |  |  |  |  | 6.6 | 6.9 |
+
+Accuracy: synthetic Barabási-Albert graphs, dataset seed 42, training seeds 7, 42, 123 (mean ± std), 60 epochs, trained on CPU (8 vCPU). The GCN's low scores at N=50-100 come with a large seed spread (unstable training of an untuned baseline). Cells marked "not run" were skipped for CPU time (one N=500 model takes 1-2 h for 3 seeds). Command: `make scaling` (the three invocations are recorded in `results/scaling_benchmark.json`).
+
+- **STA vs BARO, same candidates** (synthetic Sock Shop, 14 services, seed 42): top-1 0.90 vs 0.51 over 335 held-out incidents, 0.80 vs 0.22 on the 171 cascading ones. BARO needs no training and ties STA (1.00 vs 1.00) on the 119 local crash ('hard') faults.
+- **Demo incident** (`carts`, cascade): STA ranks it #1 in 1.16 ms, BARO ranks it #5. Command: `make demo`.
+<!-- results:end -->
+
+## How it works
+
+```mermaid
+flowchart LR
+  M["metrics per service<br/>N x 5 features x 12 steps"] --> S["selector<br/>score all N services, O(N)"]
+  S -->|top k suspects| A["spatio-temporal GNN<br/>on the k-node subgraph, O(k²)"]
+  A --> R["ranked root causes"]
+  B[("model bundle<br/>model.pt, scaler.pt, metadata.json")] -.-> S
+  R --> API["FastAPI /predict<br/>/metrics, /health"]
+```
+
+The model is shipped as a self-describing bundle (weights, scaler, service graph, service and
+metric names). `/predict` reorders the request's services and metrics to the bundle's order and
+rejects unknown names, so a column swap cannot silently change the answer.
+
+New to the project? [`HANDOVER.md`](HANDOVER.md) covers setup and what is reproducible offline;
+the documentation index is [`docs/README.md`](docs/README.md).
+
+---
 
 ## Abstract
 
@@ -18,8 +73,7 @@ Graph Information Bottleneck (GIB) for full-graph analysis, and a complementary
 Select-Then-Analyze (STA) architecture for sublinear inference on large topologies.
 This is a **deliberately honest, reproducible study**, and it makes no SOTA claim. Across three
 RCAEval benchmarks, Barabási-Albert simulations (N = 20-100), a live 14-service Kubernetes
-cluster, and a 50-service synthetic-but-real deployment, STA keeps inference latency **flat**
-as N grows and holds a **modest** accuracy edge at large N (**+2.3 pp** Avg@1 over GATv2 at
+cluster, and a 50-service synthetic-but-real deployment, STA holds a **modest** accuracy edge at large N (**+2.3 pp** Avg@1 over GATv2 at
 N = 100, 10 seeds, down from +6.2 pp at 5 seeds). At small graph scale (N ≤ 14) STA, GATv2
 and an **isoperimetric BARO** baseline are within noise. BARO even **wins on Online Boutique**.
 We also report a robust **negative result** on multimodal fusion and a fully **deployed**
@@ -29,7 +83,12 @@ and Docker images are released to support reproducibility.
 
 ---
 
-## Key Results
+## Paper results (RCAEval)
+
+> These RCAEval numbers come from the pre-publication runs listed in
+> [`results_transmission/historical/`](results_transmission/historical/). They need the external
+> RCAEval dataset and were **not** regenerated in this branch; two of their source JSONs are
+> missing from git history (see the results manifest).
 
 > **Publication-grade results** below come from `scripts/run_publication_suite.sh`
 > (5 seeds: 42, 123, 7, 1337, 2025; deterministic; 150 supervised epochs simulated, 100 epochs real).
@@ -84,6 +143,24 @@ Source: `results_transmission/paper_benchmark_sim.json`
 
 > STA scales gracefully: at N = 100 it leads top-1 by **+5 to +9 pts** over O(N²) full-graph
 > models while keeping inference under **3.5 ms**.
+
+**Regenerated in this branch** on CPU from the clean `main` commit `07b7bc1`
+(`python -m rca_pipeline.benchmark`, same 5 seeds, output
+[`results/regenerated/benchmark_full.json`](results/regenerated/benchmark_full.json)):
+
+| Model                     | N=20 Top-1    | N=50 Top-1    | N=100 Top-1   |
+|---------------------------|--------------:|--------------:|--------------:|
+| STA Select-then-Analyze   | 81.5% ± 5.4%  | 58.6% ± 2.3%  | 52.4% ± 4.2%  |
+| Late Bottleneck STGCN+GIB | 84.5% ± 1.2%  | 50.4% ± 8.3%  | 28.9% ± 18.8% |
+| Late Bottleneck GATv2     | 81.9% ± 4.6%  | 59.5% ± 1.7%  | 45.8% ± 10.3% |
+| Full-Graph GCN (baseline) | 82.1% ± 1.9%  | 52.8% ± 2.8%  | 45.3% ± 7.3%  |
+| Random Forest (baseline)  | 68.5% ± 2.3%  | 30.5% ± 0.9%  |  6.9% ± 1.1%  |
+| MLP (baseline)            |  8.6% ± 1.7%  |  2.8% ± 1.0%  |  1.1% ± 1.0%  |
+
+The N=100 lead of STA holds (+6.6 pts over GATv2, +7.1 over GCN); individual cells differ from
+the table above by up to 18 pts (Late STGCN+GIB at N=100), so the table above is not
+bit-for-bit reproducible. Latencies in that run were taken on a shared, loaded CPU and are not
+reported; see the scaling benchmark for controlled CPU latency.
 
 ### ObservIT Live Cluster: Sock-Shop with Chaos Mesh (5 seeds, 5 chaos scenarios)
 
@@ -289,11 +366,13 @@ contrastive warmup effect.
 
 ### Verifying canonical artifacts
 
-SHA-256 hashes for the pre-publication snapshots are stored in
-`results_transmission/canonical_results_manifest.json.sha256`.
+`results_transmission/canonical_results_manifest.json` (v2) lists the SHA-256, status
+(`generated`, `regenerated`, `unchanged`, `edited`, `historical`) and generation command of every
+committed result. Artifacts that cannot be rebuilt are listed under `missing` with the reason.
+The v1 manifest is kept, unmodified, in `results_transmission/historical/`. CI runs:
 
 ```bash
-sha256sum -c results_transmission/canonical_results_manifest.json.sha256
+make verify-manifest      # exit 1 on any hash mismatch or missing file
 ```
 
 ---
@@ -424,6 +503,27 @@ for real-world benchmarks. With warmup = 10, TrainTicket Avg@1 drops from
 Evidence: `results_transmission/warmup_real_trainticket_w{0,10}.json`.
 
 All benchmark commands above already include `--sta-contrastive-warmup 0`.
+
+---
+
+## Roadmap and known limitations
+
+- **Synthetic first.** Every number on the first screen comes from seeded synthetic graphs
+  (Barabási-Albert, Sock Shop topology). Real-trace numbers (RCAEval) need the external
+  dataset; they are in "Paper results" and were not regenerated here.
+- **Missing provenance.** `benchmark_real_long_prepublish.json` and
+  `benchmark_real_long_mm_strict_prepublish.json` were never committed and are not in git
+  history; the manifest lists them as missing instead of hashing them.
+- **Latency is not flat on CPU.** The earlier claim that STA's latency stays flat as N grows
+  does not hold in the scaling benchmark: at batch 1 the O(N) selector dominates, and a sparse
+  full-graph GCN is O(E), so both grow linearly and STA only catches up at N≈2000. STA's
+  measured advantage at scale is accuracy, not speed.
+- **CPU timings only.** No GPU was used. Latency is batch 1, one thread, untrained weights
+  (inference cost does not depend on the weight values).
+- **BARO is a strong baseline.** It needs no training, is faster, and is competitive on
+  single-service faults (it wins on RCAEval Online Boutique). STA's gain is on cascades.
+- **Next:** bake a bundle into a published image, add a public RCAEval case to the demo,
+  stream metrics from Prometheus into `/predict` in the compose stack.
 
 ---
 
