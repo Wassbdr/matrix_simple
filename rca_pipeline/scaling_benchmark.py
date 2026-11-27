@@ -24,7 +24,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import platform
+import sys
 import time
 from typing import Callable, Dict, List
 
@@ -199,6 +201,8 @@ def run_size(n: int, args, models: List[str]) -> Dict:
         "k": k,
         "num_samples": num_samples,
         "n_test_incidents": len(test_anom),
+        "seeds": list(args.seeds),
+        "epochs": args.epochs,
         "random_top1": 1.0 / n,
         "models": per_model,
     }
@@ -244,6 +248,14 @@ def main(argv=None) -> None:
         action="store_true",
         help="re-measure latency and update it in an existing --output-json",
     )
+    ap.add_argument(
+        "--resume",
+        action="store_true",
+        help="keep sizes already in --output-json and append the missing ones",
+    )
+    ap.add_argument(
+        "--skip-latency", action="store_true", help="accuracy only (run --latency-only later)"
+    )
     ap.add_argument("--output-json", default="results/scaling_benchmark.json")
     args = ap.parse_args(argv)
     args.seeds = [int(s) for s in args.seeds.split(",") if s]
@@ -257,12 +269,27 @@ def main(argv=None) -> None:
     else:
         if args.train_threads:
             torch.set_num_threads(args.train_threads)
-        rows = [run_size(int(n), args, models) for n in args.sizes.split(",") if n]
-        out = {
-            "benchmark": "scaling_sta_vs_full_graph",
-            "config": {k: v for k, v in vars(args).items() if k != "latency_only"},
-            "accuracy": rows,
-        }
+        out = {"benchmark": "scaling_sta_vs_full_graph", "accuracy": [], "invocations": []}
+        if args.resume and os.path.exists(args.output_json):
+            with open(args.output_json) as fh:
+                out = json.load(fh)
+            out.setdefault("invocations", [])
+        out["config"] = {k: v for k, v in vars(args).items() if k not in ("latency_only", "resume")}
+        out["invocations"].append(
+            " ".join(["python -m rca_pipeline.scaling_benchmark", *(argv or sys.argv[1:])])
+        )
+        done = {r["N"] for r in out["accuracy"]}
+        for n in [int(n) for n in args.sizes.split(",") if n]:
+            if n in done:
+                print(f"=== N={n}: kept from {args.output_json}", flush=True)
+                continue
+            out["accuracy"].append(run_size(n, args, models))
+            out["accuracy"].sort(key=lambda r: r["N"])
+            out["hardware"] = _hardware()
+            _write(out, args.output_json)
+    if args.skip_latency:
+        print(f"\nWrote {args.output_json} (accuracy only)")
+        return
     torch.set_num_threads(1)
     out["latency"] = [
         run_latency_only(int(n), models, args.latency_repeats)
@@ -270,9 +297,15 @@ def main(argv=None) -> None:
         if n
     ]
     out["hardware"] = _hardware()
-    with open(args.output_json, "w") as fh:
-        json.dump(out, fh, indent=2)
+    _write(out, args.output_json)
     print(f"\nWrote {args.output_json}")
+
+
+def _write(out: Dict, path: str) -> None:
+    tmp = f"{path}.tmp"
+    with open(tmp, "w") as fh:
+        json.dump(out, fh, indent=2)
+    os.replace(tmp, path)
 
 
 def _hardware() -> Dict[str, object]:
@@ -285,8 +318,6 @@ def _hardware() -> Dict[str, object]:
                     break
     except OSError:
         pass
-    import os
-
     return {
         "cpu": cpu,
         "logical_cpus": os.cpu_count(),
