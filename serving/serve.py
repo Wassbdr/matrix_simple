@@ -1,17 +1,15 @@
 """
 FastAPI inference service for the STA RCA model.
 
-Loads a serialized model bundle (see ``rca_pipeline/model_bundle.py``) at
-startup and exposes a small REST API:
+Loads the packaged RE1 model at startup and exposes a small REST API:
 
     POST /predict     ranked root-cause prediction on a single window
     GET  /health      liveness probe (always 200 once model is loaded)
-    GET  /ready       readiness probe (smoke-tests a zero window)
-    GET  /info        full bundle metadata.json
+    GET  /ready       readiness probe (smoke-tests ranking)
+    GET  /info        model metadata
     GET  /metrics     Prometheus metrics (via prometheus-fastapi-instrumentator)
 
-The model bundle directory is configured via the ``MODEL_BUNDLE``
-environment variable (default: ``/app/checkpoints/sta_sockshop_v1``).
+Set MODEL_BUNDLE to a legacy bundle directory to use the tensor request format.
 """
 
 from __future__ import annotations
@@ -20,21 +18,23 @@ import logging
 import os
 import time
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import numpy as np
+import pandas as pd
 from fastapi import FastAPI, HTTPException, Request
 from prometheus_client import Counter, Gauge, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
 
 from rca_pipeline.model_bundle import LoadedBundle, align_window, load_bundle, predict
+from rca_pipeline.ranking import DEFAULT_BUNDLE, Ranker
 from serving.logging_config import configure_logging
 
 configure_logging()
 logger = logging.getLogger(__name__)
 
-BUNDLE_PATH = os.environ.get("MODEL_BUNDLE", "/app/checkpoints/sta_sockshop_v1")
+BUNDLE_PATH = os.environ.get("MODEL_BUNDLE")
 DEFAULT_TOP_K = int(os.environ.get("DEFAULT_TOP_K", "3"))
 
 app = FastAPI(
@@ -64,6 +64,7 @@ MODEL_INFO = Gauge(
 Instrumentator().instrument(app).expose(app)
 
 _BUNDLE: Optional[LoadedBundle] = None
+_RANKER: Optional[Ranker] = None
 
 
 @app.middleware("http")
@@ -87,7 +88,11 @@ async def request_id_middleware(request: Request, call_next):
 
 @app.on_event("startup")
 def _load() -> None:
-    global _BUNDLE
+    global _BUNDLE, _RANKER
+    if not BUNDLE_PATH:
+        _RANKER = Ranker()
+        logger.info("Loaded %s", _RANKER.version)
+        return
     if not os.path.isdir(BUNDLE_PATH):
         logger.error("MODEL_BUNDLE directory %s not found", BUNDLE_PATH)
         return
@@ -132,6 +137,12 @@ class PredictRequest(BaseModel):
         None, description="Metric name of each feature column; guarded like `services`.")
 
 
+class MetricsRequest(BaseModel):
+    metrics: dict[str, list[float]]
+    inject_time: int
+    top_k: int = Field(DEFAULT_TOP_K, ge=1, le=50)
+
+
 class PredictedCandidate(BaseModel):
     service: str
     score: float
@@ -153,13 +164,19 @@ class PredictResponse(BaseModel):
 
 @app.get("/health")
 def health():
-    if _BUNDLE is None:
+    if _BUNDLE is None and _RANKER is None:
         raise HTTPException(status_code=503, detail="Bundle not loaded")
-    return {"status": "ok", "bundle": BUNDLE_PATH}
+    return {"status": "ok", "bundle": BUNDLE_PATH or str(DEFAULT_BUNDLE)}
 
 
 @app.get("/ready")
 def ready():
+    if _RANKER is not None:
+        try:
+            _RANKER.rank(pd.DataFrame({"time": [0, 1], "smoke_cpu": [0, 1]}), inject_time=1)
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail="Smoke predict failed") from exc
+        return {"status": "ready"}
     if _BUNDLE is None:
         raise HTTPException(status_code=503, detail="Bundle not loaded")
     cfg = _BUNDLE.metadata["config"]
@@ -173,16 +190,24 @@ def ready():
 
 @app.get("/info")
 def info():
+    if _RANKER is not None:
+        return {"model_version": _RANKER.version, "request": "metrics", "rows_per_side": _RANKER.rows}
     if _BUNDLE is None:
         raise HTTPException(status_code=503, detail="Bundle not loaded")
     return _BUNDLE.metadata
 
 
 @app.post("/predict", response_model=PredictResponse)
-def predict_endpoint(req: PredictRequest):
-    if _BUNDLE is None:
+def predict_endpoint(req: Union[PredictRequest, MetricsRequest]):
+    if _BUNDLE is None and _RANKER is None:
         PREDICT_COUNTER.labels(status="unavailable").inc()
         raise HTTPException(status_code=503, detail="Bundle not loaded")
+    if isinstance(req, MetricsRequest) and _RANKER is not None:
+        return _predict_metrics(req, _RANKER)
+    if not isinstance(req, PredictRequest) or _BUNDLE is None:
+        PREDICT_COUNTER.labels(status="bad_request").inc()
+        expected = "metrics with inject_time" if _RANKER is not None else "window"
+        raise HTTPException(status_code=400, detail=f"Send {expected} for the loaded model.")
 
     cfg = _BUNDLE.metadata["config"]
     try:
@@ -232,5 +257,23 @@ def predict_endpoint(req: PredictRequest):
             PredictedCandidate(service=svc, score=score, rank=i + 1)
             for i, (svc, score) in enumerate(ranked)
         ],
+        latency_ms=elapsed * 1000.0,
+    )
+
+
+def _predict_metrics(req: MetricsRequest, ranker: Ranker) -> PredictResponse:
+    start = time.perf_counter()
+    try:
+        frame = pd.DataFrame(req.metrics)
+        ranked = ranker.rank(frame, inject_time=req.inject_time, top_k=req.top_k)
+    except ValueError as exc:
+        PREDICT_COUNTER.labels(status="bad_request").inc()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    elapsed = time.perf_counter() - start
+    PREDICT_LATENCY.observe(elapsed)
+    PREDICT_COUNTER.labels(status="ok").inc()
+    return PredictResponse(
+        model_version=ranker.version,
+        candidates=[PredictedCandidate(service=c.service, score=c.score, rank=c.rank) for c in ranked],
         latency_ms=elapsed * 1000.0,
     )

@@ -3,7 +3,8 @@
 # Stage 1: install Python deps with pip user-site so we can copy them
 # clean into a slim runtime image.
 
-FROM python:3.11-slim AS builder
+ARG PYTHON_IMAGE=python:3.11-slim
+FROM ${PYTHON_IMAGE} AS builder
 
 WORKDIR /build
 COPY requirements/constraints-cpu.txt .
@@ -13,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends gcc && \
     pip install --user --no-cache-dir -r requirements.txt
 
 # Stage 2: lean runtime
-FROM python:3.11-slim
+FROM ${PYTHON_IMAGE}
 
 # Install minimal runtime deps (curl needed only for HEALTHCHECK)
 RUN apt-get update && apt-get install -y --no-install-recommends curl && \
@@ -24,11 +25,8 @@ COPY --from=builder /root/.local /root/.local
 ENV PATH=/root/.local/bin:$PATH \
     PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
-    MODEL_BUNDLE=/app/checkpoints/sta_sockshop_v1
+    OMP_NUM_THREADS=1
 
-# Copy only what the service needs. The model bundle is NOT baked into the
-# image: it is mounted at $MODEL_BUNDLE (volume or initContainer download),
-# decoupling the model lifecycle from the image lifecycle.
 COPY rca_pipeline/ /app/rca_pipeline/
 COPY serving/serve.py /app/serving/serve.py
 COPY serving/logging_config.py /app/serving/logging_config.py

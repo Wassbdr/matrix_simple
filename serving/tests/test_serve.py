@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
+from rca_pipeline.ranking import Ranker
 from serving.tests.conftest import NODE_NAMES, F, N, W
 
 
@@ -100,3 +101,22 @@ def test_predict_rejects_unknown_services(client):
     r = client.post("/predict", json={"window": window, "services": ["x", "y", "z", "w"]})
     assert r.status_code == 400
     assert "services do not match" in r.json()["detail"]
+
+
+def test_default_model_ranks_metrics(serve_module, monkeypatch):
+    monkeypatch.setattr(serve_module, "BUNDLE_PATH", None)
+    monkeypatch.setattr(serve_module, "_BUNDLE", None)
+    monkeypatch.setattr(serve_module, "_RANKER", None)
+    payload = {"metrics": {"time": [0, 1, 2, 3], "cart_cpu": [0, 0, 3, 5],
+                           "orders_cpu": [1, 1, 1, 1]}, "inject_time": 2}
+    with TestClient(serve_module.app) as client:
+        assert client.get("/ready").json() == {"status": "ready"}
+        assert client.get("/info").json()["request"] == "metrics"
+        result = client.post("/predict", json=payload)
+        assert result.status_code == 200
+        expected = Ranker().version
+        assert result.json()["model_version"] == expected
+        assert {c["service"] for c in result.json()["candidates"]} == {"cart", "orders"}
+        result = client.post("/predict", json={**payload, "inject_time": 4})
+        assert result.status_code == 400
+        assert "Supply samples before and at or after" in result.json()["detail"]
