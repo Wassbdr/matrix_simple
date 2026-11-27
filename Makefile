@@ -1,4 +1,4 @@
-.PHONY: help install dev test coverage lint format audit benchmark-smoke benchmark-paper clean report report-clean figures paper
+.PHONY: help install dev test coverage lint format audit benchmark-smoke benchmark-paper clean report report-clean figures paper verify-manifest manifest demo scaling showcase
 
 PYTHON ?= python3
 
@@ -15,6 +15,11 @@ help:
 	@echo "  make benchmark-paper  Full publication-grade benchmark (~4h)"
 	@echo "  make figures          Regenerate paper figures from results_transmission/*.json"
 	@echo "  make paper            Build the arXiv preprint PDF (docs/arxiv)"
+	@echo "  make demo             Run the Sock Shop incident demo (STA bundle vs BARO)"
+	@echo "  make scaling          Scaling benchmark STA vs full-graph, N=14..500 (CPU, ~1-2h)"
+	@echo "  make showcase         Rebuild showcase/ (poster, GIF, MP4, showcase.json)"
+	@echo "  make verify-manifest  Check every result artifact against its SHA-256"
+	@echo "  make manifest         Rewrite the results manifest (after regenerating artifacts)"
 	@echo "  make clean            Remove caches and generated artifacts"
 
 install:
@@ -36,6 +41,21 @@ lint:
 format:
 	$(PYTHON) -m ruff format rca_pipeline
 	$(PYTHON) -m ruff check --fix rca_pipeline
+
+verify-manifest:
+	$(PYTHON) -m rca_pipeline.provenance verify
+
+manifest:
+	$(PYTHON) -m rca_pipeline.provenance build
+
+demo:
+	$(PYTHON) -m rca_pipeline.demo_incident run
+
+scaling:
+	$(PYTHON) -m rca_pipeline.scaling_benchmark --train-threads 2 --output-json results/scaling_benchmark.json
+
+showcase:
+	bash showcase/make_showcase.sh
 
 audit:
 	bash scripts/pre_publish_audit.sh
