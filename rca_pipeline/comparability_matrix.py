@@ -172,7 +172,7 @@ def build_matrix(repo_root: Path) -> Dict[str, object]:
                 "BARO re-run on identical cases, candidate node set, per-seed split and "
                 "metric functions (results_transmission/baselines_rcaeval_ourprotocol.json). "
                 "Under identical conditions BARO is far stronger than its published 0.71: "
-                "ours wins on trainticket, ties on sockshop, loses on online-boutique — no "
+                "ours wins on trainticket, ties on sockshop, loses on online-boutique - no "
                 "uniform SOTA claim."
             ) if iso_rows else "Baseline values available, but no per-dataset split/preprocessing signatures.",
             "verdict": metrics_verdict,
@@ -268,7 +268,7 @@ def render_markdown(matrix: Dict[str, object]) -> str:
         lines.append(
             "> Under identical conditions BARO is far stronger than its published 0.71. "
             "Our models win on trainticket, are within noise on sockshop, and **lose on "
-            "online-boutique** — we make no uniform SOTA claim over BARO."
+            "online-boutique** - we make no uniform SOTA claim over BARO."
         )
 
     lines.append("")

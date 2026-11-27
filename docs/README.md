@@ -1,4 +1,10 @@
-# Index de la documentation — matrix_simple / STA
+# Documentation index
+
+- [Rank your own metrics](tutorial.md)
+- [Model card](model_card.md)
+- [Architecture](architecture.md)
+- [Public data and benchmark setup](rcaeval_data.md)
+- [Frozen paper results](paper_results.md)
 
 Point d'entrée pour la reprise : [`../HANDOVER.md`](../HANDOVER.md).
 Vue d'ensemble scientifique et tables de résultats : [`../README.md`](../README.md).
@@ -16,7 +22,7 @@ Vue d'ensemble scientifique et tables de résultats : [`../README.md`](../README
 | `scripts/` | Bootstrap cluster K8s + campagnes ObservIT (`.sh`) |
 | `k8s/` | Manifests applicatifs et manifests de chaos |
 | `results_transmission/` | Artefacts canoniques de soutenance, vérifiés SHA-256 |
-| `rcaeval/` | Données RCAEval — **non versionné** (~39 Go), voir `HANDOVER.md` |
+| `rcaeval/` | Données RCAEval - **non versionné** (~39 Go), voir `HANDOVER.md` |
 
 ### Fichiers clés de `rca_pipeline/`
 
@@ -62,7 +68,7 @@ un clone frais contient les `.tex` et les figures, pas les PDF.
 
 ### Absents d'un clone
 
-- **`docs/internal/`** — notes hebdomadaires, rapport de stage en markdown,
+- **`docs/internal/`** - notes hebdomadaires, rapport de stage en markdown,
   accompagnement maître de stage. Gitignoré volontairement (contenu personnel),
   présent uniquement sur le poste d'origine.
 
@@ -75,7 +81,7 @@ un clone frais contient les `.tex` et les figures, pas les PDF.
 | `results_transmission/*_10seed.json` + `paper_benchmark_10seed.sha256` | Contrôle de robustesse à 10 graines. |
 | `results_transmission/baselines_rcaeval_ourprotocol.json` | Re-run isopérimétrique de BARO. |
 | `rca_pipeline/*_prepublish.json` | **Legacy, non canonique.** Issus d'un run à faible nombre d'epochs ; les champs `reference_top1` sont périmés et contredisent le run déterministe 5 graines. Ne pas citer. |
-| `results_transmission/comparability_matrix.json` | Verdicts d'isopérimétrie — mais **généré depuis les `*_prepublish.json` legacy** (3 graines, 90 cas), pas depuis le run canonique. Les verdicts tiennent, la signature de protocole qu'il affiche décrit le run legacy. Cf. [`COMPARABILITY_MATRIX.md`](COMPARABILITY_MATRIX.md). |
+| `results_transmission/comparability_matrix.json` | Verdicts d'isopérimétrie - mais **généré depuis les `*_prepublish.json` legacy** (3 graines, 90 cas), pas depuis le run canonique. Les verdicts tiennent, la signature de protocole qu'il affiche décrit le run legacy. Cf. [`COMPARABILITY_MATRIX.md`](COMPARABILITY_MATRIX.md). |
 
 Vérification d'intégrité :
 

@@ -1,7 +1,7 @@
 """Shared fixtures for serving tests: a tiny STA bundle and the FastAPI app.
 
 ``serving.serve`` reads ``MODEL_BUNDLE`` at import time, so the bundle is
-built and the env var set *before* the module is imported (session scope —
+built and the env var set *before* the module is imported (session scope -
 prometheus collectors cannot be registered twice in one process).
 """
 

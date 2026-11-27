@@ -79,7 +79,7 @@ def identify_root_cause(
     Runs inference on a single window and returns the identified root cause.
 
     Uses the GIB raw logits (use_gib=True) or the NodeScorer head (use_gib=False)
-    depending on how the model was trained — matching the training objective.
+    depending on how the model was trained - matching the training objective.
 
     Args:
         model: Trained SpatioTemporalRCA (in eval mode).

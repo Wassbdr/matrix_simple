@@ -72,7 +72,7 @@ def make_objective(train_data, test_data, node_names, edge_index, device, seed: 
         contrastive_warmup = trial.suggest_categorical("contrastive_warmup", [0, 5])
         epochs = trial.suggest_int("epochs", 20, 50, step=10)
         # Reported for posterity (these are not yet wired through
-        # train_and_eval_sta's signature — lr/wd/batch are hardcoded inside).
+        # train_and_eval_sta's signature - lr/wd/batch are hardcoded inside).
         trial.suggest_float("lr_proxy", 1e-4, 5e-3, log=True)
         trial.suggest_float("wd_proxy", 1e-6, 1e-3, log=True)
         trial.suggest_float("gib_beta_max_proxy", 0.05, 0.5)

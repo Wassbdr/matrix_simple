@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-benchmark_real.py — Validate RCA models on RCAEval real-world datasets.
+benchmark_real.py - Validate RCA models on RCAEval real-world datasets.
 
 Bridges the gap between simulated BA benchmarks and production realism (§7.1).
 
@@ -409,7 +409,7 @@ def train_and_eval_sta(
         target_rate = k / N
         # k == N (small real topologies, e.g. RCAEval N=5): there is no
         # bottleneck to regularize, and KL(p || Bernoulli(1-eps)) blows up the
-        # (1-p)*log((1-p)/eps) term — selector logits saturate and supervised
+        # (1-p)*log((1-p)/eps) term - selector logits saturate and supervised
         # training can never recover (the §5.4 collapse, isolated by ablation:
         # GIB-only warmup reproduces Avg@1=0.20, NCE-only does not).
         gib_active = target_rate < 1.0
@@ -848,7 +848,7 @@ def _run_single_dataset(
         if cascade_gammas:
             # Post-hoc propagation-prior blend: eval functions iterate the
             # same filtered test list, so per-case logits align with windows.
-            # The gamma sweep is free — one trained model, several blends.
+            # The gamma sweep is free - one trained model, several blends.
             from rca_pipeline.cascade_prior import apply_cascade_prior
             test_anom = [d for d in test_data if d.root_cause[0] in name_to_idx]
             for raw, prior_runs in ((r_sta_raw, sta_prior_runs), (r_gat_raw, gat_prior_runs)):
@@ -1159,7 +1159,7 @@ def main():
                              "one-hot model probabilities).")
     parser.add_argument("--cascade-prior-gamma", type=str, default="0",
                         help="Blend weight(s) for the propagation prior (quiet node, loud "
-                             "neighbors); comma-separated sweep allowed (e.g. 0.2,0.3,0.5) — "
+                             "neighbors); comma-separated sweep allowed (e.g. 0.2,0.3,0.5) - "
                              "the blend is post-hoc so extra gammas cost nothing. 0 disables. "
                              "Validate per-scenario before adopting.")
     parser.add_argument("--enable-drift", action="store_true",

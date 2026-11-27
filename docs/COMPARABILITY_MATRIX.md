@@ -1,33 +1,11 @@
 # COMPARABILITY MATRIX
 
-Generated at: 2026-06-02T15:33:31.330826+00:00
-
-> **Provenance de ce document — à lire avant de citer la signature de protocole.**
-> `rca_pipeline/comparability_matrix.py` a généré cette matrice à partir de
-> `rca_pipeline/benchmark_real_long_prepublish.json` et
-> `benchmark_real_long_mm_strict_prepublish.json`, c'est-à-dire des artefacts
-> **legacy** que le README déconseille de citer, sur un protocole à **3 graines
-> (42,123,7) et 90 cas** — et non sur le run canonique déterministe à 5 graines
-> dont sortent les tables publiées.
->
-> Conséquence pratique : les **verdicts** d'isopérimétrie (`partially_comparable`,
-> `not_isoperimeter`) et les valeurs BARO restent valables — le re-run BARO
-> isopérimétrique vit dans `results_transmission/baselines_rcaeval_ourprotocol.json`
-> et est vérifié exact (0,80 / 0,84 / 0,86 sur TT / SS / OB). Mais la table
-> « Protocol Signature (Ours) » ci-dessous décrit le run legacy, pas le run
-> canonique. Régénérer depuis les artefacts 5 graines lèverait l'ambiguïté ;
-> ce n'est pas fait à ce jour.
+Generated at: 2026-11-27T15:58:10.474834+00:00
 
 ## Protocol Signature (Ours)
 
 | Dataset | Mode | Seeds | Epochs | Max cases | Split mode | Drift | Normalized | MM status | Protocol source |
 |---|---|---|---:|---|---|---|---|---|---|
-| trainticket | metrics_only | 42,123,7 | 100 | 90 | varying_split_by_run_seed | on | no | not_applicable | fallback_inferred |
-| sockshop | metrics_only | 42,123,7 | 100 | 90 | varying_split_by_run_seed | on | no | not_applicable | fallback_inferred |
-| online-boutique | metrics_only | 42,123,7 | 100 | 90 | varying_split_by_run_seed | on | no | not_applicable | fallback_inferred |
-| trainticket | full_mm_strict | 42,123,7 | 100 | 90 | varying_split_by_run_seed | on | no | comparable | fallback_inferred |
-| sockshop | full_mm_strict | 42,123,7 | 100 | 90 | varying_split_by_run_seed | on | no | skipped_with_reason | fallback_inferred |
-| online-boutique | full_mm_strict | 42,123,7 | 100 | 90 | varying_split_by_run_seed | on | no | comparable | fallback_inferred |
 
 ## Published Baselines Available In Repository
 
@@ -48,13 +26,13 @@ BARO re-run on the *same* cases, candidate node set, per-seed split and metric f
 | sockshop | 84.0 | 71.0 | 85.0 | 81.0 | within_noise |
 | online-boutique | 86.0 | 71.0 | 65.0 | 68.0 | baro_better |
 
-> Under identical conditions BARO is far stronger than its published 0.71. Our models win on trainticket, are within noise on sockshop, and **lose on online-boutique** — we make no uniform SOTA claim over BARO.
+> Under identical conditions BARO is far stronger than its published 0.71. Our models win on trainticket, are within noise on sockshop, and **lose on online-boutique** - we make no uniform SOTA claim over BARO.
 
 ## Isoperimeter Verdict
 
 | Claim | Evidence In Repo | Verdict | Missing For Full Isoperimeter |
 |---|---|---|---|
-| Ours vs BARO (metrics-only), isoperimetric (our protocol) | BARO re-run on identical cases, candidate node set, per-seed split and metric functions (results_transmission/baselines_rcaeval_ourprotocol.json). Under identical conditions BARO is far stronger than its published 0.71: ours wins on trainticket, ties on sockshop, loses on online-boutique — no uniform SOTA claim. | comparable |  |
+| Ours vs BARO (metrics-only), isoperimetric (our protocol) | BARO re-run on identical cases, candidate node set, per-seed split and metric functions (results_transmission/baselines_rcaeval_ourprotocol.json). Under identical conditions BARO is far stronger than its published 0.71: ours wins on trainticket, ties on sockshop, loses on online-boutique - no uniform SOTA claim. | comparable |  |
 | Ours vs *published* RCAEval baseline numbers (BARO 0.71 etc.) | Published constants have no per-dataset split/preprocessing signature; superseded by the isoperimetric row above. | partially_comparable | Published baseline split protocol per dataset; Published preprocessing/normalization details |
 | Ours MM strict vs published baselines | Published baselines in repo are not multimodal and have no MM protocol signature. | not_isoperimeter | Published multimodal baseline references with matching modality scope; Dataset-level MM comparability status for all compared datasets |
 

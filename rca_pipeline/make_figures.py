@@ -187,7 +187,7 @@ def fig_observit(data: dict, out_dir: str) -> None:
         color = "#1f77b4" if metric == "avg1" else "#ff7f0e"
         series.append((mlabel, color, vals))
     _grouped_bars(ax, models, series, "Score (%)",
-                  "ObservIT live cluster — sock-shop (5 seeds)")
+                  "ObservIT live cluster - sock-shop (5 seeds)")
     fig.tight_layout()
     _save(fig, out_dir, "observit.pdf")
 

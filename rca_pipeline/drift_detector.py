@@ -1,5 +1,5 @@
 """
-drift_detector.py — ADWIN-based concept drift detector for Kubernetes metrics.
+drift_detector.py - ADWIN-based concept drift detector for Kubernetes metrics.
 
 Implements the ADWIN (ADaptive WINdowing) algorithm (Bifet & Gavaldà, SDM 2007)
 for detecting concept drift in streaming metric data.
@@ -54,13 +54,13 @@ logger = logging.getLogger(__name__)
 
 class ADWIN:
     """
-    ADWIN(δ) — ADaptive WINdowing drift detector.
+    ADWIN(δ) - ADaptive WINdowing drift detector.
 
     Reference: Bifet & Gavaldà, "Learning from Time-Changing Data with
     Adaptive Windowing", SDM 2007.
 
     Time complexity:  O(log n) amortized per update
-    Space complexity: O(log n) — uses a compressed bucket representation
+    Space complexity: O(log n) - uses a compressed bucket representation
 
     Parameters:
         delta: confidence parameter (default 0.002 → 99.8% confidence per test)
@@ -236,7 +236,7 @@ class MultiMetricDriftDetector:
             value:       new metric value (NaN-safe: NaN values are skipped)
         """
         if metric_name not in self._detectors:
-            logger.warning("Unknown metric '%s' — skipping.", metric_name)
+            logger.warning("Unknown metric '%s' - skipping.", metric_name)
             return
 
         import math
@@ -350,14 +350,14 @@ if __name__ == "__main__":
 
     print("=== ADWIN unit test ===")
 
-    # Test 1: No drift — stable distribution
+    # Test 1: No drift - stable distribution
     adwin = ADWIN(delta=0.002)
     for _ in range(100):
         adwin.update(random.gauss(0.5, 0.05))
     assert not adwin.drift_detected, "False positive on stable stream"
     print(f"  Test 1 PASS: No false positive on stable stream (width={adwin.width})")
 
-    # Test 2: Drift — step change in mean
+    # Test 2: Drift - step change in mean
     adwin2 = ADWIN(delta=0.002)
     for _ in range(100):
         adwin2.update(random.gauss(0.5, 0.05))

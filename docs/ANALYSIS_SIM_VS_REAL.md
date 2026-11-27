@@ -7,7 +7,7 @@ Le comportement de STA dépend fortement du régime de données:
 - En simulé (benchmark BA historique, cf. `docs/internal/Week2.md`), les classements peuvent être favorables à des variantes non spatiales selon N et protocole.
 - En réel RCAEval (runs `long` actuels, 5 seeds), STA et GATv2 sont proches sur `trainticket`, mais GATv2 garde un avantage sur `online-boutique`.
 
-### Réel RCAEval — metrics only (5 seeds, 100 epochs)
+### Réel RCAEval - metrics only (5 seeds, 100 epochs)
 
 | Dataset | STA Avg@1 | GATv2 Avg@1 | Delta STA-GATv2 |
 |---|---:|---:|---:|

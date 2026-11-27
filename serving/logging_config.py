@@ -1,6 +1,6 @@
 """Structured logging for the serving stack (stdlib only, no extra deps).
 
-``LOG_FORMAT=json`` (default in containers) emits one JSON object per line —
+``LOG_FORMAT=json`` (default in containers) emits one JSON object per line -
 directly ingestible by Loki/promtail. ``LOG_FORMAT=text`` keeps the classic
 human-readable format for local runs.
 

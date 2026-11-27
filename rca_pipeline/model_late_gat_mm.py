@@ -1,5 +1,5 @@
 """
-model_late_gat_mm.py — Multimodal Late Bottleneck with GATv2 (variant _mm).
+model_late_gat_mm.py - Multimodal Late Bottleneck with GATv2 (variant _mm).
 
 Late fusion architecture inspired by Chain-of-Event (FSE 2024) and DynaCausal (ICSE 2025):
     MetricEncoder  [B, N, F_m, W] → TemporalConvBlock → H_m    [B*N, H]
@@ -11,7 +11,7 @@ Late fusion architecture inspired by Chain-of-Event (FSE 2024) and DynaCausal (I
 
 Compatibility: if x_logs=None or x_traces=None → zero-pad (mono-modal fallback).
 
-This is a SEPARATE variant — does not modify model_late_gat.py.
+This is a SEPARATE variant - does not modify model_late_gat.py.
 """
 
 import logging
@@ -69,9 +69,9 @@ class SpatioTemporalRCA_GAT_MM(nn.Module):
     Multimodal Late Bottleneck with GATv2.
 
     forward(x_metric, x_logs, x_traces, edge_index):
-        x_metric:  [B, N, F_m, W]  — required
-        x_logs:    [B, N, F_l] or None  — optional
-        x_traces:  [B, N, F_t] or None  — optional
+        x_metric:  [B, N, F_m, W]  - required
+        x_logs:    [B, N, F_l] or None  - optional
+        x_traces:  [B, N, F_t] or None  - optional
     Returns:
         logits:    [B, N]
         node_imp:  [B, N]

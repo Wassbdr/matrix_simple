@@ -1,5 +1,5 @@
 ##############################################
-# PostgreSQL — Base de données pour le RCA Lab
+# PostgreSQL - Base de données pour le RCA Lab
 ##############################################
 apiVersion: v1
 kind: PersistentVolumeClaim

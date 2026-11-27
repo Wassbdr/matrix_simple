@@ -2,7 +2,7 @@ name: Release images
 
 # Build and push serve / watcher / train images to GHCR on pushes to main
 # and version tags. GHCR packages are public, so the cluster needs no
-# imagePullSecrets. This runs on GitHub-hosted runners (build only — it does
+# imagePullSecrets. This runs on GitHub-hosted runners (build only - it does
 # not touch the private cluster; deployment is a separate pull-based step).
 
 on:

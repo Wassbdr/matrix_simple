@@ -1,5 +1,5 @@
 """
-causal_graph_builder.py — Causal DAG construction for RCA (SOTA §4.3, §6.2).
+causal_graph_builder.py - Causal DAG construction for RCA (SOTA §4.3, §6.2).
 
 Three algorithms with automatic fallback:
     1. PC (causallearn): conditional independence tests, alpha=0.05
@@ -13,10 +13,10 @@ Hybrid mode (default):
     causal edges weighted 2.0, structural edges weighted 1.0
 
 References:
-    Fu et al. (ACM CS 2025) — survey 100+ methods
-    RUN (ASE 2024) — Neural Granger + PageRank
-    PC / FCI — causallearn library
-    NOTEARS — Zheng et al. (NeurIPS 2018)
+    Fu et al. (ACM CS 2025) - survey 100+ methods
+    RUN (ASE 2024) - Neural Granger + PageRank
+    PC / FCI - causallearn library
+    NOTEARS - Zheng et al. (NeurIPS 2018)
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ def _granger_adjacency(
     Pairwise Granger causality test → adjacency matrix.
 
     Args:
-        X: [T, N] — time-series matrix (T timesteps, N nodes).
+        X: [T, N] - time-series matrix (T timesteps, N nodes).
         max_lag: max lag for the test.
         alpha: significance threshold.
     Returns:
@@ -145,7 +145,7 @@ def _fci_adjacency(
     X: np.ndarray,
     alpha: float = 0.05,
 ) -> Tuple[Optional[np.ndarray], float]:
-    """FCI algorithm — admits latent confounders (outputs PAG)."""
+    """FCI algorithm - admits latent confounders (outputs PAG)."""
     try:
         from causallearn.search.ConstraintBased.FCI import fci
     except ImportError:
@@ -304,8 +304,8 @@ class CausalGraphBuilder:
         Build causal graph from healthy windows.
 
         Args:
-            X_healthy: [T, N] — concatenated healthy time-series (per-node mean or feature).
-            structural_edge_index: [2, E] — BA topology edges (optional for hybrid).
+            X_healthy: [T, N] - concatenated healthy time-series (per-node mean or feature).
+            structural_edge_index: [2, E] - BA topology edges (optional for hybrid).
         """
         T, N = X_healthy.shape
         adj_causal = None
@@ -317,7 +317,7 @@ class CausalGraphBuilder:
             if adj_causal is not None:
                 method_used = "pc"
                 if cs_score < self.cs_fallback_threshold:
-                    logger.info("CS score %.2f < %.2f — falling back to FCI",
+                    logger.info("CS score %.2f < %.2f - falling back to FCI",
                                 cs_score, self.cs_fallback_threshold)
                     adj_fci, cs_fci = _fci_adjacency(X_healthy, self.alpha)
                     if adj_fci is not None:

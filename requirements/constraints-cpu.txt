@@ -1,4 +1,4 @@
-# Canonical ABI pins for the CPU stack — single source of truth.
+# Canonical ABI pins for the CPU stack - single source of truth.
 #
 # torch 2.0.1 is built against NumPy 1.x; numpy>=2 breaks at import time
 # (_ARRAY_API not found / dtype inference errors). Every consumer (CI, the

@@ -56,10 +56,18 @@ results_transmission/logs_publication_*/*.txt
 .vscode/
 .idea/
 
-# Claude Code (versionner CLAUDE.md + .claude/settings.json ; exclure l'override local)
-.claude/settings.local.json
+CLAUDE.md
+AGENTS.md
+agents.md
+GEMINI.md
+.claude/
+.cursor/
+.cursorrules
+STATUS.md
+PROGRESS.md
+results_transmission/publication_*.out
 
-# Internal / personal documents — never in the public repo (kept local only)
+# Internal documents
 docs/internal/
 
 # Test / tooling caches
@@ -85,7 +93,7 @@ Thumbs.db
 *.tar.gz
 *.sha256
 
-# Secrets / credentials — never commit these
+# Secrets / credentials - never commit these
 secrets/
 *_credentials.json
 *_service_account.json

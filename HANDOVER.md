@@ -1,4 +1,8 @@
-# Reprise du projet — matrix_simple / STA
+# Notes sur le protocole historique
+
+Pour installer le produit actuel et utiliser le modèle RE1, suivre le [README](README.md)
+et le [tutoriel](docs/tutorial.md). Les sections ci-dessous décrivent le protocole de recherche
+et le déploiement du modèle précédent.
 
 Ce document est la porte d'entrée. Il répond à trois questions dans l'ordre :
 **qu'est-ce que ce dépôt**, **comment le faire tourner**, **où sont les résultats**.
@@ -15,9 +19,9 @@ Ce document est la porte d'entrée. Il répond à trois questions dans l'ordre :
 Un pipeline de **Root Cause Analysis** pour microservices, qui compare deux
 architectures GNN spatio-temporelles :
 
-- **Late-Bottleneck STGCN + GIB** — analyse du graphe complet, coût O(N²)
-- **STA (Select-Then-Analyze)** — sélection différentiable de k nœuds puis
-  analyse locale, coût O(N + k²), latence plate quand N croît
+- **Late-Bottleneck STGCN + GIB** - analyse du graphe complet, coût O(N²)
+- **STA (Select-Then-Analyze)** - sélection différentiable de k nœuds puis
+  analyse locale, coût O(N + k²) dans le cas dense. La latence augmente avec N.
 
 Évalué sur quatre terrains : simulé (Barabási-Albert, N = 20/50/100), RCAEval
 (TrainTicket, SockShop, Online Boutique), un cluster Kubernetes réel
@@ -39,7 +43,7 @@ post-mortem. Les deux dépôts sont indépendants.
 | Python | ≥ 3.9 (le poste d'origine utilise 3.12) |
 | Disque | ~6 Go pour l'environnement virtuel, ~39 Go de plus si vous voulez les données RCAEval |
 | PyTorch | ≥ 2.0 avec un `torch_geometric` ≥ 2.4 compatible |
-| Optionnel | `kubectl`, `helm`, Chaos Mesh en mode cluster-scoped — uniquement pour recollecter des données |
+| Optionnel | `kubectl`, `helm`, Chaos Mesh en mode cluster-scoped - uniquement pour recollecter des données |
 
 Aucun accès cluster n'est nécessaire pour lire les résultats ni pour rejouer le
 benchmark simulé.
@@ -143,8 +147,8 @@ HPO → train_and_persist → MLflow registry (sta-sockshop@challenger)
                               → serve (FastAPI) + watcher + drift CronJob
 ```
 
-Le runbook opérationnel — y compris les pièges rencontrés (basic-auth MLflow,
-récupération par alias, MLflow OOMKilled à 512 Mi, StorageClass) — est dans
+Le runbook opérationnel - y compris les pièges rencontrés (basic-auth MLflow,
+récupération par alias, MLflow OOMKilled à 512 Mi, StorageClass) - est dans
 [`docs/OPERATIONS.md`](docs/OPERATIONS.md). Les manifests sont sous `deploy/`
 (MLflow, chart Helm `rca-stack`, dashboard Grafana) et `serving/`.
 
@@ -160,12 +164,12 @@ cluster de stage avant de partir du principe que le stack tourne encore.
 | `rcaeval/` (~39 Go) | Données externes, jamais versionnées | Télécharger depuis le dépôt RCAEval upstream |
 | `datasets/`, `checkpoints/`, `*.pt` | Artefacts régénérables et volumineux | Rejouer l'entraînement, ou `train_and_persist` |
 | `docs/internal/` | Notes personnelles de stage | Non transmis |
-| Accès au cluster ObservIT | Fin de stage | — |
+| Accès au cluster ObservIT | Fin de stage | - |
 | PDF compilés du papier / rapport | Intermédiaires LaTeX gitignorés | `make paper`, `make report` |
 
 ## 7. Limites connues
 
-À lire avant d'exploiter ou d'étendre les résultats — elles sont détaillées dans
+À lire avant d'exploiter ou d'étendre les résultats - elles sont détaillées dans
 le README (§ « Reproducibility caveats ») :
 
 - Les tables principales sont à **5 graines**, où le bootstrap au niveau graine

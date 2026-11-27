@@ -1,7 +1,7 @@
 # Operations Runbook
 
 How to train, serve, observe, and roll back the STA model in practice.
-(Phase-2 MLOps additions — MLflow registry, Helm, retraining CronJob — will
+(Phase-2 MLOps additions - MLflow registry, Helm, retraining CronJob - will
 extend this document.)
 
 ## 1. Configuration layer
@@ -76,10 +76,10 @@ docker build -f serving/Dockerfile.watcher -t rca-sta-watcher .
 - Each `/predict` log line carries `request_id` (also returned as the
   `x-request-id` response header) and `latency_ms`.
 - Key Prometheus series:
-  - `rca_predictions_total{status}` — ok / bad_request / error / unavailable
-  - `rca_predict_latency_seconds` — histogram
-  - `rca_model_info{git_commit,created_at,...}` — identifies the served bundle
-  - `rca_watcher_*` — polling loop, alerts, ntfy deliveries
+  - `rca_predictions_total{status}` - ok / bad_request / error / unavailable
+  - `rca_predict_latency_seconds` - histogram
+  - `rca_model_info{git_commit,created_at,...}` - identifies the served bundle
+  - `rca_watcher_*` - polling loop, alerts, ntfy deliveries
 
 ## 6. Watcher & alerting
 
@@ -107,13 +107,13 @@ artifact* (no pyfunc wrapping), registers model `sta-sockshop` with alias
 
 **Basic-auth gotcha**: `--app-name=basic-auth` keeps the server's *own*
 user DB, bootstrapped with `admin`/`password`. `MLFLOW_TRACKING_USERNAME/
-PASSWORD` are *client* creds — they must name a user that exists server-side.
+PASSWORD` are *client* creds - they must name a user that exists server-side.
 The `mlflow-basic-auth` secret therefore aligns on the built-in admin in the
 sandbox; for real use, create a dedicated user (auth API/UI) and rotate.
 
 **Alias fetch gotcha**: `download_artifacts("models:/name@alias/sub")` is not
 supported by the 2.x server. Resolve the alias to a version first
-(`get_model_version_by_alias`) then download by `run_id` — this is what
+(`get_model_version_by_alias`) then download by `run_id` - this is what
 `serving/fetch_bundle.py` and `promote.py` do.
 
 ### Images & CD
@@ -121,7 +121,7 @@ supported by the 2.x server. Resolve the alias to a version first
 to GHCR (public, sha+semver) on main/tags. `docker/train.Dockerfile` is the
 training/retraining/initContainer image. `.dockerignore` keeps data out of
 the build context. `deploy.yml` runs `helm upgrade` on a **self-hosted**
-runner (cluster has private IPs) — `main`/`workflow_dispatch` only, never
+runner (cluster has private IPs) - `main`/`workflow_dispatch` only, never
 `pull_request`.
 
 ### Serving pulls the model by alias
@@ -153,7 +153,7 @@ CronJob `rca-drift` (every 6h) runs `rca_pipeline/monitoring/drift_job.py`:
 Evidently `DataDriftPreset` (PSI fallback without the extra) comparing the
 bundle's `reference_windows.parquet` to the last N hours from Prometheus,
 pushing `rca_drift_share` to Pushgateway. Alert `RCADataDriftSustained`
-(`> 0.3 for 12h`) → ntfy: **alert, do not auto-retrain** — trigger manually.
+(`> 0.3 for 12h`) → ntfy: **alert, do not auto-retrain** - trigger manually.
 
 ### Dashboard
 Import `deploy/grafana/rca-model-slo.json`: latency p95/p99, prediction/error

@@ -80,7 +80,7 @@ def load_windows_dataset(filepath: str) -> List[Data]:
     """Load a windowed dataset .pt file.
 
     Supports both:
-    - New format: dict {'train': [...], 'test': [...], 'scaler': ...} — returns train+test combined.
+    - New format: dict {'train': [...], 'test': [...], 'scaler': ...} - returns train+test combined.
     - Legacy format: plain List[Data].
     """
     payload = torch.load(filepath, weights_only=False)

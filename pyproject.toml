@@ -45,6 +45,9 @@ dev = [
   "pytest>=8.0.0",
   "pytest-cov>=5.0.0",
   "ruff>=0.6.0",
+  "mypy>=1.11,<2",
+  "pandas-stubs<3",
+  "pre-commit>=3.7",
   # TestClient transport for serving tests
   "httpx>=0.27.0",
 ]
@@ -78,11 +81,19 @@ serve = [
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["rca_pipeline"]
+[tool.setuptools.packages.find]
+include = ["rca_pipeline", "rca_pipeline.*"]
+exclude = ["rca_pipeline.tests", "rca_pipeline.tests.*"]
 
 [tool.setuptools.package-data]
 rca_pipeline = ["re1.pt", "py.typed"]
+
+[tool.mypy]
+files = ["rca_pipeline/cli.py", "rca_pipeline/ranking.py", "rca_pipeline/train_re1.py", "rca_pipeline/data.py"]
+follow_imports = "silent"
+ignore_missing_imports = true
+check_untyped_defs = true
+disallow_untyped_defs = true
 
 [tool.ruff]
 line-length = 100

@@ -33,7 +33,7 @@ spec:
 # CLIENT credentials for MLflow basic-auth. IMPORTANT: with --app-name=basic-auth
 # the server keeps its OWN user DB, bootstrapped with a default admin
 # (admin/password). These env vars are what CLIENTS send, not what the server
-# accepts — so this user/password MUST match a user that exists in the server's
+# accepts - so this user/password MUST match a user that exists in the server's
 # auth DB. For the sandbox we align on the built-in admin; in a real setup,
 # create a dedicated user post-deploy (mlflow.server.auth API / UI) and rotate
 # the admin password, sourcing this secret from a sealed-secret / vault.
@@ -71,7 +71,7 @@ spec:
       securityContext:
         # The official mlflow image runs as root, which can already write the
         # PVC. fsGroup is set so the mount stays group-writable if a future
-        # image switches to a non-root uid (gid 1000) — harmless under root.
+        # image switches to a non-root uid (gid 1000) - harmless under root.
         fsGroup: 1000
       containers:
         - name: mlflow

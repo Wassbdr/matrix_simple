@@ -1,7 +1,7 @@
 {
   "manifest_version": "2.0",
-  "generated_at_utc": "2026-11-27T15:09:26+00:00",
-  "built_from_commit": "e81f18eda2ef1bcc7f6e47f97b4403fa4d7a930b",
+  "generated_at_utc": "2026-11-27T15:58:10+00:00",
+  "built_from_commit": "f9d099fc11c360cc240a5402f7fcafc1ed9cbe7d",
   "supersedes": "results_transmission/historical/canonical_results_manifest_v1.json",
   "hardware_for_regenerated_and_generated": "CPU only (no GPU); see each JSON's hardware block",
   "artifacts": [
@@ -98,16 +98,16 @@
       "status": "edited",
       "notes": "edited in d6ff3b8 (isoperimetric BARO) after the v1 manifest; v1 bytes restored from 00d220c under results_transmission/historical/",
       "generation_command": "python -m rca_pipeline.comparability_matrix --repo-root . --output-md docs/COMPARABILITY_MATRIX.md --output-json results_transmission/comparability_matrix.json (needs the RCAEval prepublish runs listed in `missing`)",
-      "size_bytes": 5121,
-      "sha256": "cab49e1d3e74a4357439150b12ec8f28966f616c3bb12e342759ae6bea9341e5"
+      "size_bytes": 3144,
+      "sha256": "f806d97db0ba4ee5d10eb8455904fe89b732ffd529b4d23209efd7c3a507c8e5"
     },
     {
       "path": "docs/COMPARABILITY_MATRIX.md",
       "status": "edited",
       "notes": "edited in d6ff3b8 and 55ea6a5 after the v1 manifest; v1 bytes restored from 00d220c under results_transmission/historical/",
       "generation_command": "see results_transmission/comparability_matrix.json",
-      "size_bytes": 4380,
-      "sha256": "7e7da11eb9074890d453c5270817d43ede54d1fd400d59b5883e7cc1a9db92a1"
+      "size_bytes": 2573,
+      "sha256": "4f02ed3ca3438aae07cd9e3753724aa2b8f4e1cba2598bb35adadb63b05ca527"
     },
     {
       "path": "results_transmission/historical/comparability_matrix_00d220c.json",

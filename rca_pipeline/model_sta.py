@@ -45,7 +45,7 @@ class LightEncoder(nn.Module):
 
     Per the formalization H_fast = MLP_fast(X), the selector must see ONLY
     node-local features before selection.  No graph convolution is applied
-    here — GCN is reserved for the deep path on the selected subgraph,
+    here - GCN is reserved for the deep path on the selected subgraph,
     preventing over-smoothing from polluting the selector at large N.
     """
 
@@ -320,8 +320,8 @@ def get_temporal_encoder(
     """Factory for temporal encoders used in the deep path (post-selection).
 
     Available types:
-        'conv' (default): DeepTemporalBlock — Conv1d + attention pooling.
-        's4': S4TemporalBlock — Structured State Space Model implementing
+        'conv' (default): DeepTemporalBlock - Conv1d + attention pooling.
+        's4': S4TemporalBlock - Structured State Space Model implementing
               the state-transition f_theta: h(t+1) = A*h(t) + B*x(t).
     """
     if encoder_type == "conv":
@@ -462,7 +462,7 @@ class HierarchicalSelector(nn.Module):
     """
     Two-stage hierarchical node selection: N -> N/2 -> k.
 
-    Progressively refines the support of U(t) — analogous to branch-and-bound
+    Progressively refines the support of U(t) - analogous to branch-and-bound
     in combinatorial optimization.
 
     Stage 1: Coarse selection with a cheap MLP -> top N/2 nodes

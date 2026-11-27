@@ -193,7 +193,7 @@ def visualize_dual(checkpoint: str, dataset_path: str, arch: str = "late",
              ha="center", fontsize=13, fontweight="bold", color=color,
              bbox=dict(boxstyle="round,pad=0.5", facecolor="white",
                        edgecolor=color, alpha=0.9))
-    fig.suptitle("Root Cause Analysis — Topology & Prediction",
+    fig.suptitle("Root Cause Analysis - Topology & Prediction",
                  fontsize=15, fontweight="bold", y=0.97)
     plt.tight_layout(rect=[0, 0.06, 1, 0.94])
     plt.savefig(output, dpi=200, bbox_inches="tight", facecolor=fig.get_facecolor())

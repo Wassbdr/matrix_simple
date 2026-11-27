@@ -1,5 +1,5 @@
 """
-prometheus_connector.py — Live Prometheus metric connector.
+prometheus_connector.py - Live Prometheus metric connector.
 
 Queries Prometheus /api/v1/query_range for 6 standard Kubernetes pod metrics
 and returns a numpy array compatible with graph_builder.py.
@@ -214,7 +214,7 @@ class PrometheusConnector:
         Args:
             start:        UNIX timestamp (seconds) of window start
             end:          UNIX timestamp (seconds) of window end
-            window_size:  W — number of time steps expected
+            window_size:  W - number of time steps expected
             pod_names:    Optional fixed pod list (skip discovery).
                           If None, pods are auto-discovered.
         Returns:
@@ -449,7 +449,7 @@ class PrometheusConnector:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Prometheus Connector — dry run")
+    parser = argparse.ArgumentParser(description="Prometheus Connector - dry run")
     parser.add_argument("--url", type=str, default="http://localhost:9090")
     parser.add_argument("--namespace", type=str, default="default")
     parser.add_argument("--step", type=str, default="2s")

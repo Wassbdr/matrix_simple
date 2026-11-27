@@ -1,5 +1,5 @@
 """
-Training loop — Semi-Supervised with Asymmetric GIB.
+Training loop - Semi-Supervised with Asymmetric GIB.
 
 Phase 1: Self-supervised contrastive pre-training (mini-batched)
     - InfoNCE separates healthy vs anomalous dynamics

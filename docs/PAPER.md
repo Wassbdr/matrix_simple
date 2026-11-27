@@ -8,30 +8,30 @@ wassim.badraoui@epita.fr
 
 ## Abstract
 
-Root Cause Analysis (RCA) in microservice architectures is a critical yet challenging task: failures propagate across service dependency graphs, observable signals are noisy, and the search space grows with the number of instrumented services. I present STA (Select-Then-Analyze), an early-bottleneck spatio-temporal graph neural network that reduces RCA complexity from O(N²) to O(N + k²) by selecting a compact candidate subgraph before deep spatial analysis. STA combines a zero-hop temporal encoder with a differentiable Straight-Through Estimator selector and Variational Graph Information Bottleneck regularization. I evaluate four model variants—STA, GATv2, STA-MM, and GATv2-MM—across four experimental regimes: synthetic Barabási-Albert graphs (N ∈ {20, 50, 100}), three real-world RCAEval datasets (N=5), a private Kubernetes cluster running sock-shop (N=14) with Chaos Mesh fault injection, and a 50-service synthetic-but-real microservice deployment on the same cluster (N=50). Rather than chase a state-of-the-art number, I report four deliberately-scoped findings, all reproducible from released code and seeds. (i) STA's O(N + k²) design keeps per-query latency flat as N grows; its accuracy edge over attention/full-graph models is real but modest and shrinks under scrutiny—from +6.3 to +2.4 pp Avg@1 at N=100 when moving from 5 to 10 seeds—though it holds in direction (and reaches +5.8 pp on the N=50 real-cluster deployment). (ii) At small graph scale (N≤14, the public-benchmark regime), STA, GATv2 and a strong statistical baseline are within the noise envelope of seed-level evaluation. (iii) Re-running BARO isoperimetrically—same cases, candidate nodes, per-seed split and metric functions as my models—shows it is far stronger than its published 0.71 (Avg@1 0.80–0.86) and beats my models on Online Boutique: I make no SOTA claim. (iv) Multimodal fusion (metrics + logs + traces) degrades or matches metrics-only on RCAEval (−5% Avg@1 on trainticket) but halves seed variance on the private cluster (STA-MM Avg@1 = 0.772 vs. STA 0.796), pointing to log/trace data quality as a likely confounder. Beyond the evaluation, I demonstrate an end-to-end operational pipeline: 25-trial Optuna hyperparameter optimization on the sock-shop windows, retraining of the best-configured model into a self-describing bundle (state_dict + scaler + metadata + HPO provenance), containerization, and live deployment as a FastAPI service on the Devoteam Kubernetes cluster with Prometheus metrics integration. All artifacts are released, with an explicit comparability matrix for baseline claims (I do not assert SOTA) and operational components including ADWIN-based drift detection and a four-mechanism gray failure detector.
+Root Cause Analysis (RCA) in microservice architectures is a critical yet challenging task: failures propagate across service dependency graphs, observable signals are noisy, and the search space grows with the number of instrumented services. I present STA (Select-Then-Analyze), an early-bottleneck spatio-temporal graph neural network that reduces RCA complexity from O(N²) to O(N + k²) by selecting a compact candidate subgraph before deep spatial analysis. STA combines a zero-hop temporal encoder with a differentiable Straight-Through Estimator selector and Variational Graph Information Bottleneck regularization. I evaluate four model variants-STA, GATv2, STA-MM, and GATv2-MM-across four experimental regimes: synthetic Barabási-Albert graphs (N ∈ {20, 50, 100}), three real-world RCAEval datasets (N=5), a private Kubernetes cluster running sock-shop (N=14) with Chaos Mesh fault injection, and a 50-service synthetic-but-real microservice deployment on the same cluster (N=50). Rather than chase a leading number, I report four deliberately-scoped findings, all reproducible from released code and seeds. (i) STA's O(N + k²) design keeps per-query latency flat as N grows; its accuracy edge over attention/full-graph models is real but modest and shrinks under scrutiny-from +6.3 to +2.4 pp Avg@1 at N=100 when moving from 5 to 10 seeds-though it holds in direction (and reaches +5.8 pp on the N=50 real-cluster deployment). (ii) At small graph scale (N≤14, the public-benchmark regime), STA, GATv2 and a strong statistical baseline are within the noise envelope of seed-level evaluation. (iii) Re-running BARO isoperimetrically-same cases, candidate nodes, per-seed split and metric functions as my models-shows it is far stronger than its published 0.71 (Avg@1 0.80-0.86) and beats my models on Online Boutique: I make no SOTA claim. (iv) Multimodal fusion (metrics + logs + traces) degrades or matches metrics-only on RCAEval (−5% Avg@1 on trainticket) but halves seed variance on the private cluster (STA-MM Avg@1 = 0.772 vs. STA 0.796), pointing to log/trace data quality as a likely confounder. Beyond the evaluation, I demonstrate an end-to-end operational pipeline: 25-trial Optuna hyperparameter optimization on the sock-shop windows, retraining of the best-configured model into a self-describing bundle (state_dict + scaler + metadata + HPO provenance), containerization, and live deployment as a FastAPI service on the Devoteam Kubernetes cluster with Prometheus metrics integration. All artifacts are released, with an explicit comparability matrix for baseline claims (I do not assert SOTA) and operational components including ADWIN-based drift detection and a four-mechanism gray failure detector.
 
 ---
 
 ## 1. Introduction
 
-Modern cloud-native applications deploy business logic across tens to hundreds of loosely coupled microservices. When an incident occurs, identifying the root cause (RC) service—the node that first entered a faulty state—is a prerequisite for any automated remediation. In production environments with dozens of instrumented services, the mean time to identify a root cause through manual triage routinely reaches tens of minutes, creating direct business impact.
+Modern cloud-native applications deploy business logic across tens to hundreds of loosely coupled microservices. When an incident occurs, identifying the root cause (RC) service-the node that first entered a faulty state-is a prerequisite for any automated remediation. In production environments with dozens of instrumented services, the mean time to identify a root cause through manual triage routinely reaches tens of minutes, creating direct business impact.
 
-RCA for microservices is hard for three related reasons. First, **failures propagate**: a single faulty service sends error signals upstream to its callers, causing a cascade of symptomatic anomalies that masks the original cause. Second, **signals are heterogeneous**: the observable evidence spans time-series metrics (CPU, memory, latency, error rates), unstructured logs, and distributed traces—each modality carrying partially overlapping but distinct information. Third, **the search space grows**: at N = 100 services, a naive pairwise graph analysis costs O(N²) = 10,000 operations at the spatial convolution level; at N = 500 this becomes prohibitive for real-time diagnosis.
+RCA for microservices is hard for three related reasons. First, **failures propagate**: a single faulty service sends error signals upstream to its callers, causing a cascade of symptomatic anomalies that masks the original cause. Second, **signals are heterogeneous**: the observable evidence spans time-series metrics (CPU, memory, latency, error rates), unstructured logs, and distributed traces-each modality carrying partially overlapping but distinct information. Third, **the search space grows**: at N = 100 services, a naive pairwise graph analysis costs O(N²) = 10,000 operations at the spatial convolution level; at N = 500 this becomes prohibitive for real-time diagnosis.
 
 Recent work has addressed these challenges using graph neural networks (GNNs) operating on the service dependency graph, with architectures ranging from full-graph GCNs to attention-based spatio-temporal models. However, several important questions remain under-explored in the literature:
 
-1. **Scalability**: Does the spatial bottleneck in full-graph GNNs limit their practical deployment at large N, and can a principled selection step reduce this cost without sacrificing recall?
-2. **Graph vs. temporal**: At the small-N scale of public benchmarks, does incorporating graph structure actually improve over temporal-only encoders, or does it introduce noise?
-3. **Multimodal integration**: Do logs and traces complement metrics, or do they introduce gradient conflicts and optimization overhead that net-hurt performance?
-4. **Operational robustness**: How do RCA models behave during Kubernetes deployment transitions (concept drift) and under gray failures—anomalies that stay within individual SLA thresholds yet degrade system performance?
+1. **Scalability**: Compare the spatial cost and recall of full-graph and selected-subgraph models at large N.
+2. **Graph vs. temporal**: Measure the contribution of graph structure over temporal-only encoders on small public benchmarks.
+3. **Multimodal integration**: Test whether logs and traces improve the metrics-only ranking.
+4. **Operational behavior**: Measure performance during Kubernetes deployment transitions and during gray failures that stay within individual SLA thresholds.
 
 This paper makes four contributions to address these questions:
 
 1. **STA: Select-Then-Analyze** (Section 5.3), an early-bottleneck GNN that achieves O(N + k²) complexity via differentiable top-k node selection with Variational GIB regularization. STA allows deep spatio-temporal analysis on a compact candidate subgraph while maintaining end-to-end trainability through a Straight-Through Estimator.
 
-2. **A rigorous, honestly-scoped evaluation** (Sections 6–7): I benchmark four model variants across synthetic graphs (N ∈ {20, 50, 100}), three public RCAEval datasets, a live Kubernetes cluster, and a 50-service synthetic-but-real deployment. Beyond a single point estimate, I run a **10-seed robustness check** (which shrinks STA's N=100 lead from +6.3 to +2.4 pp and makes the bootstrap CIs reliable) and **re-run BARO isoperimetrically** on identical cases, candidate nodes, split and metric functions—under which BARO is a strong baseline I do *not* uniformly beat (losing on Online Boutique). I make no SOTA claim; every JSON artifact is SHA-256-pinned.
+2. **A rigorous, honestly-scoped evaluation** (Sections 6-7): I benchmark four model variants across synthetic graphs (N ∈ {20, 50, 100}), three public RCAEval datasets, a live Kubernetes cluster, and a 50-service synthetic-but-real deployment. Beyond a single point estimate, I run a **10-seed robustness check** (which shrinks STA's N=100 lead from +6.3 to +2.4 pp and makes the bootstrap CIs reliable) and **re-run BARO isoperimetrically** on identical cases, candidate nodes, split and metric functions-under which BARO is a strong baseline I do *not* uniformly beat (losing on Online Boutique). I make no SOTA claim; every JSON artifact is SHA-256-pinned.
 
-3. **A robust negative result on multimodal fusion** (Section 7.3): I show empirically that on RCAEval datasets, fusing logs and traces with metrics degrades or matches metrics-only performance, and I propose three explanatory hypotheses. This result has direct practical implications for deployment decisions.
+3. **A consistent negative result on multimodal fusion** (Section 7.3): I show empirically that on RCAEval datasets, fusing logs and traces with metrics degrades or matches metrics-only performance, and I propose three explanatory hypotheses. This result has direct practical implications for deployment decisions.
 
 4. **An operational RCA stack** (Section 5.6): I contribute an ADWIN-based concept drift detector with per-metric cooldown logic, a four-mechanism composite gray failure detector (P99/P50 micro-stutters, inter-metric decorrelation, Mann-Kendall trend, Limplock signal), and three variants of a cascade-aware loss function including a fully learnable propagation matrix.
 
@@ -51,7 +51,7 @@ The **RCAEval** benchmark (https://github.com/phamquiluan/RCAEval) provides a st
 
 Spatio-temporal GNNs have shown strong performance on traffic prediction (STGCN [Yu et al., 2018]) and structural health monitoring. For RCA, the key challenge is adapting these models to directed service dependency graphs with highly variable fault propagation patterns.
 
-The Information Bottleneck principle [Tishby and Zaslavsky, 2015] and its graph adaptation, Graph Information Bottleneck (GIB) [Wu et al., 2020], provide a principled framework for learning sparse graph representations by maximizing I(Z; Y) while minimizing I(Z; X) — retaining only the information about the root cause label while discarding irrelevant node features. Prior work applies GIB at the graph level; I adapt it to node-level mask learning for selective subgraph extraction.
+The Information Bottleneck principle [Tishby and Zaslavsky, 2015] and its graph adaptation, Graph Information Bottleneck (GIB) [Wu et al., 2020], provide a principled framework for learning sparse graph representations by maximizing I(Z; Y) while minimizing I(Z; X) - retaining only the information about the root cause label while discarding irrelevant node features. Prior work applies GIB at the graph level; I adapt it to node-level mask learning for selective subgraph extraction.
 
 GATv2 [Brody et al., 2022] addresses a known expressiveness limitation of the original GAT [Veličković et al., 2018]: in GAT, the attention mechanism degenerates to a linear function of the query node alone in certain configurations, regardless of the key. GATv2 fixes this by applying the linear projection to the concatenation of query and key before the nonlinearity, enabling truly contextual attention.
 
@@ -59,7 +59,7 @@ GATv2 [Brody et al., 2022] addresses a known expressiveness limitation of the or
 
 The intuition behind multimodal fusion for RCA is that different observability signals capture complementary aspects of system health: metrics track resource utilization and application performance, logs capture discrete events and error codes, and traces provide end-to-end request paths. A common assumption in the multimodal fault-diagnosis literature is that combining these modalities improves over any one of them in isolation.
 
-However, the quality and density of log/trace data varies widely across deployments. In sparse or low-signal observability environments, additional modalities can introduce optimization interference—a phenomenon related to gradient conflicts in multi-task learning [Yu et al., 2020]. My empirical results (Section 7.3) provide evidence for this hypothesis on the RCAEval benchmark.
+However, the quality and density of log/trace data varies widely across deployments. In sparse or low-signal observability environments, additional modalities can introduce optimization interference-a phenomenon related to gradient conflicts in multi-task learning [Yu et al., 2020]. My empirical results (Section 7.3) provide evidence for this hypothesis on the RCAEval benchmark.
 
 ### 2.4 Gray Failures
 
@@ -96,7 +96,7 @@ where Y ∈ {0, 1}^N is the root cause indicator vector (exactly one component i
 ### 3.3 Evaluation Criteria
 
 Given a model producing a ranked list of candidate root causes, I evaluate with:
-- **Avg@k** (k ∈ {1, 3, 5}): fraction of test cases where the true RC appears in the top-k predictions. Avg@1 is the primary metric—it measures whether immediate automated remediation is possible.
+- **Avg@k** (k ∈ {1, 3, 5}): fraction of test cases where the true RC appears in the top-k predictions. Avg@1 is the primary metric-it measures whether immediate automated remediation is possible.
 - **MRR** (Mean Reciprocal Rank): mean of 1/rank_RC across test cases. Rewards early correct placement.
 - **NDCG@k** (Normalized Discounted Cumulative Gain): position-weighted accuracy measure.
 
@@ -127,11 +127,11 @@ All three datasets are collected from Kubernetes deployments with Chaos Mesh fau
 
 ### 4.2 Protocol
 
-All experiments use 5 independent seeds: {42, 123, 7, 1337, 2025}. For each seed, a distinct stratified train/test split is produced (train_ratio = 0.8, varying_split_by_run_seed mode). This split mode ensures that my variance estimates reflect both model initialization variance and data split variance—a conservative choice that yields wider confidence intervals.
+All experiments use 5 independent seeds: {42, 123, 7, 1337, 2025}. For each seed, a distinct stratified train/test split is produced (train_ratio = 0.8, varying_split_by_run_seed mode). This split mode ensures that my variance estimates reflect both model initialization variance and data split variance-a conservative choice that yields wider confidence intervals.
 
 Training configuration: 100 epochs for real-data benchmarks, 150 supervised epochs for synthetic benchmarks (with an additional 80-epoch contrastive pre-training phase for the Late Bottleneck family). Hidden dimension: 32. Optimizer: Adam (lr=1e-3, weight_decay=1e-4). Batch size: 256.
 
-**Statistical disclaimer.** I report mean and standard deviation across 5 seeds. With n=5, bootstrap-based 95% confidence intervals and formal significance tests (Wilcoxon, paired t-test) are not statistically reliable—the sample size is below the threshold where the assumed sampling distribution becomes a faithful approximation. The reported ± values are standard deviations only. Throughout Section 7, I treat a difference between two models as **meaningful** only when it exceeds the larger of the two reported standard deviations; otherwise I explicitly mark it as **within noise**.
+**Statistical disclaimer.** I report mean and standard deviation across 5 seeds. With n=5, bootstrap-based 95% confidence intervals and formal significance tests (Wilcoxon, paired t-test) are not statistically reliable-the sample size is below the threshold where the assumed sampling distribution becomes a faithful approximation. The reported ± values are standard deviations only. Throughout Section 7, I treat a difference between two models as **meaningful** only when it exceeds the larger of the two reported standard deviations; otherwise I explicitly mark it as **within noise**.
 
 For all real-data evaluations, `--sta-contrastive-warmup 0` is enforced: contrastive warmup destabilizes STA on real datasets by overfitting to within-dataset topology biases (see Appendix).
 
@@ -139,7 +139,7 @@ For all real-data evaluations, `--sta-contrastive-warmup 0` is enforced: contras
 
 The published baselines (BARO, E-Diagnosis, CausaRank, MicroRCA) are reproduced from the RCAEval reference numbers shipped with the benchmark. I did **not** re-implement these baselines under my own training protocol. Their split strategy, number of seeds, case filtering policy, and preprocessing normalization are not fully specified in the available documentation. I therefore classify my baseline comparisons as **partially comparable** for metrics-only evaluations and **not isoperimeter** for multimodal evaluations.
 
-Practically, this means that when my models report a higher Avg@1 than a reference baseline, I cannot rule out that the gap is partly explained by protocol differences (e.g., a different train/test split, different normalization, a stricter case filter). All comparisons to published baselines in Section 7 should be read as **indicative competitiveness**, not as conclusive SOTA evidence. A rigorous SOTA claim would require re-implementing each baseline under my isoperimeter protocol—deliberately out of scope for this work, which focuses on the relative comparison of my four model variants under a single shared protocol.
+Practically, this means that when my models report a higher Avg@1 than a reference baseline, I cannot rule out that the gap is partly explained by protocol differences (e.g., a different train/test split, different normalization, a stricter case filter). All comparisons to published baselines in Section 7 should be read as **indicative competitiveness**, not as conclusive SOTA evidence. A rigorous SOTA claim would require re-implementing each baseline under my isoperimeter protocol-deliberately out of scope for this work, which focuses on the relative comparison of my four model variants under a single shared protocol.
 
 ---
 
@@ -176,7 +176,7 @@ My pipeline follows a sequential structure (Fig. 1):
                   ▼
        ┌────────────────────────────────────────────────┐
        │  GNN: STA  | GATv2  | STA-MM  | GATv2-MM       │
-       │  (Section 5.3–5.5)                             │
+       │  (Section 5.3-5.5)                             │
        └──────────┬─────────────────────────────────────┘
                   │
                   ▼
@@ -305,7 +305,7 @@ GATv2 processes the full graph in two GATv2 spatial layers before deriving node 
 **Architecture.**
 
 ```
-H_temp  = LightEncoder(X)                 # [N, H] — shared stage
+H_temp  = LightEncoder(X)                 # [N, H] - shared stage
 H_gat1  = GATv2Conv(H_temp, edge_index, heads=4)   # [N, 4H]
 H_gat2  = GATv2Conv(H_gat1, edge_index, heads=1)   # [N, H]
 imp_i   = Σ_{j: (j,i)∈E} α_{ji}           # node importance = incoming attention sum
@@ -371,7 +371,7 @@ with margin₁ = 0.5 and margin₂ = 0.3. The *causal-weighted* variant (CausalC
 3. **Mann-Kendall trend** [Mann, 1945]: monotonic trend statistic |S/S_max| > 0.6, targeting nascent metastable degraded states and memory leaks.
 4. **Limplock signal**: ratio queue_depth_rate / cpu_usage > 5.0, detecting saturation under apparent idleness.
 
-**Causal Graph Builder.** I implement a cascade of causal discovery algorithms with automatic fallback: PC algorithm [Spirtes et al., 2000] (Fisher's z-test, α=0.05) → FCI (for latent confounders) → Granger causality [Granger, 1969] (lags 1–3) → structural Barabási-Albert edges as default. The final graph is the weighted union of discovered causal edges (weight 2.0) and structural edges (weight 1.0).
+**Causal Graph Builder.** I implement a cascade of causal discovery algorithms with automatic fallback: PC algorithm [Spirtes et al., 2000] (Fisher's z-test, α=0.05) → FCI (for latent confounders) → Granger causality [Granger, 1969] (lags 1-3) → structural Barabási-Albert edges as default. The final graph is the weighted union of discovered causal edges (weight 2.0) and structural edges (weight 1.0).
 
 ---
 
@@ -439,9 +439,9 @@ Table 1 reports performance across graph sizes N ∈ {20, 50, 100} on Barabási-
 | STGCN+GIB | 0.471 ± 0.097 | 0.557 ± 0.105 | 0.587 ± 0.093 | 0.532 ± 0.094 | 0.521 ± 0.101 |
 | Full-Graph GCN | 0.466 ± 0.042 | 0.537 ± 0.039 | 0.567 ± 0.037 | 0.521 ± 0.038 | 0.508 ± 0.041 |
 
-**Analysis.** At N=20, GATv2 and Full-Graph GCN marginally outperform STA (0.828–0.830 vs. 0.805). At this scale, k=5 ≈ N/4, and the selected subgraph captures most of the graph's connectivity; the selection bottleneck provides little benefit while introducing variance from the Gumbel selection noise. From N=50, STA's efficiency advantage materializes: STA achieves 0.589 vs. GATv2's 0.571 (+1.8 pp). At N=100, the gap widens to +6.3 pp (0.552 vs. 0.490). Random Forest collapses at N=100 (0.065), confirming that non-structural approaches do not generalize to large heterogeneous graphs.
+**Analysis.** At N=20, GATv2 and Full-Graph GCN marginally outperform STA (0.828-0.830 vs. 0.805). At this scale, k=5 ≈ N/4, and the selected subgraph captures most of the graph's connectivity; the selection bottleneck provides little benefit while introducing variance from the Gumbel selection noise. From N=50, STA's efficiency advantage materializes: STA achieves 0.589 vs. GATv2's 0.571 (+1.8 pp). At N=100, the gap widens to +6.3 pp (0.552 vs. 0.490). Random Forest collapses at N=100 (0.065), confirming that non-structural approaches do not generalize to large heterogeneous graphs.
 
-The high variance of STGCN+GIB at N=100 (±0.097) reflects optimization instability when the hard GIB mask must identify a single root cause among 100 nodes—exactly the regime where STA's softer early selection is more stable.
+The high variance of STGCN+GIB at N=100 (±0.097) reflects optimization instability when the hard GIB mask must identify a single root cause among 100 nodes-exactly the regime where STA's softer early selection is more stable.
 
 ### 7.2 Real-World Benchmark: RCAEval
 
@@ -450,8 +450,8 @@ The high variance of STGCN+GIB at N=100 (±0.097) reflects optimization instabil
 | Dataset | STA | GATv2 | BARO† | E-Diag.† | CausaRank† | MicroRCA† |
 |---|---:|---:|---:|---:|---:|---:|
 | trainticket | **0.960** ± 0.037 | 0.950 ± 0.045 | 0.71 | 0.64 | 0.52 | 0.49 |
-| sockshop | **0.850** ± 0.089 | 0.810 ± 0.080 | — | — | — | — |
-| online-boutique | 0.650 ± 0.095 | **0.680** ± 0.051 | — | — | — | — |
+| sockshop | **0.850** ± 0.089 | 0.810 ± 0.080 | - | - | - | - |
+| online-boutique | 0.650 ± 0.095 | **0.680** ± 0.051 | - | - | - | - |
 
 † Published figures; protocol not fully isoperimeter. See Section 4.3.
 
@@ -467,15 +467,15 @@ The high variance of STGCN+GIB at N=100 (±0.097) reflects optimization instabil
 | online-boutique | GATv2 | **0.680** ± 0.051 | 0.840 ± 0.080 | 1.000 | **0.788** ± 0.042 | **0.792** ± 0.057 |
 
 **Analysis.** At N=5 (the scale of all three RCAEval datasets), STA and GATv2 produce results that are **within noise** of one another:
-- trainticket: STA 0.960 vs. GATv2 0.950 — gap of 1.0 pp, well below either std (±0.037, ±0.045);
-- sockshop: STA 0.850 vs. GATv2 0.810 — gap of 4.0 pp, below both stds (±0.089, ±0.080);
-- online-boutique: GATv2 0.680 vs. STA 0.650 — gap of 3.0 pp, below STA's std of ±0.095. The variance on online-boutique is large for both models, which limits any strong ordering claim on this dataset.
+- trainticket: STA 0.960 vs. GATv2 0.950 - gap of 1.0 pp, well below either std (±0.037, ±0.045);
+- sockshop: STA 0.850 vs. GATv2 0.810 - gap of 4.0 pp, below both stds (±0.089, ±0.080);
+- online-boutique: GATv2 0.680 vs. STA 0.650 - gap of 3.0 pp, below STA's std of ±0.095. The variance on online-boutique is large for both models, which limits any strong ordering claim on this dataset.
 
-I therefore do **not** claim a winner among STA and GATv2 at N=5. What the results do show is that both architectures are competitive at this scale: the absolute Avg@1 levels (0.65–0.96) are substantially above what non-graph baselines achieve at small N.
+I therefore do **not** claim a winner among STA and GATv2 at N=5. What the results do show is that both architectures are competitive at this scale: the absolute Avg@1 levels (0.65-0.96) are substantially above what non-graph baselines achieve at small N.
 
-This is consistent with the hypothesis that at N=5, the selection bottleneck offers no complexity benefit (k ≈ N in practice), and the relative utility of spatial structure is dataset-dependent. Online-boutique's service graph has more diffuse fault propagation patterns—GATv2's contextual multi-head attention may be better suited there, but the noise envelope is too wide to assert this conclusively.
+This is consistent with the hypothesis that at N=5, the selection bottleneck offers no complexity benefit (k ≈ N in practice), and the relative utility of spatial structure is dataset-dependent. Online-boutique's service graph has more diffuse fault propagation patterns-GATv2's contextual multi-head attention may be better suited there, but the noise envelope is too wide to assert this conclusively.
 
-Compared to the RCAEval reference numbers (indicative, **not isoperimeter**—see Section 4.3), both STA and GATv2 report higher Avg@1 than BARO's 0.71 on trainticket and sockshop. On online-boutique, the gap to BARO is much smaller and likely lies inside the combined uncertainty of both protocols. I refrain from claiming SOTA: with 5 seeds and a non-aligned baseline protocol, the most I can defend is that my models are **at the level of the published baselines** on these datasets.
+Compared to the RCAEval reference numbers (indicative, **not isoperimeter**-see Section 4.3), both STA and GATv2 report higher Avg@1 than BARO's 0.71 on trainticket and sockshop. On online-boutique, the gap to BARO is much smaller and likely lies inside the combined uncertainty of both protocols. I refrain from claiming SOTA: with 5 seeds and a non-aligned baseline protocol, the most I can defend is that my models are **at the level of the published baselines** on these datasets.
 
 ### 7.3 Multimodal Evaluation
 
@@ -485,7 +485,7 @@ Compared to the RCAEval reference numbers (indicative, **not isoperimeter**—se
 |---|---:|---:|---:|---:|---:|---:|
 | trainticket | 0.960 | 0.910 ± 0.020 | **−5.0%** | 0.950 | 0.880 ± 0.051 | **−7.0%** |
 | online-boutique | 0.650 | 0.650 ± 0.155 | 0% | 0.680 | **0.790** ± 0.086 | **+11.0%** |
-| sockshop | 0.850 | — (skipped) | — | 0.810 | — (skipped) | — |
+| sockshop | 0.850 | - (skipped) | - | 0.810 | - (skipped) | - |
 
 *Sockshop MM excluded: trace coverage insufficient for strict multimodal evaluation on this dataset.*
 
@@ -493,7 +493,7 @@ Compared to the RCAEval reference numbers (indicative, **not isoperimeter**—se
 
 **Finding 2: GATv2-MM gains on online-boutique (+11%).** This is the only positive MM result across RCAEval. The late-fusion architecture of GATv2-MM appears more tolerant to low-signal auxiliary modalities: when logs/traces carry little discriminative information, the FusionMLP can implicitly down-weight these modalities, whereas STA-MM's cross-modal attention can still produce gradient interference.
 
-**Finding 3: STA-MM on online-boutique shows high variance (±0.155 vs. STA ±0.095).** This 1.6× variance inflation is a direct signature of multimodal optimization instability—the additional gradient paths create inconsistent convergence across seeds.
+**Finding 3: STA-MM on online-boutique shows high variance (±0.155 vs. STA ±0.095).** This 1.6× variance inflation is a direct signature of multimodal optimization instability-the additional gradient paths create inconsistent convergence across seeds.
 
 ### 7.4 ObservIT Cluster Evaluation
 
@@ -506,11 +506,11 @@ Compared to the RCAEval reference numbers (indicative, **not isoperimeter**—se
 | STA-MM | 0.772 ± 0.021 | **0.982** ± 0.007 | **0.992** ± 0.003 | 0.878 ± 0.010 |
 | GATv2-MM | 0.762 ± 0.016 | 0.937 ± 0.083 | 0.950 ± 0.086 | 0.846 ± 0.035 |
 
-**Analysis.** On the cluster, STA achieves the best Avg@1 (0.796 vs. GATv2's 0.762), but GATv2 achieves dramatically better Avg@3 (0.978 vs. STA's 0.921). This pattern suggests that while STA correctly identifies the root cause in 79.6% of immediate top-1 predictions, GATv2 almost never misses the true RC within the top 3—a practically important property for human-assisted triage.
+**Analysis.** On the cluster, STA achieves the best Avg@1 (0.796 vs. GATv2's 0.762), but GATv2 achieves dramatically better Avg@3 (0.978 vs. STA's 0.921). This pattern suggests that while STA correctly identifies the root cause in 79.6% of immediate top-1 predictions, GATv2 almost never misses the true RC within the top 3-a practically important property for human-assisted triage.
 
 Critically, **STA-MM shows no regression on the cluster** (Avg@1 = 0.772, −0.024 vs. unimodal STA). The variance is also lower (±0.021 vs. ±0.043 for STA). This contrasts sharply with the RCAEval degradation results, suggesting that cluster-collected observability data contains richer log/trace signals than the public datasets. The ObservIT cluster result is the first positive evidence for multimodal fusion in my evaluation suite.
 
-#### 7.4.1 Per-Scenario Breakdown — Cascade is the Real Failure Mode
+#### 7.4.1 Per-Scenario Breakdown - Cascade is the Real Failure Mode
 
 The aggregate Avg@1 in Table 6 hides large per-scenario variation. The ObservIT JSON artifacts include a per-root-cause breakdown (`<model>_per_root_cause`), aggregated across 5 seeds. Mapping each root cause to its corresponding Chaos Mesh scenario (Table 11) reveals where each model actually succeeds and fails.
 
@@ -526,13 +526,13 @@ The aggregate Avg@1 in Table 6 hides large per-scenario variation. The ObservIT 
 
 This breakdown reveals three findings that revise the qualitative discussion in my synthesis report:
 
-**Finding A: Cascade is the real failure mode.** STA's Avg@1 on the network-delay cascade scenario is 0.043—essentially random selection among the 14 services. GATv2 mitigates the failure (0.459) but is still far below its performance on isolated faults. The mechanism: a network delay at the `orders-db` link generates massive symptoms at `orders` and `front-end` (latency spikes, error rates), while the root cause node itself has near-nominal metrics. STA's hard top-k selector picks the high-score symptom nodes; GATv2's soft attention spreads weight along the cascade but still concentrates on symptoms. **The aggregate 0.796 Avg@1 reported for STA on ObservIT (Table 6) is the arithmetic mean (0.97+0.99+0.04+0.99+0.95)/5; the cascade scenario alone drags the mean down by ~0.18 points.**
+**Finding A: Cascade is the real failure mode.** STA's Avg@1 on the network-delay cascade scenario is 0.043-essentially random selection among the 14 services. GATv2 mitigates the failure (0.459) but is still far below its performance on isolated faults. The mechanism: a network delay at the `orders-db` link generates massive symptoms at `orders` and `front-end` (latency spikes, error rates), while the root cause node itself has near-nominal metrics. STA's hard top-k selector picks the high-score symptom nodes; GATv2's soft attention spreads weight along the cascade but still concentrates on symptoms. **The aggregate 0.796 Avg@1 reported for STA on ObservIT (Table 6) is the arithmetic mean (0.97+0.99+0.04+0.99+0.95)/5; the cascade scenario alone drags the mean down by ~0.18 points.**
 
-**Finding B: The 15% packet-loss "gray" failure is detectable.** Contrary to the prediction that this would be the hardest scenario for STA, all three models achieve Avg@1 ≥ 0.51 on catalogue-db, and STA/Late-STGCN+GIB reach ≥ 0.987. The interpretation is straightforward: a 15% packet loss is sufficient to cause a visible drop in network_rx at catalogue-db, making it a strong rather than a subtle signal. The "gray failure" label may be more appropriate for packet loss rates of 1–5% than 15%.
+**Finding B: The 15% packet-loss "gray" failure is detectable.** Contrary to the prediction that this would be the hardest scenario for STA, all three models achieve Avg@1 ≥ 0.51 on catalogue-db, and STA/Late-STGCN+GIB reach ≥ 0.987. The interpretation is straightforward: a 15% packet loss is sufficient to cause a visible drop in network_rx at catalogue-db, making it a strong rather than a subtle signal. The "gray failure" label may be more appropriate for packet loss rates of 1-5% than 15%.
 
 **Finding C: Hard failures are uniformly easy.** All three hard scenarios reach Avg@1 ≥ 0.95 for both STA and GATv2. Late-STGCN+GIB falters on pod-kill-user (0.741 ± 0.360, indicating one or two seeds failed to converge on this scenario). These results confirm that the simple, isolated-anomaly case is handled robustly.
 
-**Implication for the gray failure detector.** The detector's intended deployment—boosting scores for nodes with subtle network anomalies—does not match the empirical failure mode of STA on this cluster. The actual failure mode is *cascade propagation masking the root cause behind symptom nodes*. A detector targeting this pattern would need to identify nodes whose immediate neighbors are anomalous but whose own metrics are near-nominal—essentially the inverse of the current decorrelation-based design. This is a concrete refinement target for future work (Section 8.5).
+**Implication for the gray failure detector.** The detector's intended deployment-boosting scores for nodes with subtle network anomalies-does not match the empirical failure mode of STA on this cluster. The actual failure mode is *cascade propagation masking the root cause behind symptom nodes*. A detector targeting this pattern would need to identify nodes whose immediate neighbors are anomalous but whose own metrics are near-nominal-essentially the inverse of the current decorrelation-based design. This is a concrete refinement target for future work (Section 8.5).
 
 ### 7.5 Ablation Studies
 
@@ -549,9 +549,9 @@ Note: ablation runs use a distinct experimental configuration (3 seeds, fixed sp
 | A3: Spatial-only (no temporal) | 0.584 ± 0.044 | 0.478 ± 0.008 |
 | A4: Temporal-only (no GCN) | **0.992** ± 0.000 | **0.956** ± 0.040 |
 
-The dominance of temporal-only (A4) at N=100 in simulated data is striking: the pure temporal encoder, without any graph convolution, achieves 0.956 vs. 0.933–0.939 for the spatial models. At N=100 on BA graphs, the random scale-free topology provides weaker structural signal than on real microservice graphs with known dependency patterns.
+The dominance of temporal-only (A4) at N=100 in simulated data is striking: the pure temporal encoder, without any graph convolution, achieves 0.956 vs. 0.933-0.939 for the spatial models. At N=100 on BA graphs, the random scale-free topology provides weaker structural signal than on real microservice graphs with known dependency patterns.
 
-Critically, A3 (spatial-only) drops to 0.478 at N=100—confirming that spatial information alone is insufficient and the temporal encoder is the load-bearing component.
+Critically, A3 (spatial-only) drops to 0.478 at N=100-confirming that spatial information alone is insufficient and the temporal encoder is the load-bearing component.
 
 #### 7.5.2 Graph vs. Temporal on Real Data (Ablation T5)
 
@@ -576,7 +576,7 @@ The graph provides a net positive contribution only on trainticket (+2%). On soc
 | 20% | 20 | 0.940 ± 0.025 |
 | 30% | 30 | 0.949 ± 0.013 |
 
-Performance increases monotonically with k, as expected: a larger subgraph is less likely to exclude the true root cause. The trade-off is between recall (larger k = better coverage) and efficiency (smaller k = faster inference). At k=10% (k=10 nodes), Avg@1 = 0.924 — reasonable coverage at the lowest computational cost. In my main benchmark, I use k=15 (15%) which balances performance and efficiency.
+Performance increases monotonically with k, as expected: a larger subgraph is less likely to exclude the true root cause. The trade-off is between recall (larger k = better coverage) and efficiency (smaller k = faster inference). At k=10% (k=10 nodes), Avg@1 = 0.924 - reasonable coverage at the lowest computational cost. In my main benchmark, I use k=15 (15%) which balances performance and efficiency.
 
 #### 7.5.4 Training Protocol Ablation (STA)
 
@@ -592,7 +592,7 @@ Counter-intuitively, removing the contrastive warmup (D2) and k-annealing (D3) i
 
 ### 7.6 Automated Hyperparameter Optimization and Operational Deployment
 
-The previous sections establish STA's evaluation properties. This section closes the loop: how does the model behave under automated hyperparameter selection, and can the resulting artifact actually be deployed as a service on a real cluster? The point is not to chase another half-point of Avg@1—the search space here is intentionally modest. The point is to show that the pipeline scales from "experiment in a notebook" to "Pod running on Kubernetes" without manual surgery at every step.
+The previous sections establish STA's evaluation properties. This section closes the loop: how does the model behave under automated hyperparameter selection, and can the resulting artifact actually be deployed as a service on a real cluster? The point is not to chase another half-point of Avg@1-the search space here is intentionally modest. The point is to show that the pipeline scales from "experiment in a notebook" to "Pod running on Kubernetes" without manual surgery at every step.
 
 **HPO with Optuna (`rca_pipeline/hpo_sta.py`).** I run a 25-trial TPE study (median pruner, single fixed split for fair inter-trial comparison) over six hyperparameters that the previous ablation (Section 7.5) flagged as influential: `hidden_dim ∈ {16, 32, 64}`, `k_pct ∈ [15, 50]`, `contrastive_warmup ∈ {0, 5}`, `epochs ∈ {20, 30, 40, 50}`, plus `lr` and `gib_beta_max` recorded for provenance. The objective is MRR on the held-out test set (more stable than Avg@1 across 5 seeds with this dataset size). The study uses SQLite storage (`results_transmission/hpo_sta_sockshop.db`) so it can be resumed and inspected after the fact.
 
@@ -603,18 +603,18 @@ The previous sections establish STA's evaluation properties. This section closes
 | Best trial MRR (val) | **0.9376** |
 | Best trial Avg@1 (val) | **0.8824** |
 | Best hyperparameters | `hidden_dim=16, k_pct=15, contrastive_warmup=5, epochs=50` |
-| Param importance — `gib_beta_max` | 0.416 |
-| Param importance — `hidden_dim` | 0.344 |
-| Param importance — `k_pct` | 0.135 |
-| Param importance — other (`lr`, `wd`, `epochs`, `warmup`) | < 0.05 each |
+| Param importance - `gib_beta_max` | 0.416 |
+| Param importance - `hidden_dim` | 0.344 |
+| Param importance - `k_pct` | 0.135 |
+| Param importance - other (`lr`, `wd`, `epochs`, `warmup`) | < 0.05 each |
 
-Two takeaways. First, the optimizer converges on a **smaller** model than the hand-picked default (hidden_dim 16 instead of 32, k just 2 out of 14 instead of 5). This is consistent with the architectural thesis behind STA — a tight bottleneck helps — but it is worth noting that it is *automatically discovered* by the search, not engineered in. Second, the dominant importance score on `gib_beta_max` and `hidden_dim` confirms the GIB regularizer and model capacity as the two main levers, while learning-rate sensitivity is comparatively low — useful for downstream deployment, since the model tolerates a wide LR range.
+Two takeaways. First, the optimizer converges on a **smaller** model than the hand-picked default (hidden_dim 16 instead of 32, k just 2 out of 14 instead of 5). This is consistent with the architectural thesis behind STA - a tight bottleneck helps - but it is worth noting that it is *automatically discovered* by the search, not engineered in. Second, the dominant importance score on `gib_beta_max` and `hidden_dim` confirms the GIB regularizer and model capacity as the two main levers, while learning-rate sensitivity is comparatively low - useful for downstream deployment, since the model tolerates a wide LR range.
 
 **Persistence as a portable bundle (`rca_pipeline/train_and_persist.py`).** Using the best HPO params, I re-train the model across 3 seeds, pick the best by validation MRR, and persist it as a self-describing bundle:
 
 ```
 checkpoints/sta_sockshop_v1/
-├── model.pt         # state_dict only — no pickled custom classes
+├── model.pt         # state_dict only - no pickled custom classes
 ├── scaler.pt        # StandardScaler mean+scale per feature
 └── metadata.json    # config, node_names, edge_index, training/test metrics,
                      # HPO provenance, git commit, torch/python versions
@@ -626,13 +626,13 @@ The bundle is loaded by `rca_pipeline/model_bundle.py:load_bundle()` which recon
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /health` | Liveness — 200 if bundle loaded |
-| `GET /ready` | Readiness — runs a zero-window smoke predict |
+| `GET /health` | Liveness - 200 if bundle loaded |
+| `GET /ready` | Readiness - runs a zero-window smoke predict |
 | `GET /info` | Returns the full `metadata.json` (versioning + provenance) |
 | `POST /predict` | Body: `{"window": [N×F×W], "top_k": k}` → ranked list |
 | `GET /metrics` | Prometheus metrics: `rca_predictions_total{status}`, `rca_predict_latency_seconds` histogram, plus the standard `http_request_*` counters from `prometheus-fastapi-instrumentator` |
 
-The image (`serving/Dockerfile`, multi-stage Python 3.11-slim, 1.35 GB with CPU PyTorch) is built locally, then pushed to a tiny in-cluster Docker registry (`serving/in-cluster-registry.yaml`, `registry:2` exposed as NodePort `30500`). The kubelet on each Devoteam node pulls from `localhost:30500/rca-sta-serve:v1` — containerd treats `localhost` as an insecure registry by default, so no TLS or registry-credential plumbing is required.
+The image (`serving/Dockerfile`, multi-stage Python 3.11-slim, 1.35 GB with CPU PyTorch) is built locally, then pushed to a tiny in-cluster Docker registry (`serving/in-cluster-registry.yaml`, `registry:2` exposed as NodePort `30500`). The kubelet on each Devoteam node pulls from `localhost:30500/rca-sta-serve:v1` - containerd treats `localhost` as an insecure registry by default, so no TLS or registry-credential plumbing is required.
 
 **Deployment on Devoteam ObservIT (`serving/k8s-deployment.yaml`).** The service runs in the `rca-sandbox` namespace with:
 
@@ -655,7 +655,7 @@ The end-to-end reproduction (HPO → train → bundle → build → push → dep
 
 ### 7.7 Live Alerting Pipeline
 
-A trained model serving predictions on demand is only half of a deployable RCA system. To make the service emit alerts when an incident is happening — rather than just answering when polled — I add two components on top of the inference service.
+A trained model serving predictions on demand is only half of a deployable RCA system. To make the service emit alerts when an incident is happening - rather than just answering when polled - I add two components on top of the inference service.
 
 **Self-health alerts via PrometheusRule (`serving/prometheus-rules.yaml`).** Four alert rules are evaluated by the cluster's operator-managed Prometheus on a 30 s interval:
 
@@ -676,7 +676,7 @@ A `PodMonitor` in the `monitoring` namespace points the operator-managed Prometh
 4. Fires an alert if **both** the top-1 score exceeds `CONFIDENCE_THRESHOLD` *and* the cluster-wide 5xx error rate exceeds `ERROR_RATE_TRIGGER`. Both thresholds are env-driven.
 5. On alert: logs to stdout, increments `rca_watcher_alerts_total{root_cause, severity}` on its own `/metrics` endpoint, and POSTs to Alertmanager's `/api/v2/alerts` with structured labels (`alertname=RCAStaServeRootCauseDetected`, `root_cause=<service>`, `severity=warning|critical`, `model=sta_sockshop_v1`).
 
-The watcher itself is a tiny FastAPI service (~250 lines), packaged in a 234 MB image (no PyTorch needed at runtime — it only HTTPs to the inference service), pushed to the same in-cluster registry as `rca-sta-serve`, and deployed in `rca-sandbox` with its own `PodMonitor` for self-observability.
+The watcher itself is a tiny FastAPI service (~250 lines), packaged in a 234 MB image (no PyTorch needed at runtime - it only HTTPs to the inference service), pushed to the same in-cluster registry as `rca-sta-serve`, and deployed in `rca-sandbox` with its own `PodMonitor` for self-observability.
 
 **End-to-end verification on the cluster.** With both `rca-sta-serve` (8 days uptime) and `rca-watcher` running, I injected two Chaos Mesh manifests in parallel on `sock-shop`:
 
@@ -704,15 +704,15 @@ The Alertmanager instance is the one already deployed by the cluster's `kube-pro
 
 ## 8. Discussion
 
-### 8.1 When Does STA's Efficiency Advantage Materialize?
+### 8.1 STA efficiency by graph size
 
-The evidence is consistent: STA's O(N + k²) advantage is measurable from N=50 and substantial at N=100 (+6.3 pp Avg@1 over GATv2). Below N=20, the selection bottleneck provides no benefit—k approaches N, the subgraph extraction is effectively a no-op, and the additional Gumbel noise of the STESelector introduces variance.
+The evidence is consistent: STA's O(N + k²) advantage is measurable from N=50 and substantial at N=100 (+6.3 pp Avg@1 over GATv2). Below N=20, the selection bottleneck provides no benefit-k approaches N, the subgraph extraction is effectively a no-op, and the additional Gumbel noise of the STESelector introduces variance.
 
-For practical deployment: systems with fewer than 20 instrumented services should prefer GATv2 for its simplicity and lower hyperparameter sensitivity. Systems with 50+ services should strongly prefer STA—both for performance and for inference latency predictability (STA's per-query cost is bounded by O(k²), independent of N growth).
+For practical deployment: systems with fewer than 20 instrumented services should prefer GATv2 for its simplicity and lower hyperparameter sensitivity. Systems with 50+ services should strongly prefer STA-both for performance and for inference latency predictability (STA's per-query cost is bounded by O(k²), independent of N growth).
 
-### 8.2 Why Does the Graph Help at Large N but Marginally at Small N?
+### 8.2 Contribution of graph structure by size
 
-At N=5 (RCAEval), the graph has 4–6 edges at most. The dependency structure is shallow (maximum 2–3 hops between any pair of services). In this regime, the temporal signal alone—detecting the service whose metrics deviate earliest and most strongly—is nearly sufficient for root cause identification.
+At N=5 (RCAEval), the graph has 4-6 edges at most. The dependency structure is shallow (maximum 2-3 hops between any pair of services). In this regime, the temporal signal alone-detecting the service whose metrics deviate earliest and most strongly-is nearly sufficient for root cause identification.
 
 At N=100 (BA graphs), the graph has approximately N × m = 200 edges, and propagation paths can span 5+ hops. Identifying the originating fault node from downstream symptom signals requires multi-hop graph reasoning that temporal encoders cannot perform.
 
@@ -722,29 +722,29 @@ This finding has an important practical implication: teams should not assume gra
 
 On RCAEval, multimodal fusion consistently fails to improve over metrics-only performance. I propose three non-exclusive explanations:
 
-**Hypothesis 1: Low discriminative signal in RCAEval logs/traces.** The public RCAEval datasets were collected in controlled experimental environments with scripted fault injection. Log messages and trace spans in such environments may be stereotyped—the same log entries appear in both healthy and faulty states—leaving metrics as the sole source of discriminative information.
+**Hypothesis 1: Low discriminative signal in RCAEval logs/traces.** The public RCAEval datasets were collected in controlled experimental environments with scripted fault injection. Log messages and trace spans in such environments may be stereotyped-the same log entries appear in both healthy and faulty states-leaving metrics as the sole source of discriminative information.
 
 **Hypothesis 2: Gradient conflict in cross-modal fusion.** When one modality (metrics) carries the signal and two others (logs, traces) carry noise, the cross-modal attention mechanism in STA-MM must learn to down-weight two noisy modalities while amplifying one. This is a challenging optimization problem that may not converge reliably with 5-seed, 100-epoch training budgets, manifesting as the variance inflation observed in STA-MM on online-boutique (±0.155 vs. ±0.095 for STA).
 
-**Hypothesis 3: Inductive bias mismatch.** STA-MM forces each modality to independently propose a root cause node and then fuses these proposals. For metrics, the proposal is meaningful (the temporally anomalous node). For logs and traces with low discriminative content, the proposal is near-uniform—contributing noise to the fusion without signal. The per-modality selector design, while theoretically robust to missing modalities, does not handle the case where a modality is present but uninformative.
+**Hypothesis 3: Inductive bias mismatch.** STA-MM forces each modality to independently propose a root cause node and then fuses these proposals. For metrics, the proposal is meaningful (the temporally anomalous node). For logs and traces with low discriminative content, the proposal is near-uniform-contributing noise to the fusion without signal. The per-modality selector design, while theoretically consistent to missing modalities, does not handle the case where a modality is present but uninformative.
 
 The positive cluster result (STA-MM no regression, lower variance) points toward the data quality hypothesis: observability data from a live Kubernetes cluster, collected with Loki and Jaeger under production-like load, contains richer temporal and structural log/trace patterns than the scripted RCAEval collection environment.
 
 ### 8.4 Cascades: The Actual Failure Mode
 
-The per-scenario breakdown in Section 7.4.1 contradicts a prediction I had made earlier in the analysis: I expected gray failures (15% packet loss) to be the hardest scenario for STA. The data shows the opposite—STA achieves Avg@1 = 0.987 on the gray scenario, while collapsing to Avg@1 = 0.043 on the network-delay cascade.
+The per-scenario breakdown in Section 7.4.1 contradicts a prediction I had made earlier in the analysis: I expected gray failures (15% packet loss) to be the hardest scenario for STA. The data shows the opposite-STA achieves Avg@1 = 0.987 on the gray scenario, while collapsing to Avg@1 = 0.043 on the network-delay cascade.
 
 The reason, in hindsight, is mechanical:
 - **Gray (network-loss-catalogue-to-catalogue-db, 15% loss)**: 15% packet loss produces a measurable, persistent drop in network_rx at catalogue-db. Within the 5-minute injection window, this is a strong unimodal signal. The "gray failure" label suggests subtlety, but at 15% loss the signal is far from sub-threshold.
-- **Cascade (network-delay-orders-to-orders-db, 400 ms latency)**: the latency at the orders→orders-db link causes immediate, large-amplitude symptoms at orders, then at front-end. orders-db itself sees almost no change in its own metrics—its CPU, memory, and error rate stay nominal. STA's top-k selector, which ranks by local node score, picks the screaming symptom nodes; the root cause is never selected.
+- **Cascade (network-delay-orders-to-orders-db, 400 ms latency)**: the latency at the orders→orders-db link causes immediate, large-amplitude symptoms at orders, then at front-end. orders-db itself sees almost no change in its own metrics-its CPU, memory, and error rate stay nominal. STA's top-k selector, which ranks by local node score, picks the screaming symptom nodes; the root cause is never selected.
 
-My initial gray failure detector targets the sub-threshold-signal pattern. The cluster results suggest a different need: a **cascade detector** that identifies nodes whose immediate neighbors are anomalous but whose own metrics are nominal. This is essentially the dual problem of the decorrelation mechanism currently implemented. Adding such a detector—or training STA with a cascade-aware loss that explicitly penalizes ranking symptom nodes above their root cause—is a concrete refinement target.
+My initial gray failure detector targets the sub-threshold-signal pattern. The cluster results suggest a different need: a **cascade detector** that identifies nodes whose immediate neighbors are anomalous but whose own metrics are nominal. This is essentially the dual problem of the decorrelation mechanism currently implemented. Adding such a detector-or training STA with a cascade-aware loss that explicitly penalizes ranking symptom nodes above their root cause-is a concrete refinement target.
 
 Practically, on this cluster, GATv2's soft attention partially mitigates the cascade failure (Avg@1 = 0.459 vs. STA's 0.043), but neither model handles cascade well. For deployments where cascade scenarios dominate, GATv2 should be preferred over STA, and a cascade-aware regularizer should be considered standard.
 
 #### 8.4.1 A/B Validation of the Gray Failure Detector
 
-To make the design/data mismatch concrete, I built an A/B harness (`rca_pipeline/detector_ab_harness.py`) that wraps a stand-in local-score model (L2 norm of per-node feature deviations from temporal mean — a faithful abstraction of the local scoring component dominating STA's selector and most temporal-only models) and runs it with and without the gray failure detector as a logit-boost pre-filter. The harness synthesizes three controlled scenarios with known root cause, drawing on the same fault taxonomy as the chaos experiments. Results across 500 trials per scenario (seed 42, boost +3.0, N=14 nodes):
+To make the design/data mismatch concrete, I built an A/B harness (`rca_pipeline/detector_ab_harness.py`) that wraps a stand-in local-score model (L2 norm of per-node feature deviations from temporal mean - a faithful abstraction of the local scoring component dominating STA's selector and most temporal-only models) and runs it with and without the gray failure detector as a logit-boost pre-filter. The harness synthesizes three controlled scenarios with known root cause, drawing on the same fault taxonomy as the chaos experiments. Results across 500 trials per scenario (seed 42, boost +3.0, N=14 nodes):
 
 **Table 12. Gray failure detector A/B uplift on synthetic scenarios. 500 trials, boost +3.0.**
 
@@ -760,14 +760,14 @@ Three findings:
 
 2. **The detector is harmless on hard scenarios.** The baseline already achieves Avg@1 = 1.000 on isolated, high-amplitude anomalies. The detector triggers only 3.6 % of the time on these (rare false positives from the synthetic noise), and even when it does, the local model already had the RC at top-1, so no degradation occurs.
 
-3. **The detector cannot rescue cascade scenarios.** On the synthetic cascade where the RC is silent and the downstream symptom dominates, the baseline collapses to Avg@1 = 0.000 (the model always picks the screaming symptom node). The detector fires only 4.0 % of the time — its mechanisms target metric anomalies at the RC node itself, which by construction has no anomaly. The uplift is 0.000.
+3. **The detector cannot rescue cascade scenarios.** On the synthetic cascade where the RC is silent and the downstream symptom dominates, the baseline collapses to Avg@1 = 0.000 (the model always picks the screaming symptom node). The detector fires only 4.0 % of the time - its mechanisms target metric anomalies at the RC node itself, which by construction has no anomaly. The uplift is 0.000.
 
-This last row is the empirical demonstration of the design/data mismatch identified from the cluster breakdown: a detector built for sub-threshold gray signals cannot, by construction, fix a failure mode where the RC's own signal is absent and the anomaly is at a neighboring node. A separate cascade-aware detector — or a structural loss penalizing symptom-over-RC rankings — is the right next building block. The A/B output is stored as a reproducible artifact at `results_transmission/detector_ab_harness.json`.
+This last row is the empirical demonstration of the design/data mismatch identified from the cluster breakdown: a detector built for sub-threshold gray signals cannot, by construction, fix a failure mode where the RC's own signal is absent and the anomaly is at a neighboring node. A separate cascade-aware detector - or a structural loss penalizing symptom-over-RC rankings - is the right next building block. The A/B output is stored as a reproducible artifact at `results_transmission/detector_ab_harness.json`.
 
 #### 8.4.2 A/B Validation on the Real Cluster Data
 
 The synthetic harness above is a controlled test of the detector's design. To check whether the conclusion survives on the actual cluster failure modes, I built a second harness (`rca_pipeline/gray_detector_real_ab.py`) that:
-1. Loads the existing ObservIT sock-shop windows used in Table 6 (no fresh chaos collection required—the data is already on disk under `datasets/sockshop_runs/`).
+1. Loads the existing ObservIT sock-shop windows used in Table 6 (no fresh chaos collection required-the data is already on disk under `datasets/sockshop_runs/`).
 2. Trains STA end-to-end with the exact protocol of Table 6 (5 seeds, 100 epochs, stratified split, train-only StandardScaler, contrastive warmup disabled).
 3. Runs the gray failure detector on each test window and applies the same +3.0 logit boost on flagged nodes.
 4. Reports per-scenario A/B Avg@1.
@@ -784,7 +784,7 @@ The synthetic harness above is a controlled test of the detector's design. To ch
 
 The real-data result is stronger than the synthetic one, in two ways:
 
-**The detector provides no uplift on the actual cluster gray scenario.** On `network-loss-catalogue→db`, the synthetic harness showed +39.8 pp uplift because I constructed a window pattern that triggers the P99/P50 ratio detector. The real 15% packet-loss scenario does not exhibit that pattern—the affected metric (network_rx of catalogue-db) drops as a sustained shift rather than as a tail stutter, which none of the four detector mechanisms target. The detector triggers on only 13.9 % of windows, and when it does, the flagged nodes are rarely the true RC. Uplift is in the noise (−0.016).
+**The detector provides no uplift on the actual cluster gray scenario.** On `network-loss-catalogue→db`, the synthetic harness showed +39.8 pp uplift because I constructed a window pattern that triggers the P99/P50 ratio detector. The real 15% packet-loss scenario does not exhibit that pattern-the affected metric (network_rx of catalogue-db) drops as a sustained shift rather than as a tail stutter, which none of the four detector mechanisms target. The detector triggers on only 13.9 % of windows, and when it does, the flagged nodes are rarely the true RC. Uplift is in the noise (−0.016).
 
 **The detector provides no uplift on cascades either, consistent with the synthetic result.** Trigger rate 20 %, uplift −0.010.
 
@@ -794,7 +794,7 @@ Both A/B harnesses are released alongside the paper: `rca_pipeline/detector_ab_h
 
 ### 7.5 N=50 Real-Cluster Validation
 
-The asymptotic claim—STA outperforms full-graph models at large N—was previously empirically validated only on synthetic Barabási-Albert graphs (Section 7.1). To close that gap, I deployed a synthetic-but-real microservice topology of 50 services on the Devoteam ObservIT cluster: 50 FastAPI pods (`python:3.9-slim` + ConfigMap, no custom image), wired together according to the BA-like dependency graph in `rca_pipeline/k8s_massive/topology_N50.json` (141 directed edges). Each service forwards incoming requests to its declared upstreams, producing realistic call-graph fan-out under Locust load. The deployment manifest, dummy service implementation, and the topology generator are all in `rca_pipeline/k8s_massive/`.
+The asymptotic claim-STA outperforms full-graph models at large N-was previously empirically validated only on synthetic Barabási-Albert graphs (Section 7.1). To close that gap, I deployed a synthetic-but-real microservice topology of 50 services on the Devoteam ObservIT cluster: 50 FastAPI pods (`python:3.9-slim` + ConfigMap, no custom image), wired together according to the BA-like dependency graph in `rca_pipeline/k8s_massive/topology_N50.json` (141 directed edges). Each service forwards incoming requests to its declared upstreams, producing realistic call-graph fan-out under Locust load. The deployment manifest, dummy service implementation, and the topology generator are all in `rca_pipeline/k8s_massive/`.
 
 I injected four Chaos Mesh scenarios covering the three failure types (Section 3.1):
 
@@ -829,7 +829,7 @@ Each scenario ran for 60 s of healthy baseline + 60 s of anomaly under 20 concur
 
 **STA is at least as good as GATv2 on every scenario individually.** No scenario shows a regression for STA. The largest gains are on the gray (svc-025: +12.5 pp) and cascade (svc-018: +4.8 pp) scenarios, suggesting STA's selector handles the noisier signals better at this scale.
 
-**Cascade remains the hardest scenario, consistent with the sock-shop finding.** Both models collapse to Avg@1 ≈ 0.14–0.19 on the network-delay cascade scenario, where the root cause (`svc-018`) has near-nominal metrics and the downstream symptoms dominate. This is the same pattern observed at N=14 on sock-shop (Section 7.4.1) and supports the conclusion that the failure mode is structural, not scale-dependent.
+**Cascade remains the hardest scenario, consistent with the sock-shop finding.** Both models collapse to Avg@1 ≈ 0.14-0.19 on the network-delay cascade scenario, where the root cause (`svc-018`) has near-nominal metrics and the downstream symptoms dominate. This is the same pattern observed at N=14 on sock-shop (Section 7.4.1) and supports the conclusion that the failure mode is structural, not scale-dependent.
 
 **Absolute level is below RCAEval baselines, expected.** At Avg@1 = 0.437, STA is below the RCAEval-reported BARO (0.71) and E-Diagnosis (0.64). Three protocol factors keep this comparison non-isoperimeter: (i) the topology, while N=50, is a synthetic dependency graph, not a production microservice application; (ii) only one chaos repetition per scenario was collected, producing a small dataset (137 windows total); (iii) the baseline references come from N=5 RCAEval, a very different graph-size regime. The relevant comparison here is **STA vs. GATv2 under the same protocol**, where STA wins.
 
@@ -839,7 +839,7 @@ Each scenario ran for 60 s of healthy baseline + 60 s of anomaly under 20 concur
 
 I list the limitations explicitly so that the contributions can be judged for what they are, not for what they are not.
 
-**Scale of real-data evaluation — partially addressed, residual caveats.** All publicly available RCAEval datasets operate at N=5. The Devoteam ObservIT sock-shop deployment reaches N=14. To close the gap to the regime where STA's design choices matter, I deployed a synthetic-but-real 50-service topology on the cluster (Section 7.5). The N=50 result is consistent with the synthetic finding (STA +5.8 pp over GATv2 at N=50 on real cluster, vs. +6.3 pp on synthetic at N=100). Two residual caveats remain: (i) the N=50 services are uniform FastAPI dummy pods, not heterogeneous production microservices, so generalization to real-world business-logic services is still an extrapolation; (ii) the dataset is small (137 windows from a single chaos repetition per scenario), forcing the conservative protocol of 3 seeds and 50 epochs and producing absolute Avg@1 levels lower than RCAEval's N=5 datasets. The relative ordering is robust within the protocol; the absolute level is not claim-grade.
+**Scale of real-data evaluation - partially addressed, residual caveats.** All publicly available RCAEval datasets operate at N=5. The Devoteam ObservIT sock-shop deployment reaches N=14. To close the gap to the regime where STA's design choices matter, I deployed a synthetic-but-real 50-service topology on the cluster (Section 7.5). The N=50 result is consistent with the synthetic finding (STA +5.8 pp over GATv2 at N=50 on real cluster, vs. +6.3 pp on synthetic at N=100). Two residual caveats remain: (i) the N=50 services are uniform FastAPI dummy pods, not heterogeneous production microservices, so generalization to real-world business-logic services is still an extrapolation; (ii) the dataset is small (137 windows from a single chaos repetition per scenario), forcing the conservative protocol of 3 seeds and 50 epochs and producing absolute Avg@1 levels lower than RCAEval's N=5 datasets. The relative ordering is consistent within the protocol; the absolute level is not claim-grade.
 
 **Statistical rigor.** Five seeds with varying splits produce standard deviations that conflate model variance with data split variance. With n=5, bootstrap confidence intervals are not statistically reliable, and formal significance testing (Wilcoxon signed-rank, paired t-test, Bonferroni correction) is not appropriate at this sample size. I adopt the conservative reading throughout Section 7: a result is **meaningful** only when the gap exceeds both reported standard deviations, otherwise **within noise**. Under this rule, several of my headline comparisons at small N are within noise (notably STA vs. GATv2 at N=5), and I say so. On online-boutique specifically, the variances are large (STA ±0.095, STA-MM ±0.155) and any ordering claim on this dataset should be treated cautiously.
 
@@ -847,9 +847,9 @@ I list the limitations explicitly so that the contributions can be judged for wh
 
 **Multimodal baseline absence.** No published RCA baseline that I could verify reports multimodal results with a comparable protocol. My MM evaluation is therefore relative (unimodal vs. MM for my own models) but cannot be situated in the broader landscape of multimodal approaches.
 
-**Gray failure detector — design/data mismatch.** Section 7.4.1 reveals that on this cluster, the actual hard scenario is cascade propagation, not subtle gray signal. The four-mechanism gray failure detector (P99/P50, decorrelation, Mann-Kendall trend, Limplock) is implemented and unit-tested, but its targeted failure mode (sub-threshold signals) does not coincide with the empirical failure mode of STA on the chaos scenarios I injected. The end-to-end uplift on cascade scenarios specifically would require an additional cascade-aware detector, not the current design.
+**Gray failure detector - design/data mismatch.** Section 7.4.1 reveals that on this cluster, the actual hard scenario is cascade propagation, not subtle gray signal. The four-mechanism gray failure detector (P99/P50, decorrelation, Mann-Kendall trend, Limplock) is implemented and unit-tested, but its targeted failure mode (sub-threshold signals) does not coincide with the empirical failure mode of STA on the chaos scenarios I injected. The end-to-end uplift on cascade scenarios specifically would require an additional cascade-aware detector, not the current design.
 
-**Single cascade scenario.** The cascade failure mode discussion is currently grounded in a single chaos scenario (`network-delay-orders-to-orders-db`). Generalizing the finding requires additional cascade variants (e.g., network-delay at other links, multi-hop cascades, slow-burn cascades) before concluding that STA's collapse on cascades is a robust property rather than a scenario-specific artifact.
+**Single cascade scenario.** The cascade failure mode discussion is currently grounded in a single chaos scenario (`network-delay-orders-to-orders-db`). Generalizing the finding requires additional cascade variants (e.g., network-delay at other links, multi-hop cascades, slow-burn cascades) before concluding that STA's collapse on cascades is a consistent property rather than a scenario-specific artifact.
 
 ---
 
@@ -857,9 +857,9 @@ I list the limitations explicitly so that the contributions can be judged for wh
 
 I presented STA (Select-Then-Analyze), an early-bottleneck GNN for microservice root cause analysis that achieves O(N + k²) complexity by selecting a compact candidate subgraph before deep spatio-temporal analysis. My systematic evaluation across synthetic graphs, three RCAEval datasets, and a live Kubernetes cluster yields three durable findings:
 
-**Finding 1.** STA's asymptotic efficiency advantage is empirically confirmed at N≥50 both on synthetic Barabási-Albert graphs (+6.3 pp Avg@1 over GATv2 at N=100, Table 1) and on a real Kubernetes deployment of 50 instrumented services on the Devoteam ObservIT cluster (+5.8 pp Avg@1 at N=50, Table 14). The two gaps are in the same direction, of similar magnitude, and both exceed the standard-deviation envelope. The synthetic-to-real transfer that was the main open empirical question of earlier iterations of this work is now addressed: STA's structural complexity advantage is no longer purely an inference from BA simulations. At N≤14 — the scale of the public RCAEval datasets and the sock-shop deployment — STA and GATv2 remain within noise of one another, confirming that the bottleneck design needs the large-N regime to express itself.
+**Finding 1.** STA's asymptotic efficiency advantage is empirically confirmed at N≥50 both on synthetic Barabási-Albert graphs (+6.3 pp Avg@1 over GATv2 at N=100, Table 1) and on a real Kubernetes deployment of 50 instrumented services on the Devoteam ObservIT cluster (+5.8 pp Avg@1 at N=50, Table 14). The two gaps are in the same direction, of similar magnitude, and both exceed the standard-deviation envelope. The synthetic-to-real transfer that was the main open empirical question of earlier iterations of this work is now addressed: STA's structural complexity advantage is no longer purely an inference from BA simulations. At N≤14 - the scale of the public RCAEval datasets and the sock-shop deployment - STA and GATv2 remain within noise of one another, confirming that the bottleneck design needs the large-N regime to express itself.
 
-**Finding 2.** Multimodal fusion (metrics + logs + traces) does not improve—and often degrades—performance on RCAEval datasets. This negative result is robust across models and datasets, and is consistent with the hypothesis that log/trace quality in controlled experimental environments is insufficient to provide discriminative signal beyond metrics. On a live cluster with richer observability, STA-MM shows no regression and reduced variance, suggesting that data quality is the rate-limiting factor.
+**Finding 2.** Multimodal fusion (metrics + logs + traces) does not improve-and often degrades-performance on RCAEval datasets. This negative result is consistent across models and datasets, and is consistent with the hypothesis that log/trace quality in controlled experimental environments is insufficient to provide discriminative signal beyond metrics. On a live cluster with richer observability, STA-MM shows no regression and reduced variance, suggesting that data quality is the rate-limiting factor.
 
 **Finding 3.** I contribute an operational RCA pipeline that goes beyond model evaluation: ADWIN-based concept drift detection with multi-metric cooldown, a four-mechanism gray failure composite detector targeting micro-stutters, decorrelation, memory leaks, and Limplock patterns, and three variants of a cascade-aware loss function. These components address the gap between academic benchmarks and production deployment needs.
 
@@ -881,7 +881,7 @@ This work was conducted during an industrial research internship at **Devoteam**
 
 The exact commit corresponding to the results reported in this paper is recorded in `results_transmission/canonical_results_manifest.json`.
 
-**Public datasets.** Results in Tables 3–5 use the RCAEval benchmark, publicly available at https://github.com/phamquiluan/RCAEval. I use the trainticket, sockshop, and online-boutique subsets without modification.
+**Public datasets.** Results in Tables 3-5 use the RCAEval benchmark, publicly available at https://github.com/phamquiluan/RCAEval. I use the trainticket, sockshop, and online-boutique subsets without modification.
 
 **Private dataset.** The ObservIT cluster results (Table 6) were collected on a private Kubernetes cluster operated for this study. The collection scripts, chaos manifests (`k8s/chaos/sockshop/`), Locust workload (`rca_pipeline/locustfile_sockshop.py`), and topology definitions (`rca_pipeline/topologies.py`) are released; the raw cluster traces are not redistributed.
 
@@ -899,7 +899,7 @@ Each results table maps to a single, deterministic command (5 seeds, fixed split
 | 3, 4 (RCAEval metrics) | `paper_benchmark_real.json` | `python -m rca_pipeline.benchmark_real --dataset all --seeds 42,123,7,1337,2025 --epochs 100 --sta-contrastive-warmup 0 --output-json <path>` |
 | 5 (RCAEval MM) | `paper_benchmark_real_mm.json` | append `--use-mm --mm-strict` to the above |
 | 6 (ObservIT) | `paper_benchmark_observit.json`, `paper_benchmark_observit_mm.json` | `python -m rca_pipeline.benchmark_real --dataset observit --observit-topology sock_shop ...` |
-| 7–10 (ablations) | `rca_pipeline/ablation_prepublish.json`, `rca_pipeline/validation_runs/ablation_temporal_real.json` (generated) | `python -m rca_pipeline.benchmark_ablation` |
+| 7-10 (ablations) | `rca_pipeline/ablation_prepublish.json`, `rca_pipeline/validation_runs/ablation_temporal_real.json` (generated) | `python -m rca_pipeline.benchmark_ablation` |
 | 11 (ObservIT per-scenario) | derived from `paper_benchmark_observit.json` | `python -m rca_pipeline.analyze_per_scenario --observit results_transmission/paper_benchmark_observit.json --output docs/PER_SCENARIO_BREAKDOWN.md` |
 | 12 (Gray detector synthetic A/B) | `results_transmission/detector_ab_harness.json` | `python -m rca_pipeline.detector_ab_harness --n-trials 500 --seed 42 --boost 3.0 --output-json <path>` |
 | 13 (Gray detector real-cluster A/B) | `results_transmission/gray_detector_real_ab.json` | `python -m rca_pipeline.gray_detector_real_ab --dataset-dir datasets/sockshop_runs --seeds 42,123,7,1337,2025 --epochs 100 --boost 3.0 --output-json <path>` |
@@ -920,9 +920,9 @@ Bifet, A., and Gavaldà, R. (2007). *Learning from time-changing data with adapt
 
 Brody, S., Alon, U., and Yahav, E. (2022). *How attentive are graph attention networks?* In International Conference on Learning Representations (ICLR 2022).
 
-Chandola, V., Banerjee, A., and Kumar, V. (2009). *Anomaly detection: A survey*. ACM Computing Surveys, 41(3), 1–58.
+Chandola, V., Banerjee, A., and Kumar, V. (2009). *Anomaly detection: A survey*. ACM Computing Surveys, 41(3), 1-58.
 
-Granger, C. W. J. (1969). *Investigating causal relations by econometric models and cross-spectral methods*. Econometrica, 37(3), 424–438.
+Granger, C. W. J. (1969). *Investigating causal relations by econometric models and cross-spectral methods*. Econometrica, 37(3), 424-438.
 
 Huang, P., Guo, C., Lorch, J. R., Zhou, L., and Dang, Y. (2017). *Gray failure: The Achilles' heel of cloud-scale systems*. In Proceedings of the 16th Workshop on Hot Topics in Operating Systems (HotOS 2017).
 
@@ -932,7 +932,7 @@ Kipf, T. N., and Welling, M. (2017). *Semi-supervised classification with graph 
 
 Li, Q., Han, Z., and Wu, X.-M. (2018). *Deeper insights into graph convolutional networks for semi-supervised classification*. In Proceedings of the AAAI Conference on Artificial Intelligence (AAAI 2018).
 
-Mann, H. B. (1945). *Nonparametric tests against trend*. Econometrica, 13(3), 245–259.
+Mann, H. B. (1945). *Nonparametric tests against trend*. Econometrica, 13(3), 245-259.
 
 Spirtes, P., Glymour, C., and Scheines, R. (2000). *Causation, Prediction, and Search* (2nd ed.). MIT Press.
 
@@ -950,8 +950,8 @@ Zheng, X., Aragam, B., Ravikumar, P., and Xing, E. P. (2018). *DAGs with NO TEAR
 
 ### Software and tools
 
-Chaos Mesh: https://chaos-mesh.org/ — fault injection framework for Kubernetes.
+Chaos Mesh: https://chaos-mesh.org/ - fault injection framework for Kubernetes.
 
-RCAEval benchmark: https://github.com/phamquiluan/RCAEval — RCA evaluation suite.
+RCAEval benchmark: https://github.com/phamquiluan/RCAEval - RCA evaluation suite.
 
-PyTorch Geometric (Fey & Lenssen, 2019): https://pytorch-geometric.readthedocs.io/ — GNN library.
+PyTorch Geometric (Fey & Lenssen, 2019): https://pytorch-geometric.readthedocs.io/ - GNN library.

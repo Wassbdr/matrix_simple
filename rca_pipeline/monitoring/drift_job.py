@@ -137,7 +137,7 @@ def _fetch_current(
     """Build the current sample with the same unit as the reference: one row
     per (node, sub-window). The lookback is sliced into ``sub_window_minutes``
     chunks; each chunk's [W,N,F] is time-averaged to [N,F] and stacked, so the
-    current sample has ``n_sub_windows * N`` rows — comparable to the
+    current sample has ``n_sub_windows * N`` rows - comparable to the
     reference's per-(node, training-window) rows (otherwise a single window
     gives only N≈14 points, far too few for a stable PSI)."""
     import time

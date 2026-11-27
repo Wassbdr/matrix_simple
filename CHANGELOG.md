@@ -6,7 +6,14 @@ All notable changes to this project will be documented here. Format follows
 
 ## [Unreleased]
 
-### Added — Phase 2 (MLOps industrialization)
+## [0.3.0]
+
+- Add `rca rank`, a typed Python API, and a trained RE1 checkpoint for metrics exports.
+- Serve the same model through FastAPI and the default Docker image. Mounted legacy bundles still accept tensor requests.
+- Add pinned RCAEval downloads, cached reference comparisons, grouped development splits, and frozen transfer scoring.
+- Add a public-case CLI recording and document results, model limits, and export formats.
+
+### Added - Phase 2 (MLOps industrialization)
 - `rca_pipeline/tracking.py`: MLflow wrapper that is a complete no-op when
   `MLFLOW_TRACKING_URI` is unset (research/CI stay offline-capable). New
   `[tracking]` extra. `train_and_persist` logs params/metrics, logs the
@@ -22,7 +29,7 @@ All notable changes to this project will be documented here. Format follows
   and download the bundle by run_id (serve initContainer).
 - `deploy/mlflow/mlflow.yaml`: MLflow on K8s (SQLite + PVC, `Recreate`,
   basic-auth, single gunicorn worker, default StorageClass).
-- `deploy/helm/rca-stack/`: Helm chart — serve (+ fetch-bundle initContainer),
+- `deploy/helm/rca-stack/`: Helm chart - serve (+ fetch-bundle initContainer),
   watcher, PrometheusRule + MLOps alerts, retrain & drift CronJobs, optional
   shadow deployment.
 - `docker/train.Dockerfile` + `.dockerignore`; `.github/workflows/release.yml`
@@ -31,7 +38,7 @@ All notable changes to this project will be documented here. Format follows
 - Shadow comparison in `serving/rca_watcher.py`
   (`rca_watcher_shadow_top1_agree_total` / `_score_delta`).
 
-### Added — Phase 1A (model improvements, post-defense)
+### Added - Phase 1A (model improvements, post-defense)
 - `rca_pipeline/ensemble.py`: post-hoc STA+GATv2 soft/confidence vote,
   temperature calibration, ECE, routing-headroom diagnostics. Honest negative
   result on RCAEval (see `docs/ANALYSIS_MODEL_IMPROVEMENTS.md`).
@@ -42,9 +49,9 @@ All notable changes to this project will be documented here. Format follows
   collapse was GIB NaN-poisoning at `k==N` (float32 clamp no-op), not InfoNCE;
   fixed in `variational_gib_loss` + a `k>=N` skip in `benchmark_real`.
 
-### Fixed — runtime integration bugs (found by end-to-end cluster validation)
+### Fixed - runtime integration bugs (found by end-to-end cluster validation)
 - `serving/fetch_bundle.py`: `download_artifacts("models:/name@alias/sub")`
-  404s on the 2.x server — resolve to a version then download by run_id.
+  404s on the 2.x server - resolve to a version then download by run_id.
 - `deploy/mlflow/mlflow.yaml`: hard-coded StorageClass `standard` (Pending on
   Harvester) → use the cluster default; OOMKilled at 512Mi/4 workers →
   `--workers=1` + 1Gi; basic-auth secret aligned on the server's admin user.
@@ -59,7 +66,7 @@ All notable changes to this project will be documented here. Format follows
   → registered `sta-sockshop` v2 (Avg@1 0.786 / MRR 0.871) → promoted to
   `@champion` → fetched by alias with run_id cross-link intact.
 
-## [0.2.0] — 2026-06-12
+## [0.2.0] - 2026-06-12
 
 Phase 1B "engineering quality" milestone: tests on the production path,
 config-as-code, reproducible images, canonical dependency pins.
@@ -94,7 +101,7 @@ config-as-code, reproducible images, canonical dependency pins.
 - `pydantic` and `pyyaml` move to core dependencies.
 
 ### Removed
-- `requirements-frozen.txt` (froze a CUDA dev env — misleading for the CPU
+- `requirements-frozen.txt` (froze a CUDA dev env - misleading for the CPU
   serving stack; superseded by `requirements/constraints-cpu.txt`).
 
 ## [0.1.0]
@@ -105,11 +112,11 @@ config-as-code, reproducible images, canonical dependency pins.
 - `Makefile` with `install`, `dev`, `test`, `lint`, `format`, `audit`,
   `benchmark-smoke`, `benchmark-paper`, `clean` targets.
 - `.pre-commit-config.yaml` (ruff, large-file guard, private-key detection).
-- `scripts/pre_publish_audit.sh` — repeatable repo audit before public push.
-- `scripts/run_paper_benchmark.sh` — publication-grade benchmark suite
+- `scripts/pre_publish_audit.sh` - repeatable repo audit before public push.
+- `scripts/run_paper_benchmark.sh` - publication-grade benchmark suite
   (5 seeds, deterministic, simulated + RCAEval metrics-only + multimodal strict).
-- `requirements-frozen.txt` — exact dependency pins for reproducibility.
-- `.env.example` — environment-variable template (Loki, Prometheus, kubeconfig).
+- `requirements-frozen.txt` - exact dependency pins for reproducibility.
+- `.env.example` - environment-variable template (Loki, Prometheus, kubeconfig).
 
 ### Changed
 - `pyproject.toml` declares MIT license, authors, keywords, PyPI classifiers.

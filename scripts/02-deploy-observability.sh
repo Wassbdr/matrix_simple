@@ -117,7 +117,7 @@ helm upgrade --install rca-grafana grafana/grafana \
 echo ""
 echo "=== Observabilité déployée avec succès dans ${NAMESPACE} ! ==="
 echo ""
-echo "📊 Accès aux dashboards :"
+echo " Accès aux dashboards :"
 echo "  Grafana    : kubectl port-forward svc/rca-grafana -n ${NAMESPACE} 3000:80     (admin/admin)"
 echo "  Prometheus : kubectl port-forward svc/rca-prometheus-server -n ${NAMESPACE} 9090:80"
 echo "  Jaeger     : kubectl port-forward svc/rca-jaeger-query -n ${NAMESPACE} 16686:16686"

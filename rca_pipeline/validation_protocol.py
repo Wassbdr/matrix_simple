@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-validation_protocol.py — Fixed, repeatable validation runs for RCAEval.
+validation_protocol.py - Fixed, repeatable validation runs for RCAEval.
 
 Runs a small matrix of configs and writes JSON outputs under rca_pipeline/validation_runs/.
 Then prints a compact summary table (Avg@1, MRR, NDCG@3) per dataset/method.
 
-Sockshop: only ``metrics_only`` is executed; MM configs write a stub JSON (skipped) — see
+Sockshop: only ``metrics_only`` is executed; MM configs write a stub JSON (skipped) - see
 docs/PAPER_BENCHMARKS.md.
 """
 
@@ -40,7 +40,7 @@ class ProtocolPreset:
 PRESETS: Dict[str, ProtocolPreset] = {
     # Fast sanity check (quick iteration)
     "smoke": ProtocolPreset("smoke", "42,123", "20", "20"),
-    # Reference comparison — 5 seeds for more stable CIs
+    # Reference comparison - 5 seeds for more stable CIs
     "long": ProtocolPreset("long", "42,123,7,1337,2025", "100", "0"),
     # Extended: 10 seeds for paper-grade statistical power
     "paper": ProtocolPreset("paper", "42,123,7,1337,2025,314,555,888,999,4242", "100", "0"),
@@ -180,4 +180,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

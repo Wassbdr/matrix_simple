@@ -2,7 +2,7 @@
 A/B evaluation of the gray_failure_detector on REAL cluster data.
 
 Loads existing ObservIT sock-shop sliding windows (no fresh chaos
-collection needed — uses the already-collected CSVs under
+collection needed - uses the already-collected CSVs under
 ``datasets/sockshop_runs/``), trains STA once on a stratified split,
 then evaluates twice on the same test windows:
 

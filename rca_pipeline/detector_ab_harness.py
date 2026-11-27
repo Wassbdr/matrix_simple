@@ -76,7 +76,7 @@ def make_window(
         # Also distract the local model by adding modest noise on a few
         # other nodes so RC does not dominate by raw magnitude.
         lat = base[rc_idx, 4, :].copy()
-        # Two short tail spikes — enough for p99/p50 ratio, small in L2
+        # Two short tail spikes - enough for p99/p50 ratio, small in L2
         lat[-2] *= 4.0
         lat[-5] *= 3.5
         base[rc_idx, 4, :] = lat
@@ -104,7 +104,7 @@ def make_window(
 
 
 # ---------------------------------------------------------------------------
-# Mock model — produces per-node logits based on local feature magnitude
+# Mock model - produces per-node logits based on local feature magnitude
 # ---------------------------------------------------------------------------
 
 def mock_local_score_model(window: np.ndarray) -> np.ndarray:
@@ -194,7 +194,7 @@ def main():
                         help="Optional path to write results as JSON.")
     args = parser.parse_args()
 
-    print(f"\nA/B harness — mock local-score model vs. model + gray_failure_detector boost")
+    print(f"\nA/B harness - mock local-score model vs. model + gray_failure_detector boost")
     print(f"N={args.n_nodes}, F={args.n_features}, W={args.window_len}, "
           f"trials={args.n_trials}, boost={args.boost}\n")
 
