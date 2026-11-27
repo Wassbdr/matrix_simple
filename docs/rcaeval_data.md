@@ -31,4 +31,13 @@ for file in utils/PCUtils/SkeletonDiscovery.py graph/GraphClass.py utils/Fas.py 
 done
 ```
 
-Run `make bench` in the STA environment. Outputs are `benchmarks/results.md` and `benchmarks/baseline.json`; reference predictions are cached outside the checkout. Use `BENCH_ARGS='--split dev'` during development. Omit this argument to evaluate the frozen model on RE2. Slow CIRCA and RCD runs use the same seed-42 Train Ticket sample, and the report includes STA and the faster methods on that sample as well as on the full cohort. Timeouts count as misses, not column-order predictions.
+Run `make bench` in the STA environment. Outputs are `benchmarks/results.md` and `benchmarks/relative.json`; reference predictions are cached outside the checkout. The default is the frozen median and IQR design, selected on RE1 before running RE2. To regenerate the earlier experiments and the transfer result in order:
+
+```sh
+for variant in baseline relative onset tails; do
+    make bench BENCH_ARGS="--split dev --variant $variant"
+done
+make bench
+```
+
+Slow CIRCA and RCD runs use the same seed-42 Train Ticket sample. Compare all methods on the fixed TT sample rows; the faster methods also report on the full cohort. Timeouts count as misses, not column-order predictions.

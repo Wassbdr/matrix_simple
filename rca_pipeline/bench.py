@@ -24,6 +24,7 @@ DISPLAY = {
     "circa": "CIRCA", "rcd": "RCD",
 }
 METRICS = ("ac1", "ac3", "avg5")
+ITERATION_BASE = {"relative": "baseline", "onset": "relative", "tails": "relative"}
 
 
 def group_split(cases: list[Case], seed: int) -> tuple[list[Case], list[Case]]:
@@ -101,14 +102,14 @@ def rows_for_report(records: list[dict], method: str, cohort: str) -> tuple:
     return (*metrics, f"{timing:.2f}", coverage)
 
 
-def summarize(outputs: list[dict]) -> str:
-    latest = outputs[-1]
+def summarize(outputs: list[dict], latest: dict) -> str:
     lines = [
         "# Public RCAEval benchmark", "",
         latest["command"], "",
+        f"STA variant in the comparison tables: `{latest['variant']}`.", "",
         f"CPU: {latest['cpu']}; one thread per ranker. Seeds: {latest['seeds']}; "
         f"{latest['rows']} samples on each side of injection at most, metrics only. "
-        "Latency is median ranking time in ms, excluding file parsing and feature preparation.", "",
+        "Latency is median wall time from a loaded window to a ranking, including STA feature preparation.", "",
         "RE1 uses service/fault groups; RE2 is a separate transfer set. "
         "AC@k is a top-k hit rate; Avg@5 averages AC@1 through AC@5. "
         "Failures count as misses. Repeated predictions of the same case across seeds are not independent.",
@@ -117,6 +118,14 @@ def summarize(outputs: list[dict]) -> str:
         "call-edge latency and host topology; its example also lacks the expected source latency CSV.",
         "",
     ]
+    if latest["tt_limit"]:
+        lines.extend([
+            f"CIRCA and RCD use up to {latest['tt_limit']} Train Ticket cases per suite "
+            "sampled with seed 42 because the full runs are too slow. RE1 further intersects "
+            "that sample with each grouped test split. Compare them only with the other "
+            "methods in the fixed TT sample rows.",
+            "",
+        ])
     for suite in ("re1", "re2"):
         for system, title in SYSTEMS.items():
             records = [r for r in latest["cases"] if r["system"] == system and r["suite"] == suite]
@@ -135,9 +144,33 @@ def summarize(outputs: list[dict]) -> str:
                     continue
                 lines.append(f"| {DISPLAY[method]} | {cohort} | " + " | ".join(cells) + " |")
             lines.append("")
+    baseline = next((run for run in outputs if run["variant"] == "baseline"), None)
+    if baseline is not None:
+        blog = {(r["case"], r["seed"]): r for r in baseline["cases"]
+                if (r["method"], r["suite"], r["system"]) == ("baro", "re1", "ob")}
+        missed: dict[str, list[bool]] = defaultdict(list)
+        for row in baseline["cases"]:
+            if (row["method"], row["suite"], row["system"]) != ("sta", "re1", "ob"):
+                continue
+            baro = blog[row["case"], row["seed"]]
+            answer = [row["answer"]]
+            if baro["status"] == "ok" and baro["ranks"][:1] == answer and row["ranks"][:1] != answer:
+                missed[row["fault"]].append(row["selector_hit"])
+        if missed:
+            lines += [
+                "## Online Boutique RE1 baseline errors", "",
+                "| Fault | BARO hit at 1, STA missed | Root in STA top-k |",
+                "|---|---:|---:|",
+            ]
+            for fault, hits in sorted(missed.items()):
+                lines.append(f"| {fault} | {len(hits)} | {sum(hits)} |")
+            lines.append("")
+    by_variant = {out["variant"]: out for out in outputs}
     for i, out in enumerate(outputs):
+        previous = by_variant.get(ITERATION_BASE.get(out["variant"], ""))
         lines += [
             f"## Iteration {i}: {VARIANTS[out['variant']]}", "",
+            f"Delta against `{previous['variant']}`." if previous else "No earlier design measured.", "",
             "| Suite / system | AC@1 | Delta | Avg@5 | Delta |",
             "|---|---:|---:|---:|---:|",
         ]
@@ -156,7 +189,7 @@ def summarize(outputs: list[dict]) -> str:
                 current = sta_metrics(out)
                 if current is None:
                     continue
-                before = sta_metrics(outputs[i - 1]) if i else None
+                before = sta_metrics(previous) if previous else None
                 a, b = current
                 da, db = (f"{a - before[0]:+.3f}", f"{b - before[1]:+.3f}") if before else ("n/a", "n/a")
                 lines.append(f"| {suite.upper()} / {title} | {a:.3f} | {da} | {b:.3f} | {db} |")
@@ -216,19 +249,24 @@ def run(args: argparse.Namespace) -> None:
             break
     path = args.output / f"{args.variant}.json"
     seeded = ",".join(map(str, args.seeds))
-    path.write_text(json.dumps({
+    output = {
         "cpu": cpu, "seeds": args.seeds, "rows": args.rows, "epochs": args.epochs,
         "tt_limit": args.tt_limit, "timeout": args.timeout, "variant": args.variant,
         "command": f"`make bench BENCH_ARGS='--variant {args.variant} --split {args.split} "
                    f"--seeds {seeded} --epochs {args.epochs} --rows {args.rows} "
                    f"--tt-limit {args.tt_limit} --timeout {args.timeout}'`",
         "cases": records,
-    }, indent=2) + "\n")
+    }
+    path.write_text(json.dumps(output, indent=2) + "\n")
     outputs = [
         json.loads(p.read_text()) for variant in VARIANTS
         if (p := args.output / f"{variant}.json").is_file()
     ]
-    (args.output / "results.md").write_text(summarize(outputs))
+    matching = [
+        prior for prior in outputs
+        if all(prior[key] == output[key] for key in ("seeds", "rows", "epochs", "tt_limit", "timeout"))
+    ]
+    (args.output / "results.md").write_text(summarize(matching, output))
     print(f"Wrote {path} and {args.output / 'results.md'}")
 
 
@@ -251,7 +289,7 @@ def main() -> None:
     parser.add_argument("--timeout", type=int, default=90)
     parser.add_argument("--tt-limit", type=int, default=12)
     parser.add_argument("--split", choices=("dev", "all"), default="all")
-    parser.add_argument("--variant", choices=VARIANTS, default="baseline")
+    parser.add_argument("--variant", choices=VARIANTS, default="relative")
     parser.add_argument("--skip-references", action="store_true", help="Use cached results only.")
     args = parser.parse_args()
     if min(args.rows, args.epochs, args.workers, args.timeout) <= 0 or args.tt_limit < 0:

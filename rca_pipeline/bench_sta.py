@@ -19,8 +19,9 @@ METRIC_ALIASES = {"latency-90": "latency", "load": "workload"}
 STEPS = 12
 VARIANTS = {
     "baseline": "Post-injection telemetry with train-only scaling",
-    "relative": "Robust pre/post normalization per metric and case",
-    "onset": "Robust normalization plus pre/post onset and persistence channels",
+    "relative": "Pre-injection median and IQR scaling per metric and case",
+    "onset": "Median and IQR scaling plus onset and persistence channels",
+    "tails": "Median and IQR scaling plus signed within-bin tail deviations",
 }
 
 
@@ -29,6 +30,7 @@ class Incident:
     case: Case
     names: tuple[str, ...]
     x: torch.Tensor
+    preparation_ms: float
 
 
 def _downsample(values: np.ndarray) -> np.ndarray:
@@ -37,10 +39,18 @@ def _downsample(values: np.ndarray) -> np.ndarray:
     return np.array([piece.mean() for piece in np.array_split(values, STEPS)])
 
 
+def _tails(values: np.ndarray) -> np.ndarray:
+    if len(values) < STEPS:
+        return _downsample(values)
+    bounds = np.array([np.quantile(piece, (0.1, 0.9)) for piece in np.array_split(values, STEPS)])
+    return np.where(np.abs(bounds[:, 0]) > np.abs(bounds[:, 1]), bounds[:, 0], bounds[:, 1])
+
+
 def prepare(case: Case, frame: pd.DataFrame, cut: int, variant: str) -> Incident:
+    start = time.perf_counter()
     names = candidates(frame)
     by_name = {name: i for i, name in enumerate(names)}
-    channels = len(METRICS) * (3 if variant == "onset" else 1)
+    channels = len(METRICS) * {"onset": 3, "tails": 2}.get(variant, 1)
     x = np.zeros((len(names), channels, STEPS), dtype=np.float32)
     strength = np.full((len(names), len(METRICS)), -np.inf)
     mask = frame.time.to_numpy() < cut
@@ -72,9 +82,11 @@ def prepare(case: Case, frame: pd.DataFrame, cut: int, variant: str) -> Incident
         strength[node, feature] = priority
         x[node, feature] = signal
         if variant == "onset":
-            x[node, len(METRICS) + feature] = np.sign(z)[:1] * _downsample(np.abs(signed))
+            x[node, len(METRICS) + feature] = np.diff(signal, prepend=0.0)
             x[node, 2 * len(METRICS) + feature] = _downsample((np.abs(z) >= 3).astype(float))
-    return Incident(case, names, torch.from_numpy(x))
+        elif variant == "tails":
+            x[node, len(METRICS) + feature] = _tails(signed)
+    return Incident(case, names, torch.from_numpy(x), 1e3 * (time.perf_counter() - start))
 
 
 def fit(train: list[Incident], seed: int, epochs: int, variant: str) -> tuple:
@@ -136,6 +148,6 @@ def rank(fitted: tuple, sample: Incident) -> dict:
     return {
         "ranks": ranks,
         "status": "ok",
-        "latency_ms": round(1e3 * (time.perf_counter() - start), 4),
+        "latency_ms": round(sample.preparation_ms + 1e3 * (time.perf_counter() - start), 4),
         "selector_hit": sample.case.service in picked,
     }
