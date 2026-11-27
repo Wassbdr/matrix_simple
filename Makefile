@@ -52,7 +52,9 @@ demo:
 	$(PYTHON) -m rca_pipeline.demo_incident run
 
 scaling:
-	$(PYTHON) -m rca_pipeline.scaling_benchmark --train-threads 2 --output-json results/scaling_benchmark.json
+	$(PYTHON) -m rca_pipeline.scaling_benchmark --sizes 14,50,100,200 --train-threads 4 --skip-latency --output-json results/scaling_benchmark.json
+	$(PYTHON) -m rca_pipeline.scaling_benchmark --sizes 500 --models STA,FullGraphGCN --train-threads 4 --skip-latency --resume --output-json results/scaling_benchmark.json
+	$(PYTHON) -m rca_pipeline.scaling_benchmark --latency-only --models STA,FullGraphGCN,LateGATv2 --output-json results/scaling_benchmark.json
 
 showcase:
 	bash showcase/make_showcase.sh

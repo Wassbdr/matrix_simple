@@ -9,7 +9,8 @@
 # Steps (all seeded, CPU only):
 #   1. python -m rca_pipeline.demo_incident build        (Sock Shop bundle + incident, seed 42, ~2 min)
 #      skipped when the committed bundle exists, unless FULL=1
-#   2. python -m rca_pipeline.scaling_benchmark          (N=14..500, seeds 42,123,7; ~2-3 h on 2 cores)
+#   2. python -m rca_pipeline.scaling_benchmark          (N=14..200 all models, N=500 STA + GCN,
+#      seeds 42,123,7, then latency N=14..2000; ~7 h on 4 cores, N=500 alone ~3 h)
 #      skipped when results/scaling_benchmark.json exists, unless FULL=1
 #   3. python showcase/figures.py                        (poster, latency chart, showcase.json)
 #   4. vhs showcase/demo.tape against a live uvicorn     (terminal part of the demo)
@@ -27,7 +28,12 @@ if [[ "${FULL:-0}" == 1 || ! -f examples/sockshop_demo/bundle/model.pt ]]; then
   python -m rca_pipeline.demo_incident build
 fi
 if [[ "${FULL:-0}" == 1 || ! -f results/scaling_benchmark.json ]]; then
-  OMP_NUM_THREADS=2 python -m rca_pipeline.scaling_benchmark --train-threads 2 \
+  rm -f results/scaling_benchmark.json
+  python -m rca_pipeline.scaling_benchmark --sizes 14,50,100,200 --train-threads 4 --skip-latency \
+    --output-json results/scaling_benchmark.json
+  python -m rca_pipeline.scaling_benchmark --sizes 500 --models STA,FullGraphGCN --train-threads 4 \
+    --skip-latency --resume --output-json results/scaling_benchmark.json
+  python -m rca_pipeline.scaling_benchmark --latency-only --models STA,FullGraphGCN,LateGATv2 \
     --output-json results/scaling_benchmark.json
 fi
 python showcase/figures.py

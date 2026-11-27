@@ -266,6 +266,9 @@ def main(argv=None) -> None:
     if args.latency_only:
         with open(args.output_json) as fh:
             out = json.load(fh)
+        out.setdefault("invocations", []).append(
+            " ".join(["python -m rca_pipeline.scaling_benchmark", *(argv or sys.argv[1:])])
+        )
     else:
         if args.train_threads:
             torch.set_num_threads(args.train_threads)

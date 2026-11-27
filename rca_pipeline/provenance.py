@@ -35,8 +35,7 @@ ARTIFACTS: List[Dict[str, str]] = [
     {
         "path": "results/scaling_benchmark.json",
         "status": "generated",
-        "generation_command": "python -m rca_pipeline.scaling_benchmark --train-threads 2 "
-        "--output-json results/scaling_benchmark.json",
+        "generation_command": "make scaling (three invocations, listed in `invocations`)",
     },
     {
         "path": "results/sockshop_demo_eval.json",
