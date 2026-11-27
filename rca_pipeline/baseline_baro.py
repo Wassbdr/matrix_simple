@@ -73,6 +73,27 @@ def _node_columns(df: pd.DataFrame, node: str, num_features: int) -> List[str]:
     return cols[:num_features]
 
 
+def baro_scores_from_arrays(normal: np.ndarray, anomalous: np.ndarray) -> np.ndarray:
+    """BARO on in-memory series: ``normal`` [N, F, T0] and ``anomalous`` [N, F, T1].
+
+    Same mechanism as :func:`baro_scores`: per node, the max RobustScaler
+    z-score of the anomalous period, scaled on that column's normal period.
+    """
+    if normal.shape[:2] != anomalous.shape[:2]:
+        raise ValueError(f"shape mismatch: normal={normal.shape} anomalous={anomalous.shape}")
+    normal = np.asarray(normal, dtype=np.float64)
+    anomalous = np.asarray(anomalous, dtype=np.float64)
+    # RobustScaler(): center = median, scale = IQR (25-75), IQR == 0 -> 1
+    center = np.median(normal, axis=2, keepdims=True)
+    q75, q25 = np.percentile(normal, [75, 25], axis=2, keepdims=True)
+    iqr = q75 - q25
+    iqr[iqr == 0] = 1.0
+    z = (anomalous - center) / iqr
+    scores = z.max(axis=(1, 2))
+    scores[~np.isfinite(scores)] = 0.0
+    return scores.astype(np.float32)
+
+
 def baro_scores(
     case_path: str, node_names: List[str], num_features: int
 ) -> Optional[np.ndarray]:
