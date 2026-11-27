@@ -93,15 +93,14 @@ def test_sta_tail_preserves_short_downward_deviation(tmp_path):
 
 def test_train_ticket_errors_distinguish_selector_and_ranking_misses():
     fields = {"method": "sta", "system": "tt", "answer": "a", "fault": "disk"}
-    rows = [{"suite": "re1", **fields}]
-    rows += [
+    rows = [
         {**fields, "suite": "re2", "ranks": ranks, "selector_hit": selected, "fault": fault}
         for ranks, selected, fault in [(["a"], True, "disk"), (["b"], False, "disk"), (["b", "a"], True, "socket")]
     ]
-    report = "\n".join(train_ticket_errors({"variant": "relative", "cases": rows}))
+    report = "\n".join(train_ticket_errors({"variant": "relative", "cases": rows}, {"disk"}))
     assert "| disk | 2 | 1 | 1 | 0 |" in report
     assert "| socket | 1 | 0 | 0 | 1 |" in report
-    assert "account for 1 of 2 misses" in report
+    assert "(socket) account for 1 of 2 misses" in report
 
 
 def test_change_prior_uses_unknown_metrics_without_changing_model_inputs(tmp_path):

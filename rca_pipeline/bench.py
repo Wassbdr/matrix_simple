@@ -102,7 +102,7 @@ def rows_for_report(records: list[dict], method: str, cohort: str) -> tuple:
     return (*metrics, f"{timing:.2f}", coverage)
 
 
-def train_ticket_errors(run: dict) -> list[str]:
+def train_ticket_errors(run: dict, re1_faults: set[str]) -> list[str]:
     grouped: dict[str, list[dict]] = defaultdict(list)
     for row in run["cases"]:
         if (row["method"], row["suite"], row["system"]) == ("sta", "re2", "tt"):
@@ -110,8 +110,8 @@ def train_ticket_errors(run: dict) -> list[str]:
     if not grouped:
         return []
     lines = [
-        "## RE2 Train Ticket errors", "",
-        f"STA variant: `{run['variant']}`. Counts include each case once per training seed.", "",
+        f"### `{run['variant']}`", "",
+        "Counts include each case once per training seed.", "",
         "| Fault | Attempts | Top-1 hits | Miss, root outside top-k | Miss, root inside top-k |",
         "|---|---:|---:|---:|---:|",
     ]
@@ -119,12 +119,13 @@ def train_ticket_errors(run: dict) -> list[str]:
         misses = [row for row in rows if not row["ranks"] or row["ranks"][0] != row["answer"]]
         inside = sum(row["selector_hit"] for row in misses)
         lines.append(f"| {fault} | {len(rows)} | {len(rows) - len(misses)} | {len(misses) - inside} | {inside} |")
-    re1_faults = {row["fault"] for row in run["cases"] if (row["suite"], row["system"]) == ("re1", "tt")}
-    unseen = [row for fault, rows in grouped.items() if fault not in re1_faults for row in rows]
     misses = sum(row["ranks"][:1] != [row["answer"]] for rows in grouped.values() for row in rows)
-    if re1_faults and unseen:
+    unseen_faults = grouped.keys() - re1_faults
+    if re1_faults and unseen_faults:
+        unseen = [row for fault in unseen_faults for row in grouped[fault]]
         unseen_misses = sum(row["ranks"][:1] != [row["answer"]] for row in unseen)
-        lines += ["", f"Fault types absent from RE1 account for {unseen_misses} of {misses} misses."]
+        names = ", ".join(sorted(unseen_faults))
+        lines += ["", f"Fault types absent from the RE1 cohort ({names}) account for {unseen_misses} of {misses} misses."]
     return [*lines, ""]
 
 
@@ -191,8 +192,23 @@ def summarize(outputs: list[dict], latest: dict) -> str:
             for fault, hits in sorted(missed.items()):
                 lines.append(f"| {fault} | {len(hits)} | {sum(hits)} |")
             lines.append("")
+    re1_faults = set(latest.get("re1_tt_faults", []))
     incumbent = next((run for run in outputs if run["variant"] == "relative"), latest)
-    lines.extend(train_ticket_errors(incumbent))
+    breakdown = train_ticket_errors(incumbent, re1_faults)
+    if incumbent is not latest:
+        breakdown += train_ticket_errors(latest, re1_faults)
+    if breakdown:
+        lines += ["## RE2 Train Ticket errors", "", *breakdown]
+        metrics = latest.get("tt_metric_families", {})
+        if "re2" in metrics:
+            new_metrics = ", ".join(sorted(set(metrics["re2"]) - set(metrics.get("re1", []))))
+            if new_metrics:
+                lines += [
+                    f"Train Ticket metric families present only in RE2: {new_metrics}. "
+                    "The fault breakdown does not attribute a miss to a metric family. "
+                    "The prior scores all available families together, so its gains do not isolate either family.",
+                    "",
+                ]
     by_variant = {out["variant"]: out for out in outputs}
     for i, out in enumerate(outputs):
         previous = by_variant.get(ITERATION_BASE.get(out["variant"], ""))
@@ -232,6 +248,7 @@ def run(args: argparse.Namespace) -> None:
         references(args, suites)
     torch.set_num_threads(1)
     records: list[dict] = []
+    tt_metric_families: dict[str, set[str]] = defaultdict(set)
     sampled_ids = {
         case.id for case in selected(cases, "circa", args.tt_limit, 42)
         if args.tt_limit and case.system == "tt"
@@ -241,10 +258,12 @@ def run(args: argparse.Namespace) -> None:
         holdout = [case for case in cases if (case.system, case.suite) == (system, "re2")]
         if not development:
             continue
-        prepared = {
-            case.id: prepare(case, *read_window(case, args.rows), args.variant)
-            for case in development + holdout
-        }
+        prepared = {}
+        for case in development + holdout:
+            frame, cutoff = read_window(case, args.rows)
+            if system == "tt":
+                tt_metric_families[case.suite].update(col.split("_", 1)[1] for col in frame.columns if "_" in col)
+            prepared[case.id] = prepare(case, frame, cutoff, args.variant)
         for seed in args.seeds:
             train, dev_test = group_split(development, seed)
             fitted = fit([prepared[c.id] for c in train], seed, args.epochs, args.variant)
@@ -280,6 +299,8 @@ def run(args: argparse.Namespace) -> None:
     output = {
         "cpu": cpu, "seeds": args.seeds, "rows": args.rows, "epochs": args.epochs,
         "tt_limit": args.tt_limit, "timeout": args.timeout, "variant": args.variant,
+        "re1_tt_faults": sorted({c.fault for c in cases if (c.suite, c.system) == ("re1", "tt")}),
+        "tt_metric_families": {suite: sorted(families) for suite, families in tt_metric_families.items()},
         "command": f"`make bench BENCH_ARGS='--variant {args.variant} --split {args.split} "
                    f"--seeds {seeded} --epochs {args.epochs} --rows {args.rows} "
                    f"--tt-limit {args.tt_limit} --timeout {args.timeout}'`",

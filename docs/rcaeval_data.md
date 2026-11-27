@@ -31,12 +31,13 @@ for file in utils/PCUtils/SkeletonDiscovery.py graph/GraphClass.py utils/Fas.py 
 done
 ```
 
-Run `make bench` in the STA environment. Outputs are `benchmarks/results.md` and `benchmarks/relative.json`; reference predictions are cached outside the checkout. The default is the frozen median and IQR design, selected on RE1 before running RE2. To regenerate the earlier experiments and the transfer result in order:
+Run `make bench` in the STA environment. Outputs are `benchmarks/results.md` and `benchmarks/prior.json`; reference predictions are cached outside the checkout. The default adds an all-metric change prior to the fitted median and IQR design. We tested the fixed prior on RE1 development with seeds 7, 42 and 123. No system lost mean AC@1 or Avg@5, so we froze it before scoring RE2 with the same seeds. To reproduce the experiments in order:
 
 ```sh
-for variant in baseline relative onset tails; do
+for variant in baseline relative onset tails prior; do
     make bench BENCH_ARGS="--split dev --variant $variant"
 done
+make bench BENCH_ARGS="--variant relative --split all"
 make bench
 ```
 
