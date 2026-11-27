@@ -1,7 +1,7 @@
 """Propagation prior for cascade failures (inference-time, model-agnostic).
 
 Documented failure mode (docs/SYNTHESE_FINALE.md §6.4): on multi-hop cascades
-the root cause has almost no local metric anomaly — symptoms explode on its
+the root cause has almost no local metric anomaly - symptoms explode on its
 neighbors (e.g. a delay injected on the orders → orders-db link makes
 ``orders``/``front-end`` scream while ``orders-db``, the actual root cause,
 stays quiet). Local-evidence models (STA's selector in particular) then rank
@@ -14,7 +14,7 @@ time (no retraining):
     p_final = (1 - gamma) * softmax(model_logits) + gamma * softmax(prior / tau)
 
 Validation discipline: any gamma > 0 must be checked against the full
-per-scenario breakdown — the boost must not degrade hard failures where the
+per-scenario breakdown - the boost must not degrade hard failures where the
 root cause is itself the loudest node.
 """
 

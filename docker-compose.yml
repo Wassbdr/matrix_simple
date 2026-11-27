@@ -1,0 +1,8 @@
+services:
+  rca-api:
+    build:
+      context: .
+      dockerfile: serving/Dockerfile
+    image: matrix-simple-rca:local
+    ports:
+      - "8080:8080"

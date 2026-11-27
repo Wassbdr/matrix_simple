@@ -240,7 +240,7 @@ def run_ablation(output_json: Optional[str] = None) -> Dict[str, Any]:
         k = cfg["k"]
         hidden = cfg["hidden"]
 
-        print_header(f"ABLATION STUDY — N={N}", char="#")
+        print_header(f"ABLATION STUDY - N={N}", char="#")
 
         # ---- Generate dataset (same seed=42 as main benchmark) ----
         print(f"\n  Generating BA({N}, m={cfg['ba_m']}) dataset...")
@@ -272,7 +272,7 @@ def run_ablation(output_json: Optional[str] = None) -> Dict[str, Any]:
         # A1: Full Late Bottleneck (reference)
         late_runs = []
         for _si, seed in enumerate(SEEDS):
-            print(f"\n  [A1] Late Bottleneck — seed {seed}")
+            print(f"\n  [A1] Late Bottleneck - seed {seed}")
             torch.manual_seed(seed)
             np.random.seed(seed)
             m = train_v1_compact(train_data, node_names, edge_index, device,
@@ -283,7 +283,7 @@ def run_ablation(output_json: Optional[str] = None) -> Dict[str, Any]:
         # A2: Full-Graph GCN / STGCN no GIB (reference)
         gcn_runs = []
         for _si, seed in enumerate(SEEDS):
-            print(f"\n  [A2] STGCN no GIB (FullGraphGCN) — seed {seed}")
+            print(f"\n  [A2] STGCN no GIB (FullGraphGCN) - seed {seed}")
             torch.manual_seed(seed)
             np.random.seed(seed)
             m = train_baseline_gcn(train_anom, edge_index, name_to_idx, N, F_,
@@ -294,7 +294,7 @@ def run_ablation(output_json: Optional[str] = None) -> Dict[str, Any]:
         # A3: Spatial-only GCN (no temporal conv)
         spatial_runs = []
         for _si, seed in enumerate(SEEDS):
-            print(f"\n  [A3] Spatial-only GCN (no temporal) — seed {seed}")
+            print(f"\n  [A3] Spatial-only GCN (no temporal) - seed {seed}")
             torch.manual_seed(seed)
             np.random.seed(seed)
             m = SpatialOnlyGCN(F_, hidden, N)
@@ -306,7 +306,7 @@ def run_ablation(output_json: Optional[str] = None) -> Dict[str, Any]:
         # A4: Temporal-only (no GCN)
         temporal_runs = []
         for _si, seed in enumerate(SEEDS):
-            print(f"\n  [A4] Temporal-only (no GCN) — seed {seed}")
+            print(f"\n  [A4] Temporal-only (no GCN) - seed {seed}")
             torch.manual_seed(seed)
             np.random.seed(seed)
             m = TemporalOnlyModel(F_, hidden, N)
@@ -322,7 +322,7 @@ def run_ablation(output_json: Optional[str] = None) -> Dict[str, Any]:
             "A3: Spatial-only GCN (no temporal)": aggregate_seeds(spatial_runs),
             "A4: Temporal-only (no GCN)": aggregate_seeds(temporal_runs),
         }
-        print_results_table(results_a, f"ABLATION A — Component Decomposition (N={N})")
+        print_results_table(results_a, f"ABLATION A - Component Decomposition (N={N})")
         all_results[f"A_N{N}"] = results_a
 
         # ==============================================================
@@ -333,7 +333,7 @@ def run_ablation(output_json: Optional[str] = None) -> Dict[str, Any]:
         # B2: Late BN supervised only (no contrastive pretraining)
         late_nosup_runs = []
         for _si, seed in enumerate(SEEDS):
-            print(f"\n  [B2] Late BN no contrastive — seed {seed}")
+            print(f"\n  [B2] Late BN no contrastive - seed {seed}")
             torch.manual_seed(seed)
             np.random.seed(seed)
             m = train_v1_compact(train_data, node_names, edge_index, device,
@@ -345,7 +345,7 @@ def run_ablation(output_json: Optional[str] = None) -> Dict[str, Any]:
             "B1: Late BN full (contrastive+sup)": aggregate_seeds(late_runs),
             "B2: Late BN supervised only": aggregate_seeds(late_nosup_runs),
         }
-        print_results_table(results_b, f"ABLATION B — Late BN Training Protocol (N={N})")
+        print_results_table(results_b, f"ABLATION B - Late BN Training Protocol (N={N})")
         all_results[f"B_N{N}"] = results_b
 
         # ==============================================================
@@ -361,7 +361,7 @@ def run_ablation(output_json: Optional[str] = None) -> Dict[str, Any]:
             for k_val in k_values:
                 runs = []
                 for _si, seed in enumerate(SEEDS):
-                    print(f"\n  [C] STA k={k_val} — seed {seed}")
+                    print(f"\n  [C] STA k={k_val} - seed {seed}")
                     torch.manual_seed(seed)
                     np.random.seed(seed)
                     m = train_sta_compact(
@@ -373,16 +373,16 @@ def run_ablation(output_json: Optional[str] = None) -> Dict[str, Any]:
                     runs.append(eval_sta(m, test_anom, edge_index, name_to_idx, device))
                 sta_k_results[f"STA k={k_val} ({k_val}% nodes)"] = aggregate_seeds(runs)
 
-            print_results_table(sta_k_results, f"ABLATION C — STA k-Sensitivity (N={N})")
+            print_results_table(sta_k_results, f"ABLATION C - STA k-Sensitivity (N={N})")
             all_results["C"] = sta_k_results
 
             # D: STA training protocol
             print_header(f"D. STA TRAINING PROTOCOL (N={N})", char="-")
 
-            # D1: reference (full STA k=10) — reuse from C
+            # D1: reference (full STA k=10) - reuse from C
             sta_ref_runs = []
             for _si, seed in enumerate(SEEDS):
-                print(f"\n  [D1] STA full (warmup + k-anneal) — seed {seed}")
+                print(f"\n  [D1] STA full (warmup + k-anneal) - seed {seed}")
                 torch.manual_seed(seed)
                 np.random.seed(seed)
                 m = train_sta_compact(
@@ -396,7 +396,7 @@ def run_ablation(output_json: Optional[str] = None) -> Dict[str, Any]:
             # D2: STA no contrastive warmup
             sta_nowarmup_runs = []
             for _si, seed in enumerate(SEEDS):
-                print(f"\n  [D2] STA no warmup — seed {seed}")
+                print(f"\n  [D2] STA no warmup - seed {seed}")
                 torch.manual_seed(seed)
                 np.random.seed(seed)
                 m = train_sta_compact(
@@ -410,7 +410,7 @@ def run_ablation(output_json: Optional[str] = None) -> Dict[str, Any]:
             # D3: STA no k-annealing (start directly at target k)
             sta_noanneal_runs = []
             for _si, seed in enumerate(SEEDS):
-                print(f"\n  [D3] STA no k-annealing — seed {seed}")
+                print(f"\n  [D3] STA no k-annealing - seed {seed}")
                 torch.manual_seed(seed)
                 np.random.seed(seed)
                 m = train_sta_compact(
@@ -426,13 +426,13 @@ def run_ablation(output_json: Optional[str] = None) -> Dict[str, Any]:
                 "D2: STA no warmup": aggregate_seeds(sta_nowarmup_runs),
                 "D3: STA no k-annealing": aggregate_seeds(sta_noanneal_runs),
             }
-            print_results_table(results_d, f"ABLATION D — STA Training Protocol (N={N}, k={k})")
+            print_results_table(results_d, f"ABLATION D - STA Training Protocol (N={N}, k={k})")
             all_results["D"] = results_d
 
     # ==============================================================
     # SUMMARY
     # ==============================================================
-    print_header("ABLATION STUDY — SUMMARY", char="*")
+    print_header("ABLATION STUDY - SUMMARY", char="*")
 
     print("\n  KEY FINDINGS:\n")
     print("  A. Component Decomposition:")

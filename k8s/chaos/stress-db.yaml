@@ -1,5 +1,5 @@
 ##############################################
-# Expérience 1 : StressChaos — Saturation CPU
+# Expérience 1 : StressChaos - Saturation CPU
 # Cible : Pod de la base de données
 ##############################################
 apiVersion: chaos-mesh.org/v1alpha1
@@ -24,7 +24,7 @@ spec:
   duration: "3m"
 ---
 ##############################################
-# Expérience 2 : PodChaos — Kill du pod DB
+# Expérience 2 : PodChaos - Kill du pod DB
 # Cible : Pod de la base de données
 ##############################################
 apiVersion: chaos-mesh.org/v1alpha1

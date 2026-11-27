@@ -1,5 +1,5 @@
 """
-Scaled Simulated RCA Dataset — 20-node microservice architecture.
+Scaled Simulated RCA Dataset - 20-node microservice architecture.
 
 Topology: realistic 3-tier K8S architecture with 20 services.
     Tier 1 (Gateways):    gateway-web, gateway-mobile, gateway-admin

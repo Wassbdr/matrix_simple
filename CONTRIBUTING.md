@@ -1,6 +1,6 @@
 # Contributing
 
-New to the project? Read [`HANDOVER.md`](HANDOVER.md) first — it explains how to
+New to the project? Read [`HANDOVER.md`](HANDOVER.md) first - it explains how to
 install, what is reproducible offline, and where the canonical results live.
 
 ## Running the test suite
@@ -27,7 +27,7 @@ and rules `E, F, I, UP, B`. Fix errors before opening a PR. `pre-commit install`
 ## Code conventions
 
 - Python ≥ 3.9. Torch + `torch_geometric` for the GNN layers.
-- **No dependency that is not declared in `pyproject.toml`** — it is the single
+- **No dependency that is not declared in `pyproject.toml`** - it is the single
   source of truth, there is no `requirements.txt` to keep in sync.
 - Default seeds: `42, 123, 7, 1337, 2025`. Default simulated sizes: `20, 50, 100`.
   Changing either invalidates comparison with the published tables.
@@ -37,13 +37,13 @@ and rules `E, F, I, UP, B`. Fix errors before opening a PR. `pre-commit install`
 
 ## Guardrails
 
-These are not style preferences — breaking one of them silently invalidates a
+These are not style preferences - breaking one of them silently invalidates a
 published result.
 
 - **`--sta-contrastive-warmup 0` on every real-world benchmark.** With
   `warmup = 10`, TrainTicket Avg@1 collapses from 73.3 % to 0.0 % (3 seeds,
   20 cases). Evidence: `results_transmission/warmup_real_trainticket_w{0,10}.json`.
-  The guardrail is enforced at config-load time — do not weaken it.
+  The guardrail is enforced at config-load time - do not weaken it.
 - **Never modify `results_transmission/canonical_results_manifest.json*`.** It is
   the frozen defense artifact; its SHA-256 is what makes the published numbers
   verifiable. Regenerating results means writing a *new* file, not editing this one.

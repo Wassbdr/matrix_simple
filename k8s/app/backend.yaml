@@ -1,5 +1,5 @@
 ##############################################
-# Backend FastAPI — ConfigMap + Deployment + Service
+# Backend FastAPI - ConfigMap + Deployment + Service
 ##############################################
 apiVersion: v1
 kind: ConfigMap

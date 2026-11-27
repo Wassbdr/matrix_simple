@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run_publication_suite.sh — Single entry point that produces every result
+# run_publication_suite.sh - Single entry point that produces every result
 # cited in the paper, in publication-grade configuration.
 #
 # Phases (each idempotent, skipped if output already exists unless --force):
@@ -11,7 +11,7 @@
 #   5. ObservIT MM : sock-shop cluster + Loki logs (requires Loki port-forward)
 #   6. Post        : SHA256 + canonical manifest + summary
 #
-# Runtime: ~5–6 h on CPU (skip phases 4–5 if cluster unavailable: ~4 h).
+# Runtime: ~5-6 h on CPU (skip phases 4-5 if cluster unavailable: ~4 h).
 #
 # Usage:
 #   bash scripts/run_publication_suite.sh                  # full run
@@ -108,7 +108,7 @@ print_summary() {
 trap 'err "Interrupted at line $LINENO"; print_summary; exit 130' INT TERM
 
 log "============================================================"
-log "STA RCA — Publication Result Suite"
+log "STA RCA - Publication Result Suite"
 log "  timestamp     : $TS"
 log "  seeds         : $SEEDS"
 log "  output dir    : $OUT_DIR/"
@@ -135,17 +135,17 @@ if run_phase_p 0; then
     if python -m ruff check rca_pipeline >"$LOG_DIR/00_ruff.log" 2>&1; then
       ok "ruff: clean"
     else
-      err "ruff failed — see $LOG_DIR/00_ruff.log"; exit 1
+      err "ruff failed - see $LOG_DIR/00_ruff.log"; exit 1
     fi
     if python -m pytest -q rca_pipeline/tests >"$LOG_DIR/00_pytest.log" 2>&1; then
       ok "pytest: $(grep -oE '[0-9]+ passed' "$LOG_DIR/00_pytest.log" | head -1)"
     else
-      err "pytest failed — see $LOG_DIR/00_pytest.log"; exit 1
+      err "pytest failed - see $LOG_DIR/00_pytest.log"; exit 1
     fi
     if bash scripts/pre_publish_audit.sh >"$LOG_DIR/00_audit.log" 2>&1; then
       ok "pre-publish audit: passed"
     else
-      warn "audit reported issues — see $LOG_DIR/00_audit.log"
+      warn "audit reported issues - see $LOG_DIR/00_audit.log"
     fi
   fi
 
@@ -245,13 +245,13 @@ observit_preflight() {
     warn "ObservIT phases skipped (--skip-observit)"; return 1
   fi
   if ! command -v kubectl >/dev/null 2>&1; then
-    warn "kubectl not found — skipping ObservIT phases"; return 1
+    warn "kubectl not found - skipping ObservIT phases"; return 1
   fi
   if ! kubectl get ns sock-shop >/dev/null 2>&1; then
-    warn "namespace sock-shop unreachable — skipping ObservIT phases"; return 1
+    warn "namespace sock-shop unreachable - skipping ObservIT phases"; return 1
   fi
   if [[ ! -d "$OBSERVIT_DATA" ]] || ! ls "$OBSERVIT_DATA"/*.csv >/dev/null 2>&1; then
-    warn "$OBSERVIT_DATA contains no CSVs — skipping ObservIT phases"
+    warn "$OBSERVIT_DATA contains no CSVs - skipping ObservIT phases"
     warn "  Generate first: bash scripts/run_sockshop_campaign.sh"
     return 1
   fi
@@ -291,7 +291,7 @@ if run_phase_p 5 && observit_preflight; then
       LOKI_PF_PID=$!
       sleep 4
       if ! curl -sf "$LOKI_URL/ready" >/dev/null 2>&1; then
-        warn "Loki not reachable at $LOKI_URL — skipping Phase 5"
+        warn "Loki not reachable at $LOKI_URL - skipping Phase 5"
         cleanup_loki_pf
         LOKI_PF_PID=""
       else

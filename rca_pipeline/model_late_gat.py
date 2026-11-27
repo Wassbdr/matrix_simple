@@ -10,10 +10,10 @@ Why GATv2 over GIB at N=100:
     With 100 root-cause classes the causal sub-graph spans multiple hops,
     making a single-node constraint detrimental (ablation: +/-9% variance).
     GATv2 lets the model learn a soft, differentiable importance distribution
-    without any L1/L0 sparsity constraint — the network learns which nodes
+    without any L1/L0 sparsity constraint - the network learns which nodes
     matter contextually. This is the approach of DynaCausal (ICSE 2025).
 
-Design Decision — Why no GIB in GATv2:
+Design Decision - Why no GIB in GATv2:
     GIB (Graph Information Bottleneck) uses a Bernoulli mask to enforce
     explicit sparsity on node representations. GATv2's attention mechanism
     already provides implicit sparsity through learned attention weights.
@@ -117,7 +117,7 @@ class GATv2SpatialBlock(nn.Module):
             edge_index: [2, E]
         Returns:
             h_out:       [total_nodes, hidden_dim]
-            attn_w:      [E] — average attention weight per edge (for interpretability)
+            attn_w:      [E] - average attention weight per edge (for interpretability)
         """
         residual = h
         h1, a1 = self.gat1(h, edge_index, return_attention_weights=True)
@@ -146,11 +146,11 @@ def compute_node_importance(
     (i.e., root causes in a dependency cascade).
 
     Args:
-        edge_index:   [2, E] — edge_index[1] are destination nodes
-        attn_weights: [E]    — per-edge attention weights
+        edge_index:   [2, E] - edge_index[1] are destination nodes
+        attn_weights: [E]    - per-edge attention weights
         num_nodes:    N
     Returns:
-        importance: [N] — aggregated incoming attention per node
+        importance: [N] - aggregated incoming attention per node
     """
     importance = torch.zeros(num_nodes, device=attn_weights.device)
     dst = edge_index[1]

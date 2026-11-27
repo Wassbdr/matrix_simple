@@ -86,7 +86,7 @@ def evaluate(
         logger.error("No anomalous windows with root cause labels found.")
         return
 
-    # Stratified split with shuffle (order-independent) — evaluate on the test split.
+    # Stratified split with shuffle (order-independent) - evaluate on the test split.
     # We split over anomalous windows only for checkpoint evaluation.
     _, test_anomalies = stratified_split_shuffle(
         anomalies,

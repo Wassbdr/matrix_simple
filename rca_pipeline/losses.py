@@ -102,8 +102,8 @@ def asymmetric_gib_loss(
           dominating at large N where max_entropy grows.
 
     Args:
-        probs_healthy:   shape [batch_h, num_nodes, 1] — mask probs for healthy windows
-        probs_anomalous: shape [batch_a, num_nodes, 1] — mask probs for anomalous windows
+        probs_healthy:   shape [batch_h, num_nodes, 1] - mask probs for healthy windows
+        probs_anomalous: shape [batch_a, num_nodes, 1] - mask probs for anomalous windows
         target_sparsity: desired mean activation for anomalous masks (e.g. 1/N)
 
     Returns:
@@ -238,4 +238,3 @@ def multi_root_cause_metrics(
         f"set_recall@{k}": recall,
         "exact_match_ratio": exact_match,
     }
-

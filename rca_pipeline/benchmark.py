@@ -65,20 +65,14 @@ logger = logging.getLogger(__name__)
 
 from rca_pipeline.metrics_rcaeval import RCAEvalMetrics
 
-# =====================================================================
-# Reference Top-1 (multi-seed means) for regression alerts
-# =====================================================================
-
-# Calibrated from benchmark_full.json (3 seeds: 42, 123, 7) — honest multi-seed means.
-# Previous values (0.93–0.98) were from non-reproducible single-run conditions.
-REFERENCE_TOP1 = {
+REGRESSION_REFERENCE_TOP1 = {
     "FullGraphGCN": {20: 0.731, 50: 0.260, 100: 0.253},
     "LateBN_GIB":   {20: 0.702, 50: 0.273, 100: 0.229},
     "STA":          {20: 0.300, 50: 0.183, 100: 0.067},
     "LateBN_GAT":   {20: 0.676, 50: 0.083, 100: 0.188},
 }
 
-REFERENCE_TOP1_STD = {
+REGRESSION_REFERENCE_TOP1_STD = {
     "FullGraphGCN": {20: 0.030, 50: 0.036, 100: 0.033},
     "LateBN_GIB":   {20: 0.033, 50: 0.029, 100: 0.070},
     "STA":          {20: 0.122, 50: 0.085, 100: 0.031},
@@ -87,10 +81,10 @@ REFERENCE_TOP1_STD = {
 
 
 def _regression_flag(model_key: str, n: int, top1: float, threshold: float = 0.005) -> bool:
-    ref = REFERENCE_TOP1.get(model_key, {}).get(n)
+    ref = REGRESSION_REFERENCE_TOP1.get(model_key, {}).get(n)
     if ref is None:
         return False
-    std = REFERENCE_TOP1_STD.get(model_key, {}).get(n, 0.05)
+    std = REGRESSION_REFERENCE_TOP1_STD.get(model_key, {}).get(n, 0.05)
     return (ref - top1) > max(threshold, 2.0 * std)
 
 
@@ -260,7 +254,7 @@ def train_baseline_mlp(train_anom, name_to_idx, N, hidden_dim=64, epochs=150,
                        batch_size=256, seed=42):
     set_all_seeds(seed)
     # Per-node temporal statistics (mean, std, max) instead of raw flatten
-    # Reduces input from N*F*W to N*F*3 — much less overfitting
+    # Reduces input from N*F*W to N*F*3 - much less overfitting
     def extract_features(data_list):
         feats = []
         for d in data_list:
@@ -509,7 +503,7 @@ def train_v1_compact(
             degen_thresh = max(5.0 / N, 0.05)
             if epoch == 50 and train_acc < degen_thresh and not skip_degenerate_check:
                 # Keep training; use EarlyStopping (MRR patience) only.
-                print(f"    [V1-Phase2] ⚠️  Epoch 50 acc={train_acc:.3f} < {degen_thresh:.3f} — "
+                print(f"    [V1-Phase2] WARNING  Epoch 50 acc={train_acc:.3f} < {degen_thresh:.3f} - "
                       f"slow/degenerate-looking convergence (no restart).")
 
             if epoch % 30 == 0 or epoch == supervised_epochs - 1:
@@ -698,7 +692,7 @@ def train_gat_compact(
             degen_thresh = max(5.0 / N, 0.05)
             if epoch == 50 and train_acc < degen_thresh and not skip_degenerate_check:
                 # Keep training; use EarlyStopping (MRR patience) only.
-                print(f"    [GAT-Phase2] ⚠️  Epoch 50 acc={train_acc:.3f} < {degen_thresh:.3f} — "
+                print(f"    [GAT-Phase2] WARNING  Epoch 50 acc={train_acc:.3f} < {degen_thresh:.3f} - "
                       f"slow/degenerate-looking convergence (no restart).")
 
             if epoch % 30 == 0 or epoch == supervised_epochs - 1:
@@ -827,7 +821,7 @@ def train_sta_compact(
 
                 optimizer.zero_grad()
 
-                # Full forward — InfoNCE guided by mask-weighted embeddings
+                # Full forward - InfoNCE guided by mask-weighted embeddings
                 _, M_a, _, _ = model(x_anchor[idx_h], ei)
                 x_pos_aug = augment_positive(x_positive[idx_h], noise_sigma=0.05,
                                              jitter_shift=1, feature_mask_ratio=0.1)
@@ -912,7 +906,7 @@ def train_sta_compact(
 
             logits_full, M_soft, top_k, sel_logits = model(x_b, ei)
 
-            # Primary: CE on selector logits (covers all N — main learning signal)
+            # Primary: CE on selector logits (covers all N - main learning signal)
             loss_sel = F.cross_entropy(sel_logits, y_b)
 
             # Secondary: CE on scorer output (only when RC in top-k)
@@ -938,7 +932,7 @@ def train_sta_compact(
 
         degen_thresh = max(5.0 / N, 0.05)
         if epoch == 50 and train_acc < degen_thresh and not skip_degenerate_check:
-            print(f"    [STA-Phase2] ⚠️  Epoch 50 acc={train_acc:.3f} < {degen_thresh:.3f} — "
+            print(f"    [STA-Phase2] WARNING  Epoch 50 acc={train_acc:.3f} < {degen_thresh:.3f} - "
                   f"slow/degenerate-looking convergence (no restart).")
 
         if epoch % 30 == 0 or epoch == supervised_epochs - 1:
@@ -1139,7 +1133,7 @@ def print_results_table(results: Dict[str, dict], title: str):
         if m.get("missing_runs") or m.get("top1") is None:
             print(f"  {name:<38} | {'N/A':>7} | {'N/A':>7} | {'N/A':>7} | {'N/A':>7}"
                   + (f" | {'N/A':>7}" if has_sel else "")
-                  + (f" | {'N/A':>9} | {'—':>9}" if has_lat else ""))
+                  + (f" | {'N/A':>9} | {'-':>9}" if has_lat else ""))
             continue
         if has_std and "top1_std" in m:
             row = (f"  {name:<38} | {m['top1']:.4f}" + (f"\u00b1{m['top1_std']:.3f}" if m.get('top1_std') else "") +
@@ -1412,7 +1406,7 @@ def main(args):
                 print(f"  Late Bottleneck training completed in {time.time()-t0:.1f}s")
                 late_runs.append(eval_v1(late_model, test_anom, edge_index, name_to_idx, device))
             except RuntimeError as e:
-                print(f"  ⚠️  Late BN failed: {e}")
+                print(f"  WARNING  Late BN failed: {e}")
 
             # ---- Late Bottleneck GATv2 ----
             if not args.skip_late_gat:
@@ -1431,7 +1425,7 @@ def main(args):
                     print(f"  Late GAT training completed in {time.time()-t0:.1f}s")
                     gat_runs.append(eval_gat(gat_model, test_anom, edge_index, name_to_idx, device))
                 except RuntimeError as e:
-                    print(f"  ⚠️  Late GAT failed: {e}")
+                    print(f"  WARNING  Late GAT failed: {e}")
 
             # ---- Baselines ----
             print("\n  -- Training Full-Graph GCN baseline --")
@@ -1484,7 +1478,7 @@ def main(args):
         print_results_table(results, f"RESULTS FOR N={N} (mean over {NUM_SEEDS} seeds)")
 
         # Regression vs reference Top-1
-        print("\n  --- Regression check (vs reference Top-1, Δ>0.5% triggers ⚠️) ---")
+        print("\n  Regression check against historical calibration")
         short_map = {
             f"STA Select-then-Analyze (k={k})": "STA",
             f"Late Bottleneck STGCN+GIB (N={N})": "LateBN_GIB",
@@ -1493,17 +1487,17 @@ def main(args):
         }
         for disp, m in results.items():
             sk = short_map.get(disp)
-            if sk is None or sk not in REFERENCE_TOP1 or N not in REFERENCE_TOP1[sk]:
+            if sk is None or sk not in REGRESSION_REFERENCE_TOP1 or N not in REGRESSION_REFERENCE_TOP1[sk]:
                 continue
-            ref = REFERENCE_TOP1[sk][N]
+            ref = REGRESSION_REFERENCE_TOP1[sk][N]
             top1 = m.get("top1")
             if m.get("missing_runs") or top1 is None:
-                print(f"  — {disp}: no metric (run missing or training failed)")
+                print(f"  {disp}: no metric (run missing or training failed)")
                 continue
             if _regression_flag(sk, N, top1):
-                print(f"  ⚠️  {disp}: Top-1={top1:.4f} ref={ref:.4f} (regression > 0.5%)")
+                print(f"  REGRESSION {disp}: Top-1={top1:.4f} calibration={ref:.4f}")
             else:
-                print(f"  OK {disp}: Top-1={top1:.4f} ref={ref:.4f}")
+                print(f"  OK {disp}: Top-1={top1:.4f} calibration={ref:.4f}")
 
         json_runs.append({
             "N": N,
@@ -1530,7 +1524,7 @@ def main(args):
                 "cascade_loss_weight": args.cascade_loss_weight,
                 "graph_type": getattr(args, "graph_type", "structural"),
             },
-            "reference_top1": {m: REFERENCE_TOP1[m].get(N) for m in REFERENCE_TOP1},
+            "reference_top1": {m: values.get(N) for m, values in REGRESSION_REFERENCE_TOP1.items()},
             "normalization": {
                 "enabled": bool(not args.no_normalize),
                 "train_only": True,
@@ -1556,7 +1550,7 @@ def main(args):
     if getattr(args, "output_json", None):
         out_path = args.output_json
         with open(out_path, "w", encoding="utf-8") as f:
-            json.dump({"runs": json_runs, "reference_top1": REFERENCE_TOP1}, f, indent=2)
+            json.dump({"runs": json_runs, "reference_top1": REGRESSION_REFERENCE_TOP1}, f, indent=2)
         print(f"\n  Wrote JSON results to {out_path}")
 
     print_header("BENCHMARK COMPLETE", char="*")

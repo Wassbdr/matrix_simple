@@ -1,5 +1,5 @@
 """
-log_feature_extractor.py — 8 features from log text (Chain-of-Event FSE 2024).
+log_feature_extractor.py - 8 features from log text (Chain-of-Event FSE 2024).
 
 Features per node per window:
     0. error_freq:     count of ERROR/FATAL lines / total lines

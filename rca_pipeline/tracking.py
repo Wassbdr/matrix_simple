@@ -1,4 +1,4 @@
-"""Thin MLflow wrapper — a complete no-op when MLflow is unconfigured.
+"""Thin MLflow wrapper - a complete no-op when MLflow is unconfigured.
 
 Design goal: research and CI must stay offline-capable. Nothing in the
 training/benchmark code may hard-depend on an MLflow server. So:
@@ -110,7 +110,7 @@ def register_model(
     """Log the bundle dir as an artifact and register it as a model version.
 
     The bundle format (model.pt / scaler.pt / metadata.json) *is* the
-    artifact — we deliberately do not wrap it in mlflow.pyfunc. Returns the
+    artifact - we deliberately do not wrap it in mlflow.pyfunc. Returns the
     new version string, or None when tracking is disabled.
     """
     if not is_enabled():

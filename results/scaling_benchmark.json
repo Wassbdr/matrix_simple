@@ -1,0 +1,748 @@
+{
+  "benchmark": "scaling_sta_vs_full_graph",
+  "accuracy": [
+    {
+      "N": 14,
+      "k": 5,
+      "num_samples": 3000,
+      "n_test_incidents": 256,
+      "seeds": [
+        42,
+        123,
+        7
+      ],
+      "epochs": 60,
+      "random_top1": 0.07142857142857142,
+      "models": {
+        "STA": {
+          "top1_mean": 0.7213541666666666,
+          "top1_std": 0.009207119546699838,
+          "mrr_mean": 0.7934073991691178,
+          "mrr_std": 0.010339789353876768,
+          "train_seconds_mean": 9.08648912111918,
+          "runs": [
+            {
+              "seed": 42,
+              "top1": 0.71484375,
+              "mrr": 0.7921519344370906,
+              "top3": 0.8359375
+            },
+            {
+              "seed": 123,
+              "top1": 0.734375,
+              "mrr": 0.8066519743277556,
+              "top3": 0.83984375
+            },
+            {
+              "seed": 7,
+              "top1": 0.71484375,
+              "mrr": 0.7814182887425073,
+              "top3": 0.80859375
+            }
+          ]
+        },
+        "FullGraphGCN": {
+          "top1_mean": 0.6106770833333334,
+          "top1_std": 0.01948779888944761,
+          "mrr_mean": 0.6977433373917746,
+          "mrr_std": 0.01676398469690081,
+          "train_seconds_mean": 5.739616632461548,
+          "runs": [
+            {
+              "seed": 42,
+              "top1": 0.60546875,
+              "mrr": 0.6927511073995445,
+              "top3": 0.703125
+            },
+            {
+              "seed": 123,
+              "top1": 0.58984375,
+              "mrr": 0.6801682041916415,
+              "top3": 0.69921875
+            },
+            {
+              "seed": 7,
+              "top1": 0.63671875,
+              "mrr": 0.7203107005841378,
+              "top3": 0.74609375
+            }
+          ]
+        },
+        "LateGATv2": {
+          "top1_mean": 0.7005208333333334,
+          "top1_std": 0.057084141189538994,
+          "mrr_mean": 0.7792698259495131,
+          "mrr_std": 0.047444686955937,
+          "train_seconds_mean": 12.008016665776571,
+          "runs": [
+            {
+              "seed": 42,
+              "top1": 0.68359375,
+              "mrr": 0.7678956026612276,
+              "top3": 0.8125
+            },
+            {
+              "seed": 123,
+              "top1": 0.77734375,
+              "mrr": 0.8422235750360749,
+              "top3": 0.89453125
+            },
+            {
+              "seed": 7,
+              "top1": 0.640625,
+              "mrr": 0.7276903001512371,
+              "top3": 0.75390625
+            }
+          ]
+        }
+      }
+    },
+    {
+      "N": 50,
+      "k": 8,
+      "num_samples": 3000,
+      "n_test_incidents": 251,
+      "seeds": [
+        42,
+        123,
+        7
+      ],
+      "epochs": 60,
+      "random_top1": 0.02,
+      "models": {
+        "STA": {
+          "top1_mean": 0.5936254980079682,
+          "top1_std": 0.028171584907830553,
+          "mrr_mean": 0.6393128978499918,
+          "mrr_std": 0.023661985295902997,
+          "train_seconds_mean": 25.38726496696472,
+          "runs": [
+            {
+              "seed": 42,
+              "top1": 0.6334661354581673,
+              "mrr": 0.6727641787985759,
+              "top3": 0.6693227091633466
+            },
+            {
+              "seed": 123,
+              "top1": 0.5737051792828686,
+              "mrr": 0.6233574355300684,
+              "top3": 0.6215139442231076
+            },
+            {
+              "seed": 7,
+              "top1": 0.5737051792828686,
+              "mrr": 0.6218170792213311,
+              "top3": 0.6294820717131474
+            }
+          ]
+        },
+        "FullGraphGCN": {
+          "top1_mean": 0.20982735723771576,
+          "top1_std": 0.11465677393970453,
+          "mrr_mean": 0.2933236604630537,
+          "mrr_std": 0.11009621683445145,
+          "train_seconds_mean": 15.70885944366455,
+          "runs": [
+            {
+              "seed": 42,
+              "top1": 0.33067729083665337,
+              "mrr": 0.3918506727996637,
+              "top3": 0.3904382470119522
+            },
+            {
+              "seed": 123,
+              "top1": 0.24302788844621515,
+              "mrr": 0.3484684217926051,
+              "top3": 0.32669322709163345
+            },
+            {
+              "seed": 7,
+              "top1": 0.055776892430278883,
+              "mrr": 0.1396518867968922,
+              "top3": 0.09561752988047809
+            }
+          ]
+        },
+        "LateGATv2": {
+          "top1_mean": 0.5351925630810093,
+          "top1_std": 0.03159462749899157,
+          "mrr_mean": 0.5854802593290672,
+          "mrr_std": 0.030478301785146843,
+          "train_seconds_mean": 39.4607515335083,
+          "runs": [
+            {
+              "seed": 42,
+              "top1": 0.5776892430278885,
+              "mrr": 0.6275477126728917,
+              "top3": 0.6414342629482072
+            },
+            {
+              "seed": 123,
+              "top1": 0.5258964143426295,
+              "mrr": 0.5725790197572734,
+              "top3": 0.5856573705179283
+            },
+            {
+              "seed": 7,
+              "top1": 0.50199203187251,
+              "mrr": 0.5563140455570366,
+              "top3": 0.5617529880478087
+            }
+          ]
+        }
+      }
+    },
+    {
+      "N": 100,
+      "k": 15,
+      "num_samples": 3000,
+      "n_test_incidents": 281,
+      "seeds": [
+        42,
+        123,
+        7
+      ],
+      "epochs": 60,
+      "random_top1": 0.01,
+      "models": {
+        "STA": {
+          "top1_mean": 0.5907473309608541,
+          "top1_std": 0.01905382966098339,
+          "mrr_mean": 0.6298213802687402,
+          "mrr_std": 0.01000610130026442,
+          "train_seconds_mean": 75.46021286646526,
+          "runs": [
+            {
+              "seed": 42,
+              "top1": 0.6156583629893239,
+              "mrr": 0.6439664263707067,
+              "top3": 0.6441281138790036
+            },
+            {
+              "seed": 123,
+              "top1": 0.5871886120996441,
+              "mrr": 0.623097207510799,
+              "top3": 0.6227758007117438
+            },
+            {
+              "seed": 7,
+              "top1": 0.5693950177935944,
+              "mrr": 0.6224005069247149,
+              "top3": 0.6512455516014235
+            }
+          ]
+        },
+        "FullGraphGCN": {
+          "top1_mean": 0.13167259786476868,
+          "top1_std": 0.05041169480634823,
+          "mrr_mean": 0.22146750146547026,
+          "mrr_std": 0.05853548013343148,
+          "train_seconds_mean": 51.228759368260704,
+          "runs": [
+            {
+              "seed": 42,
+              "top1": 0.20284697508896798,
+              "mrr": 0.30424457593816584,
+              "top3": 0.2846975088967972
+            },
+            {
+              "seed": 123,
+              "top1": 0.09252669039145907,
+              "mrr": 0.1793235782460742,
+              "top3": 0.12455516014234876
+            },
+            {
+              "seed": 7,
+              "top1": 0.099644128113879,
+              "mrr": 0.18083435021217079,
+              "top3": 0.12455516014234876
+            }
+          ]
+        },
+        "LateGATv2": {
+          "top1_mean": 0.538552787663108,
+          "top1_std": 0.05666700314351692,
+          "mrr_mean": 0.5828601402142252,
+          "mrr_std": 0.055711584677035825,
+          "train_seconds_mean": 148.9551578362783,
+          "runs": [
+            {
+              "seed": 42,
+              "top1": 0.608540925266904,
+              "mrr": 0.6531505919880287,
+              "top3": 0.6654804270462633
+            },
+            {
+              "seed": 123,
+              "top1": 0.5373665480427047,
+              "mrr": 0.5785387734775943,
+              "top3": 0.5765124555160143
+            },
+            {
+              "seed": 7,
+              "top1": 0.4697508896797153,
+              "mrr": 0.5168910551770524,
+              "top3": 0.5302491103202847
+            }
+          ]
+        }
+      }
+    },
+    {
+      "N": 200,
+      "k": 20,
+      "num_samples": 6000,
+      "n_test_incidents": 562,
+      "seeds": [
+        42,
+        123,
+        7
+      ],
+      "epochs": 60,
+      "random_top1": 0.005,
+      "models": {
+        "STA": {
+          "top1_mean": 0.5652431791221827,
+          "top1_std": 0.017454257377891046,
+          "mrr_mean": 0.6124677605466556,
+          "mrr_std": 0.020384459971312843,
+          "train_seconds_mean": 471.2500155766805,
+          "runs": [
+            {
+              "seed": 42,
+              "top1": 0.5444839857651246,
+              "mrr": 0.5882283875491083,
+              "top3": 0.599644128113879
+            },
+            {
+              "seed": 123,
+              "top1": 0.5640569395017794,
+              "mrr": 0.6110734206285018,
+              "top3": 0.6352313167259787
+            },
+            {
+              "seed": 7,
+              "top1": 0.5871886120996441,
+              "mrr": 0.6381014734623568,
+              "top3": 0.6654804270462633
+            }
+          ]
+        },
+        "FullGraphGCN": {
+          "top1_mean": 0.36951364175563467,
+          "top1_std": 0.11504383995825666,
+          "mrr_mean": 0.4189346360635051,
+          "mrr_std": 0.11909834649894462,
+          "train_seconds_mean": 366.32269859313965,
+          "runs": [
+            {
+              "seed": 42,
+              "top1": 0.47686832740213525,
+              "mrr": 0.531153720587479,
+              "top3": 0.5516014234875445
+            },
+            {
+              "seed": 123,
+              "top1": 0.42170818505338076,
+              "mrr": 0.4715990888997258,
+              "top3": 0.4786476868327402
+            },
+            {
+              "seed": 7,
+              "top1": 0.2099644128113879,
+              "mrr": 0.25405109870331044,
+              "top3": 0.2491103202846975
+            }
+          ]
+        },
+        "LateGATv2": {
+          "top1_mean": 0.5569395017793594,
+          "top1_std": 0.03385462204704706,
+          "mrr_mean": 0.5974341301451749,
+          "mrr_std": 0.034851294945373326,
+          "train_seconds_mean": 802.0663022994995,
+          "runs": [
+            {
+              "seed": 42,
+              "top1": 0.5444839857651246,
+              "mrr": 0.5842576682347246,
+              "top3": 0.5907473309608541
+            },
+            {
+              "seed": 123,
+              "top1": 0.603202846975089,
+              "mrr": 0.645152699996353,
+              "top3": 0.6583629893238434
+            },
+            {
+              "seed": 7,
+              "top1": 0.5231316725978647,
+              "mrr": 0.562892022204447,
+              "top3": 0.5729537366548043
+            }
+          ]
+        }
+      }
+    },
+    {
+      "N": 500,
+      "k": 50,
+      "num_samples": 15000,
+      "n_test_incidents": 1424,
+      "seeds": [
+        42,
+        123,
+        7
+      ],
+      "epochs": 60,
+      "random_top1": 0.002,
+      "models": {
+        "STA": {
+          "top1_mean": 0.5142790262172284,
+          "top1_std": 0.0433703579701066,
+          "mrr_mean": 0.5637277809863549,
+          "mrr_std": 0.04078906700472488,
+          "train_seconds_mean": 2071.744528134664,
+          "runs": [
+            {
+              "seed": 42,
+              "top1": 0.5442415730337079,
+              "mrr": 0.5953750332599737,
+              "top3": 0.6165730337078652
+            },
+            {
+              "seed": 123,
+              "top1": 0.4529494382022472,
+              "mrr": 0.5061374151117907,
+              "top3": 0.5372191011235955
+            },
+            {
+              "seed": 7,
+              "top1": 0.5456460674157303,
+              "mrr": 0.5896708945873005,
+              "top3": 0.6074438202247191
+            }
+          ]
+        },
+        "FullGraphGCN": {
+          "top1_mean": 0.46278089887640456,
+          "top1_std": 0.05036635134000313,
+          "mrr_mean": 0.496129641190022,
+          "mrr_std": 0.05291706692049207,
+          "train_seconds_mean": 1509.1056842803955,
+          "runs": [
+            {
+              "seed": 42,
+              "top1": 0.4726123595505618,
+              "mrr": 0.49345583421075906,
+              "top3": 0.5007022471910112
+            },
+            {
+              "seed": 123,
+              "top1": 0.5189606741573034,
+              "mrr": 0.5622350711750123,
+              "top3": 0.586376404494382
+            },
+            {
+              "seed": 7,
+              "top1": 0.3967696629213483,
+              "mrr": 0.43269801818429476,
+              "top3": 0.44803370786516855
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "invocations": [
+    "python -m rca_pipeline.scaling_benchmark --sizes 14,50,100,200 --train-threads 4 --skip-latency --output-json results/scaling_benchmark.json",
+    "python -m rca_pipeline.scaling_benchmark --sizes 500 --models STA,FullGraphGCN --train-threads 4 --skip-latency --resume --output-json results/scaling_benchmark.json",
+    "python -m rca_pipeline.scaling_benchmark --latency-only --models STA,FullGraphGCN,LateGATv2 --output-json results/scaling_benchmark.json",
+    "python -m rca_pipeline.scaling_benchmark --latency-only --profile-latency --latency-k 16 --output-json results/scaling_benchmark.json",
+    "python -m rca_pipeline.scaling_benchmark --latency-only --profile-latency --latency-k 16 --output-json results/scaling_benchmark.json"
+  ],
+  "config": {
+    "sizes": "500",
+    "latency_sizes": "14,50,100,200,500,1000,2000",
+    "models": "STA,FullGraphGCN",
+    "seeds": [
+      42,
+      123,
+      7
+    ],
+    "dataset_seed": 42,
+    "epochs": 60,
+    "sta_warmup_epochs": 5,
+    "sta_k_anneal_epochs": 20,
+    "gat_contrastive_epochs": 10,
+    "hidden": 32,
+    "batch_size": 256,
+    "min_samples": 3000,
+    "windows_per_class": 12,
+    "anomaly_ratio": 0.4,
+    "latency_repeats": 300,
+    "train_threads": 4,
+    "skip_latency": true,
+    "output_json": "results/scaling_benchmark.json"
+  },
+  "hardware": {
+    "cpu": "Intel(R) Xeon(R) Processor",
+    "logical_cpus": 8,
+    "platform": "Linux-6.8.0-1060-aws-x86_64-with-glibc2.35",
+    "python": "3.10.12",
+    "torch": "2.0.1+cpu",
+    "device": "cpu",
+    "latency_threads": 1,
+    "latency_batch": 1
+  },
+  "latency": [
+    {
+      "N": 14,
+      "k": 14,
+      "models": {
+        "STA": {
+          "latency": {
+            "median_ms": 1.517124500026057,
+            "p90_ms": 4.572935999965466
+          },
+          "profile_self_cpu_ms_per_call": {
+            "aten::mkldnn_convolution": 0.1502,
+            "aten::index": 0.0725,
+            "aten::addmm": 0.0704,
+            "aten::copy_": 0.0619,
+            "aten::mm": 0.0577,
+            "aten::linear": 0.0502,
+            "aten::clamp_min": 0.0374,
+            "aten::mul": 0.0342
+          }
+        },
+        "FullGraphGCN": {
+          "latency": {
+            "median_ms": 0.8520810000050005,
+            "p90_ms": 1.0696631999735482
+          }
+        },
+        "LateGATv2": {
+          "latency": {
+            "median_ms": 0.9927190000098562,
+            "p90_ms": 1.2913529999991626
+          }
+        }
+      }
+    },
+    {
+      "N": 50,
+      "k": 16,
+      "models": {
+        "STA": {
+          "latency": {
+            "median_ms": 1.7150220000416994,
+            "p90_ms": 2.2740129999647305
+          },
+          "profile_self_cpu_ms_per_call": {
+            "aten::copy_": 0.154,
+            "aten::mkldnn_convolution": 0.1187,
+            "aten::mm": 0.0818,
+            "aten::addmm": 0.072,
+            "aten::index": 0.0573,
+            "aten::linear": 0.0535,
+            "aten::tanh": 0.0361,
+            "aten::scatter_add_": 0.0301
+          }
+        },
+        "FullGraphGCN": {
+          "latency": {
+            "median_ms": 0.9642134999694463,
+            "p90_ms": 4.0340702999969835
+          }
+        },
+        "LateGATv2": {
+          "latency": {
+            "median_ms": 1.1818400000151996,
+            "p90_ms": 1.2224845999867284
+          }
+        }
+      }
+    },
+    {
+      "N": 100,
+      "k": 16,
+      "models": {
+        "STA": {
+          "latency": {
+            "median_ms": 1.83389049999505,
+            "p90_ms": 2.0538120999844978
+          },
+          "profile_self_cpu_ms_per_call": {
+            "aten::addmm": 0.3833,
+            "aten::copy_": 0.3715,
+            "aten::linear": 0.3571,
+            "aten::scatter_add_": 0.3363,
+            "aten::scatter_": 0.3089,
+            "aten::mkldnn_convolution": 0.1329,
+            "aten::mm": 0.1293,
+            "aten::index": 0.0615
+          }
+        },
+        "FullGraphGCN": {
+          "latency": {
+            "median_ms": 1.1545385000317765,
+            "p90_ms": 1.5366173999836976
+          }
+        },
+        "LateGATv2": {
+          "latency": {
+            "median_ms": 1.4566649999778747,
+            "p90_ms": 2.0270068000968444
+          }
+        }
+      }
+    },
+    {
+      "N": 200,
+      "k": 16,
+      "models": {
+        "STA": {
+          "latency": {
+            "median_ms": 2.1175969999944755,
+            "p90_ms": 5.1182227999447605
+          },
+          "profile_self_cpu_ms_per_call": {
+            "aten::mm": 0.2331,
+            "aten::copy_": 0.1736,
+            "aten::mkldnn_convolution": 0.1235,
+            "aten::addmm": 0.103,
+            "aten::tanh": 0.0951,
+            "aten::fill_": 0.0693,
+            "aten::index": 0.0589,
+            "aten::linear": 0.0549
+          }
+        },
+        "FullGraphGCN": {
+          "latency": {
+            "median_ms": 1.5372114999649966,
+            "p90_ms": 1.675833899912505
+          }
+        },
+        "LateGATv2": {
+          "latency": {
+            "median_ms": 2.0168774998978733,
+            "p90_ms": 5.170957100085616
+          }
+        }
+      }
+    },
+    {
+      "N": 500,
+      "k": 16,
+      "models": {
+        "STA": {
+          "latency": {
+            "median_ms": 3.10829400007151,
+            "p90_ms": 6.240358200125229
+          },
+          "profile_self_cpu_ms_per_call": {
+            "aten::copy_": 1.4824,
+            "aten::mm": 0.9516,
+            "aten::scatter_add_": 0.3319,
+            "aten::tanh": 0.2055,
+            "aten::addmm": 0.1719,
+            "aten::mkldnn_convolution": 0.1309,
+            "aten::clamp_min": 0.1122,
+            "aten::mul": 0.1023
+          }
+        },
+        "FullGraphGCN": {
+          "latency": {
+            "median_ms": 5.332630999987487,
+            "p90_ms": 11.630482899931849
+          }
+        },
+        "LateGATv2": {
+          "latency": {
+            "median_ms": 6.254615499983629,
+            "p90_ms": 12.562262299911708
+          }
+        }
+      }
+    },
+    {
+      "N": 1000,
+      "k": 16,
+      "models": {
+        "STA": {
+          "latency": {
+            "median_ms": 5.1142099999879065,
+            "p90_ms": 11.812413499865215
+          },
+          "profile_self_cpu_ms_per_call": {
+            "aten::copy_": 2.3996,
+            "aten::mm": 2.3809,
+            "aten::tanh": 1.0112,
+            "aten::fill_": 0.6628,
+            "aten::mul": 0.4444,
+            "aten::select": 0.3332,
+            "aten::arange": 0.3267,
+            "aten::addmm": 0.3125
+          }
+        },
+        "FullGraphGCN": {
+          "latency": {
+            "median_ms": 4.888291000042955,
+            "p90_ms": 11.001003399974254
+          }
+        },
+        "LateGATv2": {
+          "latency": {
+            "median_ms": 7.053793000068254,
+            "p90_ms": 16.173243699972772
+          }
+        }
+      }
+    },
+    {
+      "N": 2000,
+      "k": 16,
+      "models": {
+        "STA": {
+          "latency": {
+            "median_ms": 9.039753000024575,
+            "p90_ms": 18.72326590009834
+          },
+          "profile_self_cpu_ms_per_call": {
+            "aten::copy_": 12.3208,
+            "aten::mm": 3.1262,
+            "aten::tanh": 1.0893,
+            "aten::addmm": 0.9176,
+            "aten::clamp_min": 0.8454,
+            "aten::add_": 0.6395,
+            "aten::_softmax": 0.4846,
+            "aten::sum": 0.4731
+          }
+        },
+        "FullGraphGCN": {
+          "latency": {
+            "median_ms": 9.548108999979377,
+            "p90_ms": 20.371350400023417
+          }
+        },
+        "LateGATv2": {
+          "latency": {
+            "median_ms": 14.246672500007662,
+            "p90_ms": 29.190717699862034
+          }
+        }
+      }
+    }
+  ],
+  "latency_config": {
+    "sta_k": 16,
+    "repeats": 300
+  },
+  "latency_slope_ms_per_1000_nodes": {
+    "STA": 3.775554066100635,
+    "FullGraphGCN": 4.332466850255488,
+    "LateGATv2": 6.615096460080214
+  }
+}

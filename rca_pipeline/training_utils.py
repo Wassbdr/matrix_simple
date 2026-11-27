@@ -1,5 +1,5 @@
 """
-training_utils.py — Shared training infrastructure for RCA models.
+training_utils.py - Shared training infrastructure for RCA models.
 
 Extracts common patterns from benchmark.py, train_sta.py, and benchmark_real.py:
     - EarlyStopping (MRR-based, patience-based)

@@ -1,41 +1,82 @@
-.PHONY: help install dev test coverage lint format audit benchmark-smoke benchmark-paper clean report report-clean figures paper
+.PHONY: help install dev test coverage lint format audit benchmark-smoke benchmark-paper clean report report-clean figures paper verify-manifest manifest demo scaling showcase data bench bundle
 
 PYTHON ?= python3
+CPU_INDEX ?= https://download.pytorch.org/whl/cpu
+CONSTRAINTS ?= requirements/constraints-cpu.txt
+INSTALL_TARGET ?= .
+RCA_DATA ?= $(HOME)/data/rcaeval
+RCA_CASES ?= $(RCA_DATA)/figshare/data
 
 help:
 	@echo "Targets:"
 	@echo "  make install          Install runtime dependencies (editable)"
 	@echo "  make dev              Install dev dependencies + pre-commit hooks"
 	@echo "  make test             Run pytest unit tests (rca_pipeline + serving)"
+	@echo "  make data             Download the pinned RCAEval datasets"
+	@echo "  make bench            Compare STA with RCAEval references"
+	@echo "  make bundle           Rebuild the packaged STA checkpoint from RE1"
 	@echo "  make coverage         Run tests with the coverage gate"
-	@echo "  make lint             Run ruff linter"
+	@echo "  make lint             Run Ruff and mypy"
 	@echo "  make format           Run ruff formatter"
 	@echo "  make audit            Run pre-publication audit"
 	@echo "  make benchmark-smoke  Quick simulated benchmark (1 seed, N=20)"
 	@echo "  make benchmark-paper  Full publication-grade benchmark (~4h)"
 	@echo "  make figures          Regenerate paper figures from results_transmission/*.json"
 	@echo "  make paper            Build the arXiv preprint PDF (docs/arxiv)"
+	@echo "  make demo             Rank a public incident with STA and compare with BARO"
+	@echo "  make scaling          Scaling benchmark STA vs full-graph, N=14..500 (CPU, ~1-2h)"
+	@echo "  make showcase         Rebuild showcase/ (poster, GIF, MP4, showcase.json)"
+	@echo "  make verify-manifest  Check every result artifact against its SHA-256"
+	@echo "  make manifest         Rewrite the results manifest (after regenerating artifacts)"
 	@echo "  make clean            Remove caches and generated artifacts"
 
 install:
-	$(PYTHON) -m pip install -e .
+	$(PYTHON) -m pip install torch==2.0.1 --index-url "$(CPU_INDEX)"
+	$(PYTHON) -m pip install -e "$(INSTALL_TARGET)" -c "$(CONSTRAINTS)"
 
-dev:
-	$(PYTHON) -m pip install -e ".[dev]"
-	pre-commit install || echo "pre-commit not installed; skipping hook install"
+dev: INSTALL_TARGET = .[dev,serve,data]
+dev: install
+	$(PYTHON) -m pre_commit install
 
 test:
 	$(PYTHON) -m pytest -q
+
+data:
+	$(PYTHON) -m rca_pipeline.data --root "$(RCA_DATA)" $(DATA_ARGS)
+
+bench:
+	$(PYTHON) -m rca_pipeline.bench $(BENCH_ARGS)
+
+bundle:
+	$(PYTHON) -m rca_pipeline.train_re1 --data-root "$(RCA_CASES)" --output rca_pipeline/re1.pt
 
 coverage:
 	$(PYTHON) -m pytest --cov --cov-report=term
 
 lint:
 	$(PYTHON) -m ruff check rca_pipeline serving conftest.py
+	$(PYTHON) -m mypy
 
 format:
 	$(PYTHON) -m ruff format rca_pipeline
 	$(PYTHON) -m ruff check --fix rca_pipeline
+
+verify-manifest:
+	$(PYTHON) -m rca_pipeline.provenance verify
+
+manifest:
+	$(PYTHON) -m rca_pipeline.provenance build
+
+demo:
+	PATH="$(dir $(PYTHON)):$$PATH" RCA_DATA="$(RCA_DATA)" bash showcase/demo.sh
+
+scaling:
+	$(PYTHON) -m rca_pipeline.scaling_benchmark --sizes 14,50,100,200 --train-threads 4 --skip-latency --output-json results/scaling_benchmark.json
+	$(PYTHON) -m rca_pipeline.scaling_benchmark --sizes 500 --models STA,FullGraphGCN --train-threads 4 --skip-latency --resume --output-json results/scaling_benchmark.json
+	$(PYTHON) -m rca_pipeline.scaling_benchmark --latency-only --profile-latency --latency-k 16 --models STA,FullGraphGCN,LateGATv2 --output-json results/scaling_benchmark.json
+
+showcase:
+	PATH="$(dir $(PYTHON)):$$PATH" RCA_DATA="$(RCA_DATA)" bash showcase/make_showcase.sh
 
 audit:
 	bash scripts/pre_publish_audit.sh

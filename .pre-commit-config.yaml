@@ -16,5 +16,6 @@ repos:
         exclude: ^results_transmission/
       - id: check-added-large-files
         args: ['--maxkb=500']
+        exclude: ^(benchmarks/[^/]+\.json|showcase/demo\.(gif|mp4))$
       - id: check-merge-conflict
       - id: detect-private-key

@@ -1,19 +1,19 @@
 """
-gray_failure_detector.py — Gray failure detection inspired by GrayScope (FSE 2024).
+gray_failure_detector.py - Gray failure detection inspired by GrayScope (FSE 2024).
 
 Gray failures: 39% of production incidents (2025). Observable as collective
-temporal-intermetric anomalies (Chandola 2009 / Zamanzadeh 2024) — individual
+temporal-intermetric anomalies (Chandola 2009 / Zamanzadeh 2024) - individual
 metrics stay within SLA thresholds while their joint correlation degrades.
 
 Four detection mechanisms:
     1. P99/P50 ratio  (micro-stutter: CPU steal, L3 contention, GC pauses, CFS throttle)
     2. Inter-metric decorrelation  (Pearson corr(cpu, latency) break on sliding window)
-    3. Monotone trend  (Mann-Kendall on memory — detects nascent Metastable Failures)
-    4. Limplock signal  (queue_depth_rate / cpu_usage — Google 2023)
+    3. Monotone trend  (Mann-Kendall on memory - detects nascent Metastable Failures)
+    4. Limplock signal  (queue_depth_rate / cpu_usage - Google 2023)
 
 References:
     GrayScope (FSE 2024), GREYBOUND (ATC 2025), Limplock (Google 2023),
-    Bronson et al. (OSDI 2022 — Metastable Failures)
+    Bronson et al. (OSDI 2022 - Metastable Failures)
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ def detect_p99_p50(
     Per-node ratio of P99 to P50 across the time axis.
 
     Args:
-        window: [N, W] — one metric (typically latency) for N nodes over W steps.
+        window: [N, W] - one metric (typically latency) for N nodes over W steps.
         threshold: ratio above which a node is flagged.
     Returns:
         (triggered, max_ratio, flagged_node_indices)
@@ -71,8 +71,8 @@ def detect_decorrelation(
     Detect inter-metric correlation break.
 
     Args:
-        window_mts: [N, F, W] — all features for N nodes.
-        baseline_corr: [F, F] — healthy baseline correlation.
+        window_mts: [N, F, W] - all features for N nodes.
+        baseline_corr: [F, F] - healthy baseline correlation.
         drop_threshold: mean absolute correlation drop trigger.
     Returns:
         (triggered, mean_drop, affected_nodes)
@@ -123,7 +123,7 @@ def detect_trend(
     Mann-Kendall trend on per-node metric (e.g. memory).
 
     Args:
-        window: [N, W] — one metric for N nodes.
+        window: [N, W] - one metric for N nodes.
         mk_threshold: |S/Smax| above which trend is declared.
     Returns:
         (triggered, max_mk, affected_nodes)
@@ -154,8 +154,8 @@ def detect_limplock(
     Limplock: queue depth grows while CPU stays flat.
 
     Args:
-        queue_depth_rate: [N, W] — derivative of queue depth.
-        cpu_usage: [N, W] — CPU utilization.
+        queue_depth_rate: [N, W] - derivative of queue depth.
+        cpu_usage: [N, W] - CPU utilization.
         threshold: ratio of mean(queue_depth_rate) / mean(cpu) above which flagged.
     """
     N, W = queue_depth_rate.shape
@@ -191,7 +191,7 @@ def detect_gray_failure(
     Run all 4 detectors and return the first triggered mechanism.
 
     Args:
-        window_mts: [N, F, W] — node × feature × time.
+        window_mts: [N, F, W] - node × feature × time.
         latency_idx, memory_idx, cpu_idx: feature indices.
         queue_depth_idx: feature index for queue depth (optional, enables Limplock).
         baseline_corr: [F, F] healthy baseline.

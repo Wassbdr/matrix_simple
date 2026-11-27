@@ -1,5 +1,5 @@
 """
-trace_feature_extractor.py — 6 features from distributed traces (RUN ASE 2024).
+trace_feature_extractor.py - 6 features from distributed traces (RUN ASE 2024).
 
 Features per node per window:
     0. call_depth:        mean call depth across spans

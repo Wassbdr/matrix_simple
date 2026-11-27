@@ -1,10 +1,10 @@
 """
-cascade_aware_loss.py — Cascade-structure regularization for RCA.
+cascade_aware_loss.py - Cascade-structure regularization for RCA.
 
 Implements two cascade-aware regularization terms:
 
 1. CascadeAwareLoss (original):
-    Hinge loss on structural hop distance — inspired by Chain-of-Event (FSE 2024).
+    Hinge loss on structural hop distance - inspired by Chain-of-Event (FSE 2024).
     s[rc] > s[1hop] + margin_1, s[1hop] > s[2hop] + margin_2.
 
 2. CausalCascadeAwareLoss (new):
@@ -102,7 +102,7 @@ class CascadeAwareLoss(torch.nn.Module):
     Total: mean of all violated constraints.
 
     Note: Only works when the ground-truth RC is known (training time).
-    At inference, the loss is undefined — do not use for eval.
+    At inference, the loss is undefined - do not use for eval.
 
     Args:
         margin_1hop: required score gap between RC and 1-hop nodes (default 0.5)
@@ -131,9 +131,9 @@ class CascadeAwareLoss(torch.nn.Module):
         Compute cascade regularization loss.
 
         Args:
-            logits:     [B, N] — per-node scores
-            y:          [B]    — ground-truth root cause indices
-            edge_index: [2, E] — directed dependency graph (shared across batch)
+            logits:     [B, N] - per-node scores
+            y:          [B]    - ground-truth root cause indices
+            edge_index: [2, E] - directed dependency graph (shared across batch)
         Returns:
             Scalar loss (mean violation).
         """
@@ -203,7 +203,7 @@ class CausalCascadeAwareLoss(torch.nn.Module):
             logits:       [B, N]
             y:            [B]
             edge_index:   [2, E]
-            edge_weights: [E] — causal weights (default 1.0 if None)
+            edge_weights: [E] - causal weights (default 1.0 if None)
         """
         B, N = logits.shape
         device = logits.device
@@ -329,9 +329,9 @@ def cascade_aware_total_loss(
     Combined CE + cascade regularization loss.
 
     Args:
-        logits:         [B, N] — per-node scores
-        y:              [B]    — ground-truth root cause indices
-        edge_index:     [2, E] — directed dependency graph
+        logits:         [B, N] - per-node scores
+        y:              [B]    - ground-truth root cause indices
+        edge_index:     [2, E] - directed dependency graph
         lambda_cascade: weight for the cascade regularization term
         margin_1hop:    hinge margin for 1-hop constraint
         margin_2hop:    hinge margin for 2-hop constraint
@@ -359,7 +359,7 @@ if __name__ == "__main__":
         [1, 2, 3, 4, 5, 6, 7],
     ])
 
-    # Test 1: No violation — RC scores highest
+    # Test 1: No violation - RC scores highest
     logits_good = torch.zeros(1, N)
     logits_good[0, 0] = 3.0   # RC
     logits_good[0, 1] = 1.0   # 1-hop
@@ -371,7 +371,7 @@ if __name__ == "__main__":
     assert loss_good.item() < 0.01, f"Expected ~0 loss, got {loss_good.item()}"
     print(f"  Test 1 PASS: No constraint violation (loss={loss_good.item():.4f})")
 
-    # Test 2: Violation — 1-hop scores higher than RC
+    # Test 2: Violation - 1-hop scores higher than RC
     logits_bad = torch.zeros(1, N)
     logits_bad[0, 0] = 0.5    # RC (too low)
     logits_bad[0, 1] = 2.0    # 1-hop (too high)

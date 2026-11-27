@@ -1,4 +1,4 @@
-# ObservIT cluster — per-scenario breakdown
+# ObservIT cluster - per-scenario breakdown
 
 Source: `results_transmission/paper_benchmark_observit{,_mm}.json`.
 Five chaos scenarios from `scripts/run_sockshop_campaign.sh`, five seeds each (42, 123, 7, 1337, 2025).
@@ -27,4 +27,3 @@ Values are Avg@1 mean +/- std across 5 seeds.
 - **Gray failure (`catalogue-db` / network-loss)**: STA Avg@1 = 0.987, GATv2 Avg@1 = 0.508. This is the hardest scenario for STA's hard top-k selector when the signal sits in a sub-threshold metric.
 - **Cascade failure (`orders-db` / network-delay)**: STA Avg@1 = 0.043, GATv2 Avg@1 = 0.459. Multi-hop propagation; GATv2's soft attention can spread weight along the cascade chain.
 - **Hard failures** (CPU stress, memory stress, pod-kill): STA mean = 0.968, GATv2 mean = 0.965. Both models handle isolated, high-signal anomalies well.
-

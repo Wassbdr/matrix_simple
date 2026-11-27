@@ -1,5 +1,5 @@
 """
-loaders/observit_loader.py — Charger des fenêtres PyG depuis le labo K8s observ-it.
+loaders/observit_loader.py - Charger des fenêtres PyG depuis le labo K8s observ-it.
 
 Flux attendu :
   1) `dataset_builder.py` (Chaos + Locust + Prometheus) → CSV `dataset_<run_id>.csv`
@@ -145,7 +145,7 @@ def load_observit(
     snapshots = builder.build_snapshots()
     if not snapshots:
         raise RuntimeError(
-            "No snapshots built — check CSV columns (timestamp, pod, features, label, root_cause)."
+            "No snapshots built - check CSV columns (timestamp, pod, features, label, root_cause)."
         )
 
     windows = builder.create_sliding_windows(snapshots, window_size)
@@ -164,7 +164,7 @@ def load_observit(
 
     if not labeled:
         raise RuntimeError(
-            "No labeled windows — ensure chaos experiments set root_cause during anomaly period."
+            "No labeled windows - ensure chaos experiments set root_cause during anomaly period."
         )
 
     node_names = builder.get_node_names()

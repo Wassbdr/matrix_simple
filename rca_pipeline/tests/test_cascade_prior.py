@@ -62,7 +62,7 @@ def test_cascade_blend_flips_symptom_to_root_cause():
 
 def test_hard_failure_unaffected_when_root_is_loud():
     # Hard failure: the root cause (1) is itself the loudest node and the
-    # model already ranks it first — the prior must not flip it away.
+    # model already ranks it first - the prior must not flip it away.
     model_logits = np.array([0.0, 8.0, 0.0, 0.0])
     x = _window([0.3, 4.0, 0.2, 0.0])
     for gamma in (0.2, 0.4, 0.6):

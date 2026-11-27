@@ -59,7 +59,7 @@ a compact candidate subgraph of $k \ll N$ nodes before any deep spatial
 analysis. Selection is performed by a Straight-Through Estimator with annealed
 Gumbel noise, regularized by a Variational Graph Information Bottleneck loss
 that is \emph{asymmetric} between healthy and faulty windows. Rather than chase
-a state-of-the-art number, we report a deliberately honest, fully reproducible
+a leading number, we report a deliberately honest, fully reproducible
 study of four model variants (\STA{}, \GATv{}, and their multimodal extensions)
 across four regimes: (i)~Barab\'asi--Albert synthetic graphs at
 $N\in\{20,50,100\}$; (ii)~three RCAEval public benchmarks (TrainTicket,
@@ -78,7 +78,7 @@ statistical baseline are statistically tied. \textbf{(iii)}~Re-running BARO
 metric functions) shows it is far stronger than its published number and
 \emph{beats} our models on Online Boutique: we make \emph{no} SOTA claim.
 \textbf{(iv)}~Multimodal fusion (logs+traces) degrades or matches metrics-only
-on RCAEval while halving seed variance on the cluster --- a robust negative
+on RCAEval while halving seed variance on the cluster --- a consistent negative
 result. Beyond evaluation we contribute a full operational stack: 25-trial
 Optuna HPO, a self-describing model bundle, and a FastAPI inference service
 with Prometheus metrics and live alerting deployed on the cluster, plus an
@@ -148,7 +148,7 @@ and metric functions --- under which BARO is a strong baseline our models do
 \emph{not} uniformly beat (losing on Online Boutique). We explicitly make no
 SOTA claim. Every JSON artifact is SHA-256-pinned.
 
-\textbf{C3.~A robust negative result on multimodal fusion
+\textbf{C3.~A consistent negative result on multimodal fusion
 (Section~\ref{sec:mm}).} Adding logs and traces to metrics degrades or matches
 metrics-only performance on RCAEval, while leaving \Avg{1} unchanged but
 halving variance on the live cluster. Three explanatory hypotheses are
@@ -162,7 +162,7 @@ cascade-aware loss including a learnable propagation matrix; a 25-trial
 Optuna HPO loop; a self-describing model bundle; and a FastAPI inference
 service with Prometheus metrics deployed on the same private cluster.
 
-We \emph{do not} claim state-of-the-art --- and our own isoperimetric BARO
+We \emph{do not} claim leading --- and our own isoperimetric BARO
 re-run (Section~\ref{sec:results}) shows precisely why such a claim would be
 unsafe. Section~\ref{sec:comparability} ships an explicit comparability matrix:
 the metrics-only-vs-BARO comparison is now \emph{comparable} (isoperimetric),
@@ -801,7 +801,7 @@ seed-level bootstrap CIs are too tight to publish (every JSON flags
 synthetic and RCAEval suites at 10 seeds
 (\texttt{42,123,7,1337,2025,314,555,888,999,4242}; artifacts
 \texttt{paper\_benchmark\_*\_10seed.json}). Two things change
-(Table~\ref{tab:robust}). First, the bootstrap CIs become reliable
+(Table~\ref{tab:stability}). First, the bootstrap CIs become reliable
 (\texttt{seed\_level\_bootstrap\_reliable = true} across all metrics).
 Second, \STA{}'s lead over \GATv{} at $N{=}100$ shrinks from $+6.2$ to
 $+2.3$ pp: the asymptotic advantage holds in direction but is more modest than
@@ -833,7 +833,7 @@ Bootstrap CI reliable         & no             & \textbf{yes} \\
 synthetic large-$N$ lead (still positive) and flip the bootstrap-reliability
 flag to true. Five-seed numbers remain primary; 10-seed artifacts are released
 as \texttt{paper\_benchmark\_*\_10seed.json}.}
-\label{tab:robust}
+\label{tab:stability}
 \end{table}
 
 \section{Discussion}
@@ -897,7 +897,7 @@ asymmetric Variational GIB. Under a single 5-seed deterministic protocol,
 $N{=}50$ cluster ($+5.7$ pp \Avg{1}, $4.6\times$ lower spread), matches
 strong attention baselines at small $N$, and exposes a clean architectural
 trade-off vs.\ \GATv{} along the hard/gray vs.\ cascade axis. We also report
-a robust negative result on multimodal fusion: with current public log/trace
+a consistent negative result on multimodal fusion: with current public log/trace
 coverage, fusion reduces variance but does not improve mean accuracy. The
 operational stack---HPO, drift detector, gray-failure detector, model bundle,
 FastAPI serving---is released and deployed on the same cluster used for
@@ -954,7 +954,7 @@ H.~B.~Mann. Nonparametric tests against trend. \emph{Econometrica},
 13(3):245--259, 1945.
 
 \bibitem{pham2024baro}
-L.~Pham \emph{et al.}\ BARO: Robust root cause analysis for microservice
+L.~Pham \emph{et al.}\ BARO for root cause analysis for microservice
 systems with multivariate Bayesian online change-point detection.
 \emph{Proc.\ ACM SE}, 2024.
 

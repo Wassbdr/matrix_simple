@@ -19,6 +19,7 @@ rca_pipeline/checkpoints
 rca_pipeline/datasets
 rca_pipeline/validation_runs
 *.pt
+!rca_pipeline/re1.pt
 benchmark*.json
 *.optuna.db
 

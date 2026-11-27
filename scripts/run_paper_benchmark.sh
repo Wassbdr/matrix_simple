@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run_paper_benchmark.sh — Publication-grade benchmark suite.
+# run_paper_benchmark.sh - Publication-grade benchmark suite.
 #
 # Runs three benchmarks sequentially:
 #   1. Simulated (Barabasi-Albert N=20/50/100, 5 seeds, deterministic)
@@ -7,7 +7,7 @@
 #   3. RCAEval multimodal strict (3 datasets, 5 seeds, deterministic)
 #
 # Outputs to results_transmission/paper_*.json (tracked in git).
-# Runtime estimate: 4–6 h on CPU.
+# Runtime estimate: 4-6 h on CPU.
 #
 # Usage:
 #   bash scripts/run_paper_benchmark.sh [--dry-run]
@@ -41,7 +41,7 @@ REAL_EPOCHS=100
 log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 
 log "=========================================="
-log "STA RCA — Paper Benchmark Suite"
+log "STA RCA - Paper Benchmark Suite"
 log "  seeds        : $SEEDS"
 log "  sim epochs   : sup=$SIM_SUP_EPOCHS contrastive=$SIM_CONTRASTIVE_EPOCHS"
 log "                 warmup=$SIM_WARMUP_EPOCHS anneal=$SIM_ANNEAL_EPOCHS"
@@ -81,7 +81,7 @@ fi
 
 # ── 2. REAL BENCHMARK (metrics-only) ─────────────────────────────────────────
 log ""
-log "=== PHASE 2/3: RCAEval real benchmark — metrics-only (5 seeds) ==="
+log "=== PHASE 2/3: RCAEval real benchmark - metrics-only (5 seeds) ==="
 T0=$SECONDS
 
 REAL_CMD=(
@@ -103,7 +103,7 @@ fi
 
 # ── 3. REAL BENCHMARK (multimodal strict) ────────────────────────────────────
 log ""
-log "=== PHASE 3/3: RCAEval real benchmark — multimodal strict (5 seeds) ==="
+log "=== PHASE 3/3: RCAEval real benchmark - multimodal strict (5 seeds) ==="
 T0=$SECONDS
 
 MM_CMD=(

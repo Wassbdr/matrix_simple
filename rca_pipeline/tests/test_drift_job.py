@@ -50,7 +50,7 @@ def test_flatten_windows_shapes():
 
 def test_fetch_current_stacks_sub_windows(monkeypatch):
     """The current sample must hold one row per (node, sub-window), not just
-    N rows from a single window — otherwise PSI compares ~14 points against
+    N rows from a single window - otherwise PSI compares ~14 points against
     the reference's thousands."""
     N, F, W = 14, 6, 12
 

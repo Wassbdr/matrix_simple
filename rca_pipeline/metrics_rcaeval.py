@@ -1,5 +1,5 @@
 """
-metrics_rcaeval.py — RCAEval benchmark metrics (Pham et al., ASE 2024 / WWW 2025).
+metrics_rcaeval.py - RCAEval benchmark metrics (Pham et al., ASE 2024 / WWW 2025).
 
 Implements the evaluation protocol from:
     "RCAEval: A Benchmark Suite for Evaluating Root Cause Analysis Methods"
@@ -8,8 +8,8 @@ Implements the evaluation protocol from:
 Metrics:
     Avg@k  (= Top-k accuracy): fraction of instances where the true root cause
             is ranked in the top-k predictions.
-    MRR:   Mean Reciprocal Rank — average of 1/rank across instances.
-    NDCG@k: Normalized Discounted Cumulative Gain at k — accounts for rank position.
+    MRR:   Mean Reciprocal Rank - average of 1/rank across instances.
+    NDCG@k: Normalized Discounted Cumulative Gain at k - accounts for rank position.
 
 Comparison baselines from RCAEval paper (15 published methods, Table 2):
     These values are for direct comparison. Lower N -> higher accuracy expected.
@@ -41,8 +41,8 @@ def avg_at_k(y_true: List[int], y_pred_logits: List[np.ndarray], k: int) -> floa
     is ranked within the top k predictions.
 
     Args:
-        y_true:        List[int] — ground truth node indices
-        y_pred_logits: List[np.ndarray] — per-node score arrays (higher = more likely RC)
+        y_true:        List[int] - ground truth node indices
+        y_pred_logits: List[np.ndarray] - per-node score arrays (higher = more likely RC)
         k:             integer cutoff
     Returns:
         float in [0, 1]
@@ -86,8 +86,8 @@ def ndcg_at_k(y_true: List[int], y_pred_logits: List[np.ndarray], k: int) -> flo
     NDCG@k = DCG@k / IDCG@k
 
     Args:
-        y_true:        List[int] — ground truth node indices
-        y_pred_logits: List[np.ndarray] — per-node score arrays
+        y_true:        List[int] - ground truth node indices
+        y_pred_logits: List[np.ndarray] - per-node score arrays
         k:             integer cutoff
     Returns:
         float in [0, 1]
@@ -134,8 +134,8 @@ class RCAEvalMetrics:
         Compute all RCAEval metrics.
 
         Args:
-            y_true:        List[int] — ground truth class indices (0-indexed)
-            y_pred_logits: List[np.ndarray] — per-instance score vectors (length N)
+            y_true:        List[int] - ground truth class indices (0-indexed)
+            y_pred_logits: List[np.ndarray] - per-instance score vectors (length N)
         Returns:
             dict with keys: avg1, avg3, avg5, mrr, ndcg3, ndcg5
         """
@@ -163,7 +163,7 @@ class RCAEvalMetrics:
         Compute metrics over multiple runs (e.g., 3 seeds) and return mean ± std.
 
         Args:
-            runs: List of (y_true, y_pred_logits) tuples — one per seed
+            runs: List of (y_true, y_pred_logits) tuples - one per seed
         Returns:
             Dict with keys "avgk", "avgk_std", "mrr", "mrr_std", etc.
         """
@@ -192,7 +192,7 @@ class RCAEvalMetrics:
             regression_threshold: alert if metric drops more than this fraction
         """
         print(f"\n{'='*70}")
-        print(f"  RCAEval Metrics — {model_name}")
+        print(f"  RCAEval Metrics - {model_name}")
         print(f"{'='*70}")
 
         header = f"  {'METRIC':<12} | {'VALUE':>8}"
@@ -221,9 +221,9 @@ class RCAEvalMetrics:
                 diff = val - ref_val
                 diff_str = f"{diff:+.4f}"
                 if diff < -regression_threshold:
-                    status = "⚠️  REGR"
+                    status = "WARNING  REGR"
                 elif diff >= 0:
-                    status = "✅  OK"
+                    status = "OK  OK"
                 else:
                     status = "~  OK"
                 row += f" | {ref_val:>8.4f} | {diff_str:>8} | {status}"
@@ -271,10 +271,10 @@ def compare_with_rcaeval_baselines(
 ) -> None:
     """
     Print comparison table between our results and RCAEval published baselines.
-    Alerts ⚠️ REGRESSION vs BARO if Top@1 < BARO - threshold.
+    Alerts WARNING REGRESSION vs BARO if Top@1 < BARO - threshold.
     """
     print(f"\n{'='*75}")
-    print(f"  RCAEval Comparison — {model_name} on {dataset_name}")
+    print(f"  RCAEval Comparison - {model_name} on {dataset_name}")
     print(f"{'='*75}")
     print(f"  {'METHOD':<15} | {'Avg@1':>7} | {'Avg@3':>7} | {'Avg@5':>7} | {'MRR':>7} | {'NDCG@3':>7}")
     print(f"  {'-'*15}-+-{'-'*7}-+-{'-'*7}-+-{'-'*7}-+-{'-'*7}-+-{'-'*7}")
@@ -289,9 +289,9 @@ def compare_with_rcaeval_baselines(
     baro = RCAEVAL_PUBLISHED_BASELINES["BARO"]
     our_top1 = results.get("avg1", 0)
     if our_top1 < baro["avg1"] - baro_regression_threshold:
-        print(f"\n  ⚠️  REGRESSION vs BARO: Avg@1={our_top1:.4f} < {baro['avg1']:.4f} - {baro_regression_threshold}")
+        print(f"\n  WARNING  REGRESSION vs BARO: Avg@1={our_top1:.4f} < {baro['avg1']:.4f} - {baro_regression_threshold}")
     else:
-        print(f"\n  ✅  Avg@1={our_top1:.4f} ≥ BARO threshold ({baro['avg1'] - baro_regression_threshold:.4f})")
+        print(f"\n  OK  Avg@1={our_top1:.4f} ≥ BARO threshold ({baro['avg1'] - baro_regression_threshold:.4f})")
     print(f"{'='*75}\n")
 
 

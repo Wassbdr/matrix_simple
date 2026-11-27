@@ -1,0 +1,132 @@
+{
+  "manifest_version": "1.0",
+  "generated_at_utc": "2026-04-29T14:35:35.511489+00:00",
+  "canonical_source": "rca_pipeline/benchmark_full_prepublish.json",
+  "git": {
+    "commit": "c6c2bfa88f51d57285e2af97cf688743404d38fb",
+    "dirty_worktree": true
+  },
+  "artifacts": [
+    {
+      "path": "rca_pipeline/benchmark_full_prepublish.json",
+      "optional": false,
+      "exists": true,
+      "generation_command": "python -m rca_pipeline.benchmark --output-json rca_pipeline/benchmark_full_prepublish.json",
+      "size_bytes": 27519,
+      "sha256": "f8accc8f81551d2f9073cac701db491fa3669ecf4b975b15325ec73b71f0f332"
+    },
+    {
+      "path": "rca_pipeline/benchmark_real_long_prepublish.json",
+      "optional": false,
+      "exists": true,
+      "generation_command": "python -m rca_pipeline.benchmark_real --dataset all --seeds 42,123,7 --epochs 100 --max-cases 90 --sta-contrastive-warmup 0 --output-json rca_pipeline/benchmark_real_long_prepublish.json",
+      "size_bytes": 17265,
+      "sha256": "4164b26113271fb99252892e27dcfce250e058a9db7d3b7bc78a46bdb82945dd"
+    },
+    {
+      "path": "rca_pipeline/benchmark_real_long_mm_strict_prepublish.json",
+      "optional": false,
+      "exists": true,
+      "generation_command": "python -m rca_pipeline.benchmark_real --dataset all --seeds 42,123,7 --epochs 100 --max-cases 90 --sta-contrastive-warmup 0 --use-mm --mm-strict --output-json rca_pipeline/benchmark_real_long_mm_strict_prepublish.json",
+      "size_bytes": 12410,
+      "sha256": "3883998c7a235f71965ffe04816b63815a9316803f45773737d37352fb01603d"
+    },
+    {
+      "path": "rca_pipeline/ablation_prepublish.json",
+      "optional": false,
+      "exists": true,
+      "generation_command": "python -m rca_pipeline.benchmark_ablation --output-json rca_pipeline/ablation_prepublish.json",
+      "size_bytes": 22136,
+      "sha256": "ab73913e18264682aab3d4defcf3c50e93fe4fcb8fb31afd7bc41e1c20a7c723"
+    },
+    {
+      "path": "results_transmission/warmup_real_trainticket_w0.json",
+      "optional": false,
+      "exists": true,
+      "generation_command": "python -m rca_pipeline.benchmark_real --dataset trainticket --seeds 42,123,7 --epochs 20 --max-cases 20 --enable-drift --sta-contrastive-warmup 0 --output-json results_transmission/warmup_real_trainticket_w0.json",
+      "size_bytes": 5772,
+      "sha256": "31118d80bb9f29bc6fb1d8163ef2ddd57ec5d61a08016b4ff96fb732217e7bbb"
+    },
+    {
+      "path": "results_transmission/warmup_real_trainticket_w10.json",
+      "optional": false,
+      "exists": true,
+      "generation_command": "python -m rca_pipeline.benchmark_real --dataset trainticket --seeds 42,123,7 --epochs 20 --max-cases 20 --enable-drift --sta-contrastive-warmup 10 --allow-real-warmup --output-json results_transmission/warmup_real_trainticket_w10.json",
+      "size_bytes": 5784,
+      "sha256": "0603cb74ae3c2bd0a2e7d027804a95fabfc7c7c6ec250f056b66f1214d49d05f"
+    },
+    {
+      "path": "results_transmission/smoke_pre_submission_check.json",
+      "optional": false,
+      "exists": true,
+      "generation_command": "python -m rca_pipeline.benchmark_real --dataset trainticket --seeds 42 --epochs 1 --max-cases 10 --sta-contrastive-warmup 0 --output-json results_transmission/smoke_pre_submission_check.json",
+      "size_bytes": 7101,
+      "sha256": "4db31318ba8e0ebda5cdbe563a3b53d509887c2b48186078187487c4a6f5022c"
+    },
+    {
+      "path": "results_transmission/comparability_matrix.json",
+      "optional": false,
+      "exists": true,
+      "generation_command": "python -m rca_pipeline.comparability_matrix --repo-root . --output-md docs/COMPARABILITY_MATRIX.md --output-json results_transmission/comparability_matrix.json",
+      "size_bytes": 3831,
+      "sha256": "a25df0c5ecd723cacc494d4f2e7e7552e46435e545db1a3d39b1d459dd50ff12"
+    },
+    {
+      "path": "docs/COMPARABILITY_MATRIX.md",
+      "optional": false,
+      "exists": true,
+      "generation_command": "python -m rca_pipeline.comparability_matrix --repo-root . --output-md docs/COMPARABILITY_MATRIX.md --output-json results_transmission/comparability_matrix.json",
+      "size_bytes": 2281,
+      "sha256": "d03f78ec69abdcc4b28a7a551ee53966fd4116648ea386452973debcec3a76f1"
+    },
+    {
+      "path": "rca_pipeline/baseline_official.json",
+      "optional": true,
+      "exists": false,
+      "generation_command": "legacy archive reference only"
+    },
+    {
+      "path": "rca_pipeline/baseline_official_compact.json",
+      "optional": true,
+      "exists": false,
+      "generation_command": "legacy archive reference only"
+    }
+  ],
+  "simulated_snapshot": {
+    "N20": {
+      "STA Select-then-Analyze::top1": 0.7691309987029831,
+      "STA Select-then-Analyze::mrr": 0.8230387639500588,
+      "Late Bottleneck STGCN+GIB::top1": 0.8145265888456551,
+      "Late Bottleneck STGCN+GIB::mrr": 0.8625750113226168,
+      "Late Bottleneck GATv2::top1": 0.8223086900129702,
+      "Late Bottleneck GATv2::mrr": 0.8730628547634728,
+      "Full-Graph GCN::top1": 0.8378728923476005,
+      "Full-Graph GCN::mrr": 0.8821784833343541
+    },
+    "N50": {
+      "STA Select-then-Analyze::top1": 0.6278195488721804,
+      "STA Select-then-Analyze::mrr": 0.6763012966226691,
+      "Late Bottleneck STGCN+GIB::top1": 0.456140350877193,
+      "Late Bottleneck STGCN+GIB::mrr": 0.5084094505097014,
+      "Late Bottleneck GATv2::top1": 0.575187969924812,
+      "Late Bottleneck GATv2::mrr": 0.6248386732799881,
+      "Full-Graph GCN::top1": 0.5263157894736842,
+      "Full-Graph GCN::mrr": 0.5768868099082968
+    },
+    "N100": {
+      "STA Select-then-Analyze::top1": 0.5756501182033097,
+      "STA Select-then-Analyze::mrr": 0.6226868545108369,
+      "Late Bottleneck STGCN+GIB::top1": 0.42080378250591016,
+      "Late Bottleneck STGCN+GIB::mrr": 0.48463428508221246,
+      "Late Bottleneck GATv2::top1": 0.5011820330969267,
+      "Late Bottleneck GATv2::mrr": 0.5545642404645612,
+      "Full-Graph GCN::top1": 0.47990543735224583,
+      "Full-Graph GCN::mrr": 0.5338650173124204
+    }
+  },
+  "reconciliation_table": [],
+  "notes": [
+    "Use this manifest as the single source of truth for soutenance metrics.",
+    "If reconciliation_table is non-empty, legacy and canonical values diverge and must be explained."
+  ]
+}

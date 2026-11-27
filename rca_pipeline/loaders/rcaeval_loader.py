@@ -1,5 +1,5 @@
 """
-loaders/rcaeval_loader.py — Load RCAEval datasets (Pham et al., ASE 2024 / WWW 2025).
+loaders/rcaeval_loader.py - Load RCAEval datasets (Pham et al., ASE 2024 / WWW 2025).
 
 Converts RCAEval failure cases into the same format as generate_scalable_dataset():
     (List[Data], node_names, edge_index)
@@ -370,7 +370,7 @@ class RCAEvalLoader:
                     if mask_exact_ts.any():
                         sub = df_logs[mask_exact_ts]
                     else:
-                        # 3) Suffix fallback (robust against naming mismatches).
+                        # 3) Suffix fallback (consistent against naming mismatches).
                         mask_suffix = cvals.str.endswith(f"-{node}")
                         sub = df_logs[mask_suffix] if mask_suffix.any() else df_logs.iloc[0:0]
 
@@ -647,7 +647,7 @@ class RCAEvalLoader:
     @staticmethod
     def _default_edge_index(n: int) -> torch.Tensor:
         """
-        Fallback when ``get_graph()`` is empty or raises: **undirected chain** 0—1—…—(n-1).
+        Fallback when ``get_graph()`` is empty or raises: **undirected chain** 0-1-…-(n-1).
 
         This is a deliberate simplification: rankings from GNN/GAT can differ from the
         true service dependency graph. JSON exports should record when this path was used

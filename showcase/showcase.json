@@ -1,0 +1,47 @@
+{
+  "slug": "matrix_simple",
+  "title": "STA root-cause ranking",
+  "tagline": "Rank likely root-cause services from a metrics export.",
+  "problem": "Many services show symptoms when a microservice fails. On-call engineers need to find where the incident started.",
+  "approach": "Select-Then-Analyze measures pre/post metric changes, then runs a deep scorer only on the most suspect services.",
+  "stack": [
+    "Python",
+    "PyTorch",
+    "PyTorch Geometric",
+    "FastAPI",
+    "Docker"
+  ],
+  "demo": {
+    "gif": "showcase/demo.gif",
+    "mp4": "showcase/demo.mp4",
+    "poster": "showcase/poster.png",
+    "kind": "public",
+    "caption": "The installed CLI ranks an RCAEval Online Boutique CPU fault and compares it with the cached RCAEval BARO prediction."
+  },
+  "reproduce": [
+    "make install INSTALL_TARGET='.[data]'",
+    "make demo",
+    "make showcase"
+  ],
+  "results": [
+    {
+      "label": "Held-out RCAEval Online Boutique case: rank of the injected service",
+      "value": "STA 1, BARO 2",
+      "command": "make demo",
+      "setup": "re2ob_checkoutservice_cpu_1; pooled RE1 checkpoint, training seed 42; cached RCAEval BARO"
+    },
+    {
+      "label": "Fitted synthetic CPU latency slopes (STA vs full-graph GCN)",
+      "value": "3.78 vs 4.33 ms per 1,000 services",
+      "command": "make scaling",
+      "setup": "Intel(R) Xeon(R) Processor, one CPU thread, batch one"
+    }
+  ],
+  "limits": [
+    "The showcase is one public case, not an estimate of the packaged checkpoint's accuracy.",
+    "The metrics-only comparison cannot run MicroRCA on the same inputs.",
+    "STA latency grows with the number of services and is slower than the GCN at small sizes."
+  ],
+  "role": "Sole developer. Built during my ML research internship at Devoteam (AIOps), where it is used internally.",
+  "repo": "https://github.com/Wassbdr/matrix_simple"
+}

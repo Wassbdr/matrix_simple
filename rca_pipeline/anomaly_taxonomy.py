@@ -1,5 +1,5 @@
 """
-anomaly_taxonomy.py — Signal-level anomaly classification (SOTA 2023–2026).
+anomaly_taxonomy.py - Signal-level anomaly classification (SOTA 2023-2026).
 
 Implements three taxonomies:
     1. Chandola (ACM CS 2009): point / contextual / collective
@@ -82,7 +82,7 @@ def classify_chandola(
 
 
 # ---------------------------------------------------------------------------
-# Zamanzadeh Darban (2024) — MTS extensions
+# Zamanzadeh Darban (2024) - MTS extensions
 # ---------------------------------------------------------------------------
 
 def classify_zamanzadeh(

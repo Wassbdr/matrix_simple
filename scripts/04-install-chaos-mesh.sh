@@ -34,14 +34,14 @@ echo "Attente de l'installation de Chaos Mesh..."
 sleep 10
 kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=chaos-mesh \
   -n "${NAMESPACE}" --timeout=300s || {
-    echo "⚠️  Certains pods Chaos Mesh ne sont pas encore prêts"
+    echo "WARNING  Certains pods Chaos Mesh ne sont pas encore prêts"
     kubectl get pods -n "${NAMESPACE}" -l app.kubernetes.io/instance=chaos-mesh
 }
 
 echo ""
 echo "=== Chaos Mesh installé avec succès ! ==="
 echo ""
-echo "🧪 Expériences disponibles :"
+echo " Expériences disponibles :"
 echo "  Latence réseau    : kubectl apply -f k8s/chaos/network-delay.yaml"
 echo "  Stress CPU (DB)   : kubectl apply -f k8s/chaos/stress-db.yaml"
 echo ""

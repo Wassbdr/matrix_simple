@@ -1,7 +1,7 @@
 """Promotion gate: compare the challenger model against the current champion.
 
 Reads the two registered versions' logged metrics from MLflow and prints a
-verdict. Promotion stays MANUAL (human-in-the-loop) by default — a deliberate
+verdict. Promotion stays MANUAL (human-in-the-loop) by default - a deliberate
 gate for a single-environment cluster, not a limitation. Pass --apply to move
 the ``champion`` alias to the challenger version when the gate passes.
 
@@ -54,7 +54,7 @@ def evaluate(
     if challenger is None:
         raise SystemExit("No challenger to evaluate.")
     if champion is None:
-        logger.info("No champion yet — challenger %s=%.4f will be promoted.", metric, challenger)
+        logger.info("No champion yet - challenger %s=%.4f will be promoted.", metric, challenger)
         passed = True
     else:
         delta = challenger - champion

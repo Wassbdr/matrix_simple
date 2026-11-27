@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pre_publish_audit.sh — Quick audit before pushing the repo public.
+# pre_publish_audit.sh - Quick audit before pushing the repo public.
 # Run from repo root: bash scripts/pre_publish_audit.sh
 
 set -uo pipefail
@@ -29,7 +29,7 @@ echo "--- Scanning tracked files for secret-like patterns ---"
 hits=$(git grep -nIE '(api[_-]?key|secret[_-]?key|bearer\s+[a-z0-9]|ghp_[a-z0-9]+|sk-[a-z0-9]{20,}|aws_access_key|password\s*=\s*["\x27][^"\x27]+["\x27])' \
     -- ':!*.md' ':!.gitignore' ':!.env.example' 2>/dev/null | grep -vi 'placeholder\|example\|test_\|fake\|dummy' || true)
 if [[ -n "$hits" ]]; then
-  warn "Possible secrets — review:"
+  warn "Possible secrets - review:"
   echo "$hits" | head -20
 else
   ok "No obvious hardcoded secrets"
@@ -40,7 +40,7 @@ if grep -q 'mypassword' k8s/app/db.yaml k8s/app/backend.yaml 2>/dev/null; then
   if grep -q 'mypassword' SECURITY.md 2>/dev/null; then
     ok "Sandbox password documented in SECURITY.md"
   else
-    err "k8s/app/{db,backend}.yaml contains 'mypassword' — undocumented"
+    err "k8s/app/{db,backend}.yaml contains 'mypassword' - undocumented"
   fi
 fi
 
@@ -98,7 +98,7 @@ if command -v pytest >/dev/null 2>&1; then
   if python -m pytest -q rca_pipeline/tests --co >/dev/null 2>&1; then
     ok "pytest collection succeeds"
   else
-    warn "pytest collection failed — run 'python -m pytest rca_pipeline/tests'"
+    warn "pytest collection failed - run 'python -m pytest rca_pipeline/tests'"
   fi
 else
   warn "pytest not installed"
@@ -106,7 +106,7 @@ fi
 
 echo ""
 if [[ $fail -ne 0 ]]; then
-  echo "${RED}Audit failed — fix the FAIL items before publishing.${RST}"
+  echo "${RED}Audit failed - fix the FAIL items before publishing.${RST}"
   exit 1
 fi
 echo "${GRN}Audit passed (review WARN items).${RST}"

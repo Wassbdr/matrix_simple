@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ##############################################################################
-# run_paper_all.sh — End-to-end publication-grade benchmark pipeline.
+# run_paper_all.sh - End-to-end publication-grade benchmark pipeline.
 #
 # Runs all benchmarks needed to reproduce the published numbers, in the
 # canonical order, with identical hyperparameters across phases:
@@ -188,11 +188,11 @@ log "  pyg:    $(python -c 'import torch_geometric;print(torch_geometric.__versi
 # Lint + tests guard (catch broken state before 5 hours of compute)
 hdr "GUARD: lint + tests"
 if ! run python -m ruff check rca_pipeline; then
-  err "Ruff failed — aborting (fix lint before paper run)"
+  err "Ruff failed - aborting (fix lint before paper run)"
   exit 1
 fi
 if ! run python -m pytest -q rca_pipeline/tests; then
-  err "Tests failed — aborting"
+  err "Tests failed - aborting"
   exit 1
 fi
 
@@ -270,7 +270,7 @@ fi
 
 # ── PHASE 2: RCAEval metrics-only ───────────────────────────────────────────
 if [[ $SKIP_REAL -eq 0 ]]; then
-  hdr "PHASE 2/7: RCAEval real — metrics-only (5 seeds)"
+  hdr "PHASE 2/7: RCAEval real - metrics-only (5 seeds)"
   T0=$SECONDS
   if run python -m rca_pipeline.benchmark_real \
         --dataset all \
@@ -290,7 +290,7 @@ fi
 
 # ── PHASE 3: RCAEval multimodal strict ──────────────────────────────────────
 if [[ $SKIP_MM -eq 0 ]]; then
-  hdr "PHASE 3/7: RCAEval real — multimodal strict (5 seeds)"
+  hdr "PHASE 3/7: RCAEval real - multimodal strict (5 seeds)"
   T0=$SECONDS
   if run python -m rca_pipeline.benchmark_real \
         --dataset all \
@@ -325,7 +325,7 @@ fi
 
 # ── PHASE 5A: ObservIT metrics-only ─────────────────────────────────────────
 if [[ $SKIP_OBSERVIT -eq 0 ]]; then
-  hdr "PHASE 5A/7: ObservIT sock-shop — metrics-only"
+  hdr "PHASE 5A/7: ObservIT sock-shop - metrics-only"
   T0=$SECONDS
   if run python -m rca_pipeline.benchmark_real \
         --observit-csv      "$OBSERVIT_DATA" \
@@ -345,7 +345,7 @@ if [[ $SKIP_OBSERVIT -eq 0 ]]; then
 
   # ── PHASE 5B: ObservIT multimodal (Loki) ─────────────────────────────────
   if [[ $SKIP_OBSERVIT_MM -eq 0 ]]; then
-    hdr "PHASE 5B/7: ObservIT sock-shop — multimodal (metrics + Loki logs)"
+    hdr "PHASE 5B/7: ObservIT sock-shop - multimodal (metrics + Loki logs)"
     T0=$SECONDS
     if start_loki_pf; then
       if run python -m rca_pipeline.benchmark_real \
@@ -420,12 +420,12 @@ import json
 from pathlib import Path
 
 OUTS = {
-    "Phase 1 — Simulated":         "results_transmission/paper_benchmark_sim.json",
-    "Phase 2 — Real metrics-only": "results_transmission/paper_benchmark_real.json",
-    "Phase 3 — Real MM strict":    "results_transmission/paper_benchmark_real_mm.json",
-    "Phase 4 — Ablation":          "results_transmission/paper_benchmark_ablation.json",
-    "Phase 5A — ObservIT":         "results_transmission/paper_benchmark_observit.json",
-    "Phase 5B — ObservIT MM":      "results_transmission/paper_benchmark_observit_mm.json",
+    "Phase 1 - Simulated":         "results_transmission/paper_benchmark_sim.json",
+    "Phase 2 - Real metrics-only": "results_transmission/paper_benchmark_real.json",
+    "Phase 3 - Real MM strict":    "results_transmission/paper_benchmark_real_mm.json",
+    "Phase 4 - Ablation":          "results_transmission/paper_benchmark_ablation.json",
+    "Phase 5A - ObservIT":         "results_transmission/paper_benchmark_observit.json",
+    "Phase 5B - ObservIT MM":      "results_transmission/paper_benchmark_observit_mm.json",
 }
 
 for label, path in OUTS.items():

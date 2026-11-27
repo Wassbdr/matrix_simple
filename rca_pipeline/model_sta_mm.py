@@ -1,5 +1,5 @@
 """
-model_sta_mm.py — Multi-View Select-then-Analyze (variant _mm).
+model_sta_mm.py - Multi-View Select-then-Analyze (variant _mm).
 
 Multi-view inverse problem formulation:
     min_U ||U||_0  s.t.  Y^(m) ≈ g^(m)_phi(X)  for all m ∈ {metrics, logs, traces}

@@ -212,7 +212,7 @@ def train_sta(
 
                 optimizer.zero_grad()
 
-                # Full forward through model — InfoNCE on Z_subgraph (not H_fast)
+                # Full forward through model - InfoNCE on Z_subgraph (not H_fast)
                 logits_a, M_soft_a, _, _ = model(x_anchor[idx_h], edge_index)
                 x_pos_aug = augment_positive(
                     x_positive[idx_h], noise_sigma=0.05,

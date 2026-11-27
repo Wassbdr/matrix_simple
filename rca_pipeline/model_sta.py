@@ -45,7 +45,7 @@ class LightEncoder(nn.Module):
 
     Per the formalization H_fast = MLP_fast(X), the selector must see ONLY
     node-local features before selection.  No graph convolution is applied
-    here — GCN is reserved for the deep path on the selected subgraph,
+    here - GCN is reserved for the deep path on the selected subgraph,
     preventing over-smoothing from polluting the selector at large N.
     """
 
@@ -65,6 +65,13 @@ class LightEncoder(nn.Module):
             nn.LayerNorm(hidden_dim),
         )
 
+    @staticmethod
+    def _linear_conv(x: torch.Tensor, layer: nn.Conv1d) -> torch.Tensor:
+        padding = layer.padding[0]
+        windows = F.pad(x, (0, 0, padding, padding)).unfold(1, layer.kernel_size[0], 1)
+        weights = layer.weight.transpose(1, 2).flatten(1)
+        return F.linear(windows.transpose(2, 3).flatten(2), weights, layer.bias)
+
     def forward(self, x_flat: torch.Tensor, edge_index: torch.Tensor = None) -> torch.Tensor:
         """
         Args:
@@ -73,9 +80,13 @@ class LightEncoder(nn.Module):
         Returns:
             [B*N, H]
         """
-        h = F.relu(self.temporal1(x_flat))                                  # [B*N, H, W]
-        h = F.relu(self.temporal2(h))                                       # [B*N, H, W]
-        h_t = h.permute(0, 2, 1)                                           # [B*N, W, H]
+        if not self.training and not torch.is_grad_enabled() and x_flat.device.type == "cpu":
+            h = F.relu(self._linear_conv(x_flat.transpose(1, 2).contiguous(), self.temporal1))
+            h_t = F.relu(self._linear_conv(h, self.temporal2))
+        else:
+            h = F.relu(self.temporal1(x_flat))
+            h = F.relu(self.temporal2(h))
+            h_t = h.transpose(1, 2)                                        # [B*N, W, H]
         attn = F.softmax(self.temp_attn(h_t).squeeze(-1), dim=-1)          # [B*N, W]
         h = (h_t * attn.unsqueeze(-1)).sum(dim=1)                          # [B*N, H]
         h = self.norm(h)
@@ -309,8 +320,8 @@ def get_temporal_encoder(
     """Factory for temporal encoders used in the deep path (post-selection).
 
     Available types:
-        'conv' (default): DeepTemporalBlock — Conv1d + attention pooling.
-        's4': S4TemporalBlock — Structured State Space Model implementing
+        'conv' (default): DeepTemporalBlock - Conv1d + attention pooling.
+        's4': S4TemporalBlock - Structured State Space Model implementing
               the state-transition f_theta: h(t+1) = A*h(t) + B*x(t).
     """
     if encoder_type == "conv":
@@ -451,7 +462,7 @@ class HierarchicalSelector(nn.Module):
     """
     Two-stage hierarchical node selection: N -> N/2 -> k.
 
-    Progressively refines the support of U(t) — analogous to branch-and-bound
+    Progressively refines the support of U(t) - analogous to branch-and-bound
     in combinatorial optimization.
 
     Stage 1: Coarse selection with a cheap MLP -> top N/2 nodes
@@ -637,7 +648,9 @@ class SelectThenAnalyze(nn.Module):
         )
 
         # ---- Stage 3: Mask features and extract subgraph ----
-        x_masked = x * M_ste.unsqueeze(-1).unsqueeze(-1)                    # [B, N, F, W]
+        x_masked = x
+        if self.training or torch.is_grad_enabled():
+            x_masked = x * M_ste.unsqueeze(-1).unsqueeze(-1)
 
         x_sub, sub_ei = extract_subgraph_vectorized(
             x_masked, edge_index, top_k_indices, self.num_nodes,

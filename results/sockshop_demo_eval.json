@@ -1,0 +1,66 @@
+{
+  "benchmark": "sockshop_demo_heldout",
+  "command": "python -m rca_pipeline.demo_incident build",
+  "setup": {
+    "topology": "sock_shop (14 services)",
+    "seed": 42,
+    "num_samples": 4000,
+    "test_incidents": 335,
+    "baro_normal_period": "5 healthy windows",
+    "candidates": "all 14 services, same for STA and BARO"
+  },
+  "metrics": {
+    "all": {
+      "n": 335,
+      "STA": {
+        "avg1": 0.8985,
+        "avg3": 0.9851,
+        "mrr": 0.9401
+      },
+      "BARO": {
+        "avg1": 0.5134,
+        "avg3": 0.7463,
+        "mrr": 0.6549
+      }
+    },
+    "cascade": {
+      "n": 171,
+      "STA": {
+        "avg1": 0.8012,
+        "avg3": 0.9708,
+        "mrr": 0.8826
+      },
+      "BARO": {
+        "avg1": 0.2164,
+        "avg3": 0.5029,
+        "mrr": 0.4156
+      }
+    },
+    "gray": {
+      "n": 45,
+      "STA": {
+        "avg1": 1.0,
+        "avg3": 1.0,
+        "mrr": 1.0
+      },
+      "BARO": {
+        "avg1": 0.3556,
+        "avg3": 1.0,
+        "mrr": 0.6519
+      }
+    },
+    "hard": {
+      "n": 119,
+      "STA": {
+        "avg1": 1.0,
+        "avg3": 1.0,
+        "mrr": 1.0
+      },
+      "BARO": {
+        "avg1": 1.0,
+        "avg3": 1.0,
+        "mrr": 1.0
+      }
+    }
+  }
+}

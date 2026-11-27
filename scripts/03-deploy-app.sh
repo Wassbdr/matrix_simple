@@ -21,7 +21,7 @@ kubectl apply -f "${SCRIPT_DIR}/../k8s/app/db.yaml"
 echo "Attente du pod de la base de données..."
 sleep 5
 kubectl wait --for=condition=Ready pod -l app=database -n "${NAMESPACE}" --timeout=120s || {
-    echo "⚠️  Le pod database n'est pas prêt après 120s — continuons quand même"
+    echo "WARNING  Le pod database n'est pas prêt après 120s - continuons quand même"
 }
 
 echo ""
@@ -36,7 +36,7 @@ echo ""
 echo "Attente de tous les pods..."
 sleep 5
 kubectl wait --for=condition=Ready pod --all -n "${NAMESPACE}" --timeout=300s || {
-    echo "⚠️  Certains pods ne sont pas encore prêts"
+    echo "WARNING  Certains pods ne sont pas encore prêts"
 }
 
 echo ""
@@ -44,7 +44,7 @@ echo "=== Application 3-Tiers déployée avec succès ! ==="
 echo ""
 kubectl get pods -n "${NAMESPACE}" -l 'app in (database,backend,frontend)'
 echo ""
-echo "🌐 Accès au Frontend :"
+echo "Accès au Frontend :"
 echo "  kubectl port-forward svc/frontend -n ${NAMESPACE} 8080:80"
 echo "  Puis ouvrir http://localhost:8080"
 echo ""

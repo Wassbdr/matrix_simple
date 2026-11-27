@@ -62,7 +62,7 @@ def load_observit(path: Path) -> Dict[str, Dict[str, tuple]]:
 def render_table(metrics_only: Dict[str, Dict[str, tuple]],
                  mm: Dict[str, Dict[str, tuple]]) -> str:
     lines = []
-    lines.append("# ObservIT cluster — per-scenario breakdown")
+    lines.append("# ObservIT cluster - per-scenario breakdown")
     lines.append("")
     lines.append("Source: `results_transmission/paper_benchmark_observit{,_mm}.json`.")
     lines.append("Five chaos scenarios from `scripts/run_sockshop_campaign.sh`, "

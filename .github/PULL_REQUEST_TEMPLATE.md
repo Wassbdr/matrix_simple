@@ -1,5 +1,5 @@
 ## Summary
-- What changed and why (1–3 bullets).
+- What changed and why (1-3 bullets).
 
 ## Reproducibility checklist
 - [ ] `python -m pytest -q rca_pipeline/tests` passes

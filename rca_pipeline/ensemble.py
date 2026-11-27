@@ -7,7 +7,7 @@ models produce logits on different scales.
 
 Calibration utilities (temperature scaling, ECE) operate on (logits, labels)
 pairs; fitting must be done on held-out *training* predictions to avoid
-test leakage — callers are responsible for that split discipline.
+test leakage - callers are responsible for that split discipline.
 """
 
 from __future__ import annotations
@@ -123,7 +123,7 @@ def fit_temperature(
     y_true: Sequence[int],
     grid: Optional[Sequence[float]] = None,
 ) -> float:
-    """NLL-minimizing temperature over a log-spaced grid (robust, no scipy dep).
+    """NLL-minimizing temperature over a log-spaced grid (consistent, no scipy dep).
 
     Fit on held-out training predictions, never on the test split.
     """

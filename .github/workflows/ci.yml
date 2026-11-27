@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'showcase/2026-11']
   pull_request:
     branches: [main]
 
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # ubuntu-26.04 has no Python 3.9 build
     strategy:
       matrix:
         python-version: ["3.9", "3.11"]
@@ -36,8 +36,8 @@ jobs:
           pip install torch_geometric==2.4.0
           pip install -e ".[dev,serve]" -c requirements/constraints-cpu.txt
 
-      - name: Lint (ruff)
-        run: python -m ruff check rca_pipeline serving conftest.py
+      - name: Lint and type-check
+        run: make lint PYTHON=python
 
       - name: Unit tests + coverage gate
         run: python -m pytest --cov --cov-report=xml
@@ -64,6 +64,19 @@ jobs:
 
       # validation_protocol (smoke/long/paper) requires RCAEval data not available in CI.
       # Run locally: RCA_VAL_PRESET=smoke RCA_VAL_STA_WARMUP=0 python -m rca_pipeline.validation_protocol
+
+  verify-manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      # Stdlib only: fails on any SHA-256 mismatch or missing result artifact.
+      - name: Verify results manifest
+        run: python -m rca_pipeline.provenance verify
 
   docker-build:
     runs-on: ubuntu-latest

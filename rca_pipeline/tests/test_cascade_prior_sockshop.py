@@ -1,8 +1,8 @@
 """End-to-end-ish cascade prior check on the real sock_shop N=14 topology.
 
-Reproduces the documented failure (SYNTHESE_FINALE §6.4) — root cause
+Reproduces the documented failure (SYNTHESE_FINALE §6.4) - root cause
 ``orders-db`` metric-quiet, downstream neighbors ``orders``/``front-end``
-loud — and verifies the prior blend recovers it to top-1. No training: the
+loud - and verifies the prior blend recovers it to top-1. No training: the
 prior is post-hoc, so this isolates the mechanism from model noise and runs
 in CI without any dataset.
 """
