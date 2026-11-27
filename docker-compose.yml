@@ -1,0 +1,15 @@
+# One-command local demo: FastAPI STA service with the bundled Sock Shop demo model.
+#   docker compose up --build -d
+#   python scripts/demo_predict.py        # sends examples/sockshop_demo/incident.json to /predict
+services:
+  rca-api:
+    build:
+      context: .
+      dockerfile: serving/Dockerfile
+    image: matrix-simple-rca:local
+    ports:
+      - "8080:8080"
+    environment:
+      MODEL_BUNDLE: /app/checkpoints/sta_sockshop_demo
+    volumes:
+      - ./examples/sockshop_demo/bundle:/app/checkpoints/sta_sockshop_demo:ro
