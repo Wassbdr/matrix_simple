@@ -24,7 +24,7 @@ DISPLAY = {
     "circa": "CIRCA", "rcd": "RCD",
 }
 METRICS = ("ac1", "ac3", "avg5")
-ITERATION_BASE = {"relative": "baseline", "onset": "relative", "tails": "relative"}
+ITERATION_BASE = {"relative": "baseline", "onset": "relative", "tails": "relative", "prior": "relative"}
 
 
 def group_split(cases: list[Case], seed: int) -> tuple[list[Case], list[Case]]:
@@ -102,6 +102,32 @@ def rows_for_report(records: list[dict], method: str, cohort: str) -> tuple:
     return (*metrics, f"{timing:.2f}", coverage)
 
 
+def train_ticket_errors(run: dict) -> list[str]:
+    grouped: dict[str, list[dict]] = defaultdict(list)
+    for row in run["cases"]:
+        if (row["method"], row["suite"], row["system"]) == ("sta", "re2", "tt"):
+            grouped[row["fault"]].append(row)
+    if not grouped:
+        return []
+    lines = [
+        "## RE2 Train Ticket errors", "",
+        f"STA variant: `{run['variant']}`. Counts include each case once per training seed.", "",
+        "| Fault | Attempts | Top-1 hits | Miss, root outside top-k | Miss, root inside top-k |",
+        "|---|---:|---:|---:|---:|",
+    ]
+    for fault, rows in sorted(grouped.items()):
+        misses = [row for row in rows if not row["ranks"] or row["ranks"][0] != row["answer"]]
+        inside = sum(row["selector_hit"] for row in misses)
+        lines.append(f"| {fault} | {len(rows)} | {len(rows) - len(misses)} | {len(misses) - inside} | {inside} |")
+    re1_faults = {row["fault"] for row in run["cases"] if (row["suite"], row["system"]) == ("re1", "tt")}
+    unseen = [row for fault, rows in grouped.items() if fault not in re1_faults for row in rows]
+    misses = sum(row["ranks"][:1] != [row["answer"]] for rows in grouped.values() for row in rows)
+    if re1_faults and unseen:
+        unseen_misses = sum(row["ranks"][:1] != [row["answer"]] for row in unseen)
+        lines += ["", f"Fault types absent from RE1 account for {unseen_misses} of {misses} misses."]
+    return [*lines, ""]
+
+
 def summarize(outputs: list[dict], latest: dict) -> str:
     lines = [
         "# Public RCAEval benchmark", "",
@@ -165,6 +191,8 @@ def summarize(outputs: list[dict], latest: dict) -> str:
             for fault, hits in sorted(missed.items()):
                 lines.append(f"| {fault} | {len(hits)} | {sum(hits)} |")
             lines.append("")
+    incumbent = next((run for run in outputs if run["variant"] == "relative"), latest)
+    lines.extend(train_ticket_errors(incumbent))
     by_variant = {out["variant"]: out for out in outputs}
     for i, out in enumerate(outputs):
         previous = by_variant.get(ITERATION_BASE.get(out["variant"], ""))
@@ -289,7 +317,7 @@ def main() -> None:
     parser.add_argument("--timeout", type=int, default=90)
     parser.add_argument("--tt-limit", type=int, default=12)
     parser.add_argument("--split", choices=("dev", "all"), default="all")
-    parser.add_argument("--variant", choices=VARIANTS, default="relative")
+    parser.add_argument("--variant", choices=VARIANTS, default="prior")
     parser.add_argument("--skip-references", action="store_true", help="Use cached results only.")
     args = parser.parse_args()
     if min(args.rows, args.epochs, args.workers, args.timeout) <= 0 or args.tt_limit < 0:

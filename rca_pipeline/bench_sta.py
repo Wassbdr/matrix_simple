@@ -1,5 +1,7 @@
 """Train and score STA on telemetry-derived candidate sets."""
 
+from __future__ import annotations
+
 import time
 from collections import defaultdict
 from dataclasses import dataclass
@@ -22,6 +24,7 @@ VARIANTS = {
     "relative": "Pre-injection median and IQR scaling per metric and case",
     "onset": "Median and IQR scaling plus onset and persistence channels",
     "tails": "Median and IQR scaling plus signed within-bin tail deviations",
+    "prior": "Add an all-metric change prior to the existing STA ranking",
 }
 
 
@@ -31,6 +34,7 @@ class Incident:
     names: tuple[str, ...]
     x: torch.Tensor
     preparation_ms: float
+    prior: torch.Tensor | None = None
 
 
 def _downsample(values: np.ndarray) -> np.ndarray:
@@ -54,14 +58,15 @@ def prepare(case: Case, frame: pd.DataFrame, cut: int, variant: str) -> Incident
     x = np.zeros((len(names), channels, STEPS), dtype=np.float32)
     strength = np.full((len(names), len(METRICS)), -np.inf)
     mask = frame.time.to_numpy() < cut
+    prior = np.zeros(len(names), dtype=np.float32) if variant == "prior" else None
     for col in frame.columns:
         if "_" not in col:
             continue
         metric = col.split("_", 1)[1]
         metric = METRIC_ALIASES.get(metric, metric)
-        if metric not in METRICS:
+        if metric not in METRICS and prior is None:
             continue
-        node, feature = by_name[service_name(col)], METRICS.index(metric)
+        node = by_name[service_name(col)]
         values = frame[col].to_numpy(dtype=np.float64)
         before, after = values[mask], values[~mask]
         if variant == "baseline":
@@ -74,9 +79,14 @@ def prepare(case: Case, frame: pd.DataFrame, cut: int, variant: str) -> Incident
             if scale <= 1e-12:
                 scale = max(float(np.std(before)), abs(center) * 0.01, 1e-9)
             z = (after - center) / scale
+            if prior is not None:
+                prior[node] = max(prior[node], np.log1p(np.quantile(np.abs(z), 0.9)))
+            if metric not in METRICS:
+                continue
             priority = float(np.max(np.abs(z)))
             signed = np.sign(z) * np.log1p(np.abs(z))
             signal = _downsample(signed)
+        feature = METRICS.index(metric)
         if priority <= strength[node, feature]:
             continue
         strength[node, feature] = priority
@@ -86,7 +96,8 @@ def prepare(case: Case, frame: pd.DataFrame, cut: int, variant: str) -> Incident
             x[node, 2 * len(METRICS) + feature] = _downsample((np.abs(z) >= 3).astype(float))
         elif variant == "tails":
             x[node, len(METRICS) + feature] = _tails(signed)
-    return Incident(case, names, torch.from_numpy(x), 1e3 * (time.perf_counter() - start))
+    change = None if prior is None else torch.from_numpy(prior)
+    return Incident(case, names, torch.from_numpy(x), 1e3 * (time.perf_counter() - start), change)
 
 
 def fit(train: list[Incident], seed: int, epochs: int, variant: str) -> tuple:
@@ -143,6 +154,11 @@ def rank(fitted: tuple, sample: Incident) -> dict:
     x = ((sample.x - mean) / scale).unsqueeze(0)
     scores, _, top, selector = model(x, edges)
     fused = gated_selector_scorer_fusion(selector[0], scores[0], top[0], gamma=0.35)
+    if sample.prior is not None:
+        change = sample.prior
+        fused = fused + 0.2 * fused.std(unbiased=False) * (
+            (change - change.mean()) / change.std(unbiased=False).clamp_min(1e-6)
+        )
     ranks = [sample.names[i] for i in fused.argsort(descending=True, stable=True).tolist()]
     picked = [sample.names[i] for i in top[0].tolist()]
     return {

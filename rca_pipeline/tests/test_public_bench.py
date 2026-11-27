@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from rca_pipeline import bench_reference
-from rca_pipeline.bench import group_split, score, summarize
+from rca_pipeline.bench import group_split, score, summarize, train_ticket_errors
 from rca_pipeline.bench_data import Case
 from rca_pipeline.bench_reference import selected
 from rca_pipeline.bench_sta import METRICS, STEPS, prepare
@@ -89,3 +89,27 @@ def test_sta_tail_preserves_short_downward_deviation(tmp_path):
     assert sample.x.shape == (1, 2 * len(METRICS), STEPS)
     assert sample.x[0, len(METRICS), 0] < sample.x[0, 0, 0] < 0
     assert sample.x[0, len(METRICS), 1] == 0
+
+
+def test_train_ticket_errors_distinguish_selector_and_ranking_misses():
+    fields = {"method": "sta", "system": "tt", "answer": "a", "fault": "disk"}
+    rows = [{"suite": "re1", **fields}]
+    rows += [
+        {**fields, "suite": "re2", "ranks": ranks, "selector_hit": selected, "fault": fault}
+        for ranks, selected, fault in [(["a"], True, "disk"), (["b"], False, "disk"), (["b", "a"], True, "socket")]
+    ]
+    report = "\n".join(train_ticket_errors({"variant": "relative", "cases": rows}))
+    assert "| disk | 2 | 1 | 1 | 0 |" in report
+    assert "| socket | 1 | 0 | 0 | 1 |" in report
+    assert "account for 1 of 2 misses" in report
+
+
+def test_change_prior_uses_unknown_metrics_without_changing_model_inputs(tmp_path):
+    frame = pd.DataFrame({"time": range(8), "cart_new_metric": [0, 1, 0, 1, 5, 5, 5, 5],
+                          "orders_cpu": [0, 1, 0, 1, 0, 1, 0, 1]})
+    case = Case(tmp_path, "re1", "tt", "cart", "cpu")
+    original = prepare(case, frame, 4, "relative")
+    sample = prepare(case, frame, 4, "prior")
+    assert sample.x.equal(original.x)
+    assert sample.prior is not None
+    assert sample.prior[0] > sample.prior[1]
