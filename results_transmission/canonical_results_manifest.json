@@ -1,7 +1,7 @@
 {
   "manifest_version": "2.0",
-  "generated_at_utc": "2026-11-27T11:10:59+00:00",
-  "built_from_commit": "90f95ea61ea015345af50c2a323ab2c9cba5dc21",
+  "generated_at_utc": "2026-11-27T15:09:26+00:00",
+  "built_from_commit": "e81f18eda2ef1bcc7f6e47f97b4403fa4d7a930b",
   "supersedes": "results_transmission/historical/canonical_results_manifest_v1.json",
   "hardware_for_regenerated_and_generated": "CPU only (no GPU); see each JSON's hardware block",
   "artifacts": [
@@ -9,12 +9,14 @@
       "path": "results/scaling_benchmark.json",
       "status": "generated",
       "generation_command": "make scaling (three invocations, listed in `invocations`)",
-      "size_bytes": 17665,
-      "sha256": "9f2e969eedc2a436e04c533394f706215a421a09797c189e251bbbead9538462",
+      "size_bytes": 20583,
+      "sha256": "ff95d1cc5bf9059cbee9a4982ea643ef94c15a04e1db17e23b5dbd62ace02a69",
       "invocations": [
         "python -m rca_pipeline.scaling_benchmark --sizes 14,50,100,200 --train-threads 4 --skip-latency --output-json results/scaling_benchmark.json",
         "python -m rca_pipeline.scaling_benchmark --sizes 500 --models STA,FullGraphGCN --train-threads 4 --skip-latency --resume --output-json results/scaling_benchmark.json",
-        "python -m rca_pipeline.scaling_benchmark --latency-only --models STA,FullGraphGCN,LateGATv2 --output-json results/scaling_benchmark.json"
+        "python -m rca_pipeline.scaling_benchmark --latency-only --models STA,FullGraphGCN,LateGATv2 --output-json results/scaling_benchmark.json",
+        "python -m rca_pipeline.scaling_benchmark --latency-only --profile-latency --latency-k 16 --output-json results/scaling_benchmark.json",
+        "python -m rca_pipeline.scaling_benchmark --latency-only --profile-latency --latency-k 16 --output-json results/scaling_benchmark.json"
       ]
     },
     {

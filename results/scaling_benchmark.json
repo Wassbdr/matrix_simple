@@ -458,7 +458,9 @@
   "invocations": [
     "python -m rca_pipeline.scaling_benchmark --sizes 14,50,100,200 --train-threads 4 --skip-latency --output-json results/scaling_benchmark.json",
     "python -m rca_pipeline.scaling_benchmark --sizes 500 --models STA,FullGraphGCN --train-threads 4 --skip-latency --resume --output-json results/scaling_benchmark.json",
-    "python -m rca_pipeline.scaling_benchmark --latency-only --models STA,FullGraphGCN,LateGATv2 --output-json results/scaling_benchmark.json"
+    "python -m rca_pipeline.scaling_benchmark --latency-only --models STA,FullGraphGCN,LateGATv2 --output-json results/scaling_benchmark.json",
+    "python -m rca_pipeline.scaling_benchmark --latency-only --profile-latency --latency-k 16 --output-json results/scaling_benchmark.json",
+    "python -m rca_pipeline.scaling_benchmark --latency-only --profile-latency --latency-k 16 --output-json results/scaling_benchmark.json"
   ],
   "config": {
     "sizes": "500",
@@ -497,171 +499,250 @@
   "latency": [
     {
       "N": 14,
-      "k": 5,
+      "k": 14,
       "models": {
         "STA": {
           "latency": {
-            "median_ms": 0.9681615010777023,
-            "p90_ms": 1.0085302004881669
+            "median_ms": 1.517124500026057,
+            "p90_ms": 4.572935999965466
+          },
+          "profile_self_cpu_ms_per_call": {
+            "aten::mkldnn_convolution": 0.1502,
+            "aten::index": 0.0725,
+            "aten::addmm": 0.0704,
+            "aten::copy_": 0.0619,
+            "aten::mm": 0.0577,
+            "aten::linear": 0.0502,
+            "aten::clamp_min": 0.0374,
+            "aten::mul": 0.0342
           }
         },
         "FullGraphGCN": {
           "latency": {
-            "median_ms": 0.5865174989594379,
-            "p90_ms": 0.7234343021991664
+            "median_ms": 0.8520810000050005,
+            "p90_ms": 1.0696631999735482
           }
         },
         "LateGATv2": {
           "latency": {
-            "median_ms": 0.7636214995727642,
-            "p90_ms": 0.8802908007055522
+            "median_ms": 0.9927190000098562,
+            "p90_ms": 1.2913529999991626
           }
         }
       }
     },
     {
       "N": 50,
-      "k": 8,
+      "k": 16,
       "models": {
         "STA": {
           "latency": {
-            "median_ms": 1.2491475008573616,
-            "p90_ms": 1.4773975010029976
+            "median_ms": 1.7150220000416994,
+            "p90_ms": 2.2740129999647305
+          },
+          "profile_self_cpu_ms_per_call": {
+            "aten::copy_": 0.154,
+            "aten::mkldnn_convolution": 0.1187,
+            "aten::mm": 0.0818,
+            "aten::addmm": 0.072,
+            "aten::index": 0.0573,
+            "aten::linear": 0.0535,
+            "aten::tanh": 0.0361,
+            "aten::scatter_add_": 0.0301
           }
         },
         "FullGraphGCN": {
           "latency": {
-            "median_ms": 0.7746524988760939,
-            "p90_ms": 0.9135387012065621
+            "median_ms": 0.9642134999694463,
+            "p90_ms": 4.0340702999969835
           }
         },
         "LateGATv2": {
           "latency": {
-            "median_ms": 0.9040480017574737,
-            "p90_ms": 1.0537325990298998
+            "median_ms": 1.1818400000151996,
+            "p90_ms": 1.2224845999867284
           }
         }
       }
     },
     {
       "N": 100,
-      "k": 15,
+      "k": 16,
       "models": {
         "STA": {
           "latency": {
-            "median_ms": 1.2750109999615233,
-            "p90_ms": 1.6103762027341877
+            "median_ms": 1.83389049999505,
+            "p90_ms": 2.0538120999844978
+          },
+          "profile_self_cpu_ms_per_call": {
+            "aten::addmm": 0.3833,
+            "aten::copy_": 0.3715,
+            "aten::linear": 0.3571,
+            "aten::scatter_add_": 0.3363,
+            "aten::scatter_": 0.3089,
+            "aten::mkldnn_convolution": 0.1329,
+            "aten::mm": 0.1293,
+            "aten::index": 0.0615
           }
         },
         "FullGraphGCN": {
           "latency": {
-            "median_ms": 0.8979550020740135,
-            "p90_ms": 1.0630192016833462
+            "median_ms": 1.1545385000317765,
+            "p90_ms": 1.5366173999836976
           }
         },
         "LateGATv2": {
           "latency": {
-            "median_ms": 1.0535029996390222,
-            "p90_ms": 1.2891205980849918
+            "median_ms": 1.4566649999778747,
+            "p90_ms": 2.0270068000968444
           }
         }
       }
     },
     {
       "N": 200,
-      "k": 20,
+      "k": 16,
       "models": {
         "STA": {
           "latency": {
-            "median_ms": 1.5953474994603312,
-            "p90_ms": 1.8687088999286063
+            "median_ms": 2.1175969999944755,
+            "p90_ms": 5.1182227999447605
+          },
+          "profile_self_cpu_ms_per_call": {
+            "aten::mm": 0.2331,
+            "aten::copy_": 0.1736,
+            "aten::mkldnn_convolution": 0.1235,
+            "aten::addmm": 0.103,
+            "aten::tanh": 0.0951,
+            "aten::fill_": 0.0693,
+            "aten::index": 0.0589,
+            "aten::linear": 0.0549
           }
         },
         "FullGraphGCN": {
           "latency": {
-            "median_ms": 1.1822824999399018,
-            "p90_ms": 1.3877460016374243
+            "median_ms": 1.5372114999649966,
+            "p90_ms": 1.675833899912505
           }
         },
         "LateGATv2": {
           "latency": {
-            "median_ms": 1.486007502535358,
-            "p90_ms": 1.6769155972724548
+            "median_ms": 2.0168774998978733,
+            "p90_ms": 5.170957100085616
           }
         }
       }
     },
     {
       "N": 500,
-      "k": 50,
+      "k": 16,
       "models": {
         "STA": {
           "latency": {
-            "median_ms": 2.4337285012734355,
-            "p90_ms": 2.648517799752881
+            "median_ms": 3.10829400007151,
+            "p90_ms": 6.240358200125229
+          },
+          "profile_self_cpu_ms_per_call": {
+            "aten::copy_": 1.4824,
+            "aten::mm": 0.9516,
+            "aten::scatter_add_": 0.3319,
+            "aten::tanh": 0.2055,
+            "aten::addmm": 0.1719,
+            "aten::mkldnn_convolution": 0.1309,
+            "aten::clamp_min": 0.1122,
+            "aten::mul": 0.1023
           }
         },
         "FullGraphGCN": {
           "latency": {
-            "median_ms": 2.1313595007086406,
-            "p90_ms": 2.3279615998035297
+            "median_ms": 5.332630999987487,
+            "p90_ms": 11.630482899931849
           }
         },
         "LateGATv2": {
           "latency": {
-            "median_ms": 2.7286779986752663,
-            "p90_ms": 2.897864900660352
+            "median_ms": 6.254615499983629,
+            "p90_ms": 12.562262299911708
           }
         }
       }
     },
     {
       "N": 1000,
-      "k": 100,
+      "k": 16,
       "models": {
         "STA": {
           "latency": {
-            "median_ms": 3.836672502075089,
-            "p90_ms": 4.044000897920341
+            "median_ms": 5.1142099999879065,
+            "p90_ms": 11.812413499865215
+          },
+          "profile_self_cpu_ms_per_call": {
+            "aten::copy_": 2.3996,
+            "aten::mm": 2.3809,
+            "aten::tanh": 1.0112,
+            "aten::fill_": 0.6628,
+            "aten::mul": 0.4444,
+            "aten::select": 0.3332,
+            "aten::arange": 0.3267,
+            "aten::addmm": 0.3125
           }
         },
         "FullGraphGCN": {
           "latency": {
-            "median_ms": 3.787614499742631,
-            "p90_ms": 4.0455116006342
+            "median_ms": 4.888291000042955,
+            "p90_ms": 11.001003399974254
           }
         },
         "LateGATv2": {
           "latency": {
-            "median_ms": 5.066283500127611,
-            "p90_ms": 5.923222602359602
+            "median_ms": 7.053793000068254,
+            "p90_ms": 16.173243699972772
           }
         }
       }
     },
     {
       "N": 2000,
-      "k": 200,
+      "k": 16,
       "models": {
         "STA": {
           "latency": {
-            "median_ms": 6.613491499592783,
-            "p90_ms": 7.14503599992895
+            "median_ms": 9.039753000024575,
+            "p90_ms": 18.72326590009834
+          },
+          "profile_self_cpu_ms_per_call": {
+            "aten::copy_": 12.3208,
+            "aten::mm": 3.1262,
+            "aten::tanh": 1.0893,
+            "aten::addmm": 0.9176,
+            "aten::clamp_min": 0.8454,
+            "aten::add_": 0.6395,
+            "aten::_softmax": 0.4846,
+            "aten::sum": 0.4731
           }
         },
         "FullGraphGCN": {
           "latency": {
-            "median_ms": 6.8911314992874395,
-            "p90_ms": 7.154834700122592
+            "median_ms": 9.548108999979377,
+            "p90_ms": 20.371350400023417
           }
         },
         "LateGATv2": {
           "latency": {
-            "median_ms": 9.360076999655575,
-            "p90_ms": 12.644290799289593
+            "median_ms": 14.246672500007662,
+            "p90_ms": 29.190717699862034
           }
         }
       }
     }
-  ]
+  ],
+  "latency_config": {
+    "sta_k": 16,
+    "repeats": 300
+  },
+  "latency_slope_ms_per_1000_nodes": {
+    "STA": 3.775554066100635,
+    "FullGraphGCN": 4.332466850255488,
+    "LateGATv2": 6.615096460080214
+  }
 }
