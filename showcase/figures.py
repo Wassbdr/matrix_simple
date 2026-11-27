@@ -77,6 +77,7 @@ def _hw(scaling) -> str:
 
 
 def latency_axes(ax, scaling, compact=False):
+    ends = []
     for name in ("STA", "FullGraphGCN", "LateGATv2"):
         rows = [r for r in scaling["latency"] if name in r["models"]]
         if not rows:
@@ -84,12 +85,21 @@ def latency_axes(ax, scaling, compact=False):
         ns = [r["N"] for r in rows]
         ms = [r["models"][name]["latency"]["median_ms"] for r in rows]
         ax.plot(ns, ms, "o-", color=COLORS[name], lw=2.5, ms=5, label=LABELS[name])
-        if not compact:
+        ends.append((ms[-1], ns[-1], name))
+    if not compact:
+        # spread end labels that would overlap (values within 20 %)
+        ends.sort()
+        dy, prev = [0.0] * len(ends), None
+        for i, (v, _, _) in enumerate(ends):
+            if prev is not None and v / prev < 1.2:
+                dy[i] = dy[i - 1] + 13
+            prev = v
+        for (v, n, name), off in zip(ends, dy):
             ax.annotate(
-                f"{ms[-1]:.1f} ms",
-                (ns[-1], ms[-1]),
+                f"{v:.1f} ms",
+                (n, v),
                 textcoords="offset points",
-                xytext=(6, 0),
+                xytext=(6, off - (6 if any(dy) else 0)),
                 va="center",
                 color=COLORS[name],
                 fontsize=11,
@@ -114,7 +124,7 @@ def latency_chart(scaling, path: Path):
     fig.text(
         0.08,
         0.93,
-        "CPU inference latency vs number of services",
+        "STA vs full-graph models as the service graph grows",
         fontsize=18,
         weight="bold",
     )
@@ -130,15 +140,18 @@ def latency_chart(scaling, path: Path):
             fig.text(
                 0.74 + j * 0.085,
                 y,
-                m.replace("FullGraph", "Full").replace("LateGATv2", "GATv2"),
+                m.replace("FullGraphGCN", "GCN").replace("LateGATv2", "GATv2"),
                 color=COLORS[m],
                 fontsize=11,
             )
         for r in acc:
             y -= 0.05
             fig.text(0.68, y, str(r["N"]))
-            best = max(r["models"][m]["top1_mean"] for m in names)
+            best = max(r["models"][m]["top1_mean"] for m in names if m in r["models"])
             for j, m in enumerate(names):
+                if m not in r["models"]:
+                    fig.text(0.74 + j * 0.085, y, "not run", color=MUTED, fontsize=10)
+                    continue
                 v = r["models"][m]["top1_mean"]
                 fig.text(0.74 + j * 0.085, y, f"{v:.2f}", weight="bold" if v == best else "normal")
     seeds = ",".join(str(s) for s in scaling["config"]["seeds"])
@@ -160,7 +173,7 @@ def latency_chart(scaling, path: Path):
     fig.text(
         0.08,
         0.06,
-        "Regenerate: python -m rca_pipeline.scaling_benchmark",
+        "Regenerate: make scaling  (python -m rca_pipeline.scaling_benchmark)",
         color=MUTED,
         fontsize=11,
         family="DejaVu Sans Mono",
@@ -291,16 +304,9 @@ def showcase_json(demo, scaling, demo_eval) -> dict:
     acc = {r["N"]: r["models"] for r in scaling.get("accuracy", [])}
     seeds = ",".join(str(s) for s in scaling["config"]["seeds"])
     a, c = demo_eval["all"], demo_eval["cascade"]
-    results = [
-        {
-            "label": f"CPU inference latency at N={n_max}: STA vs full-graph GCN",
-            "value": f"{sta_ms[n_max]:.1f} ms vs {full_ms[n_max]:.1f} ms "
-            f"(STA {sta_ms[min(lat)]:.1f} ms at N={min(lat)})",
-            "command": "python -m rca_pipeline.scaling_benchmark",
-            "setup": f"seeded BA graphs, untrained weights, batch 1, {hw}",
-        },
-    ]
-    for n in sorted(acc):
+    cross = next((n for n in sorted(lat) if sta_ms[n] <= full_ms[n]), n_max)
+    results = []
+    for n in sorted(acc, reverse=True):
         m = acc[n]
         results.append(
             {
@@ -311,6 +317,15 @@ def showcase_json(demo, scaling, demo_eval) -> dict:
                 f"training seeds {seeds}, {scaling['config']['epochs']} epochs, CPU",
             }
         )
+    results.append(
+        {
+            "label": f"CPU inference latency at N={min(lat)} and N={n_max}: STA vs full-graph GCN",
+            "value": f"N={min(lat)}: {sta_ms[min(lat)]:.1f} ms vs {full_ms[min(lat)]:.1f} ms; "
+            f"N={n_max}: {sta_ms[n_max]:.1f} ms vs {full_ms[n_max]:.1f} ms",
+            "command": "python -m rca_pipeline.scaling_benchmark --latency-only",
+            "setup": f"seeded BA graphs, untrained weights, {hw}",
+        }
+    )
     results += [
         {
             "label": "Sock Shop held-out incidents, top-1 STA vs BARO",
@@ -332,13 +347,14 @@ def showcase_json(demo, scaling, demo_eval) -> dict:
         "slug": "matrix_simple",
         "title": "STA: root-cause analysis for microservice incidents",
         "tagline": "Ranks the service that caused a microservice incident from its metrics, "
-        "with CPU latency that stays flat as the system grows.",
+        "and stays accurate as the system grows to hundreds of services.",
         "problem": "When a microservice system degrades, alerts fire on many services at once and "
         "on-call engineers lose time finding the one that started it. Graph models that "
         "look at every service pair get slower as the system grows.",
         "approach": "Select-Then-Analyze (STA) first scores every service cheaply and keeps the k "
         "most suspect ones, then runs a spatio-temporal graph network on that k-node "
-        "subgraph only, so cost is O(N + k^2) instead of O(N^2). The model ships as a "
+        "subgraph only, so cost is O(N + k^2) instead of O(N^2) for dense full-graph analysis. "
+        "The model ships as a "
         "self-describing bundle served by FastAPI, compared against the BARO statistical "
         "baseline on the same candidates.",
         "stack": [
@@ -371,6 +387,8 @@ def showcase_json(demo, scaling, demo_eval) -> dict:
             "All showcase numbers come from synthetic, seeded data; real-trace numbers (RCAEval) "
             "need the external dataset and are not regenerated here.",
             "Latency is measured on CPU with untrained weights at batch 1; no GPU numbers.",
+            "STA's CPU latency is not flat: its O(N) selector dominates at batch 1 and a sparse "
+            f"full-graph GCN is O(E), so STA is slower than the GCN below N={cross}.",
             "BARO needs no training and ties STA on local crash faults; STA's gain is "
             "largest on cascading failures and at larger N.",
         ],
@@ -390,11 +408,32 @@ def readme_results(demo, scaling, demo_eval) -> str:
     hw = _hw(scaling)
     n_max = max(lat)
     sta, full = lat[n_max]["STA"]["latency"], lat[n_max]["FullGraphGCN"]["latency"]
+    n_acc = max(acc)
+    top = {
+        m: [acc[n]["models"][m]["top1_mean"] for n in sorted(acc)] for m in ("STA", "FullGraphGCN")
+    }
+    n_min = min(lat)
+    cross = next(
+        (
+            n
+            for n in sorted(lat)
+            if lat[n]["STA"]["latency"]["median_ms"]
+            <= lat[n]["FullGraphGCN"]["latency"]["median_ms"]
+        ),
+        None,
+    )
     lines = [
-        f"- **CPU latency stays flat:** at N={n_max} services STA answers in "
-        f"{sta['median_ms']:.1f} ms vs {full['median_ms']:.1f} ms for the full-graph GCN "
-        f"({full['median_ms'] / sta['median_ms']:.0f}x). Setup: seeded BA graphs, batch 1, "
-        f"1 thread, {hw}.",
+        f"- **Accuracy holds as the graph grows:** from N={min(acc)} to N={n_acc} services STA keeps "
+        f"top-1 between {min(top['STA']):.2f} and {max(top['STA']):.2f}; the full-graph GCN ranges "
+        f"{min(top['FullGraphGCN']):.2f}-{max(top['FullGraphGCN']):.2f} and is beaten at every N "
+        f"(N={n_acc}: {top['STA'][-1]:.2f} vs {top['FullGraphGCN'][-1]:.2f}). The full-graph GATv2 "
+        "is close to STA up to N=200.",
+        f"- **CPU latency grows with N for every model, STA included:** STA "
+        f"{lat[n_min]['STA']['latency']['median_ms']:.1f} -> {sta['median_ms']:.1f} ms, GCN "
+        f"{lat[n_min]['FullGraphGCN']['latency']['median_ms']:.1f} -> {full['median_ms']:.1f} ms "
+        f"from N={n_min} to N={n_max}. The O(N) selector dominates at batch 1, so STA only "
+        + (f"matches the sparse GCN from N={cross}." if cross else "approaches the sparse GCN.")
+        + f" Setup: {hw}.",
         "",
         "| N services | k | top-1 STA | top-1 full-graph GCN | top-1 full-graph GATv2 "
         "| random | STA ms | GCN ms |",
@@ -425,8 +464,12 @@ def readme_results(demo, scaling, demo_eval) -> str:
         "",
         f"Accuracy: synthetic Barabási-Albert graphs, dataset seed "
         f"{scaling['config']['dataset_seed']}, training seeds {', '.join(map(str, seeds))} "
-        f"(mean ± std), {', '.join(map(str, epochs))} epochs, trained on CPU. "
-        "Command: `python -m rca_pipeline.scaling_benchmark`.",
+        f"(mean ± std), {', '.join(map(str, epochs))} epochs, trained on CPU "
+        f"({scaling['hardware']['logical_cpus']} vCPU). The GCN's low scores at N=50-100 come with "
+        "a large seed spread (unstable training of an untuned baseline). Cells marked "
+        '"not run" were skipped for CPU time (one N=500 model takes 1-2 h for 3 seeds). '
+        "Command: `make scaling` (the three invocations are recorded in "
+        "`results/scaling_benchmark.json`).",
         "",
     ]
     a, c, h = demo_eval["all"], demo_eval["cascade"], demo_eval["hard"]
