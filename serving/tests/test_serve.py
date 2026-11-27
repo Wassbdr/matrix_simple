@@ -82,3 +82,21 @@ def test_endpoints_503_when_bundle_missing(serve_module):
         assert r.status_code == 503
     finally:
         serve_module._BUNDLE = loaded
+
+
+def test_predict_realigns_named_services(client):
+    window = np.random.RandomState(0).randn(len(NODE_NAMES), F, W)
+    ref = client.post("/predict", json={"window": window.tolist(), "services": NODE_NAMES, "top_k": 4})
+    assert ref.status_code == 200
+    perm = [2, 0, 3, 1]
+    shuffled = client.post("/predict", json={
+        "window": window[perm].tolist(), "services": [NODE_NAMES[i] for i in perm], "top_k": 4})
+    assert shuffled.status_code == 200
+    assert [c["service"] for c in shuffled.json()["candidates"]] == [c["service"] for c in ref.json()["candidates"]]
+
+
+def test_predict_rejects_unknown_services(client):
+    window = np.zeros((len(NODE_NAMES), F, W)).tolist()
+    r = client.post("/predict", json={"window": window, "services": ["x", "y", "z", "w"]})
+    assert r.status_code == 400
+    assert "services do not match" in r.json()["detail"]

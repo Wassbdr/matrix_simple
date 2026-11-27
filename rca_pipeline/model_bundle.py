@@ -57,6 +57,7 @@ def save_bundle(
     training_info: Dict[str, Any],
     hpo_provenance: Optional[Dict[str, Any]] = None,
     mlflow_run_id: Optional[str] = None,
+    feature_names: Optional[List[str]] = None,
 ) -> None:
     """Persist a model + everything needed to serve it later."""
     p = Path(bundle_dir)
@@ -81,6 +82,7 @@ def save_bundle(
         },
         "node_names": list(node_names),
         "edge_index": edge_index.tolist(),
+        "feature_names": list(feature_names) if feature_names is not None else None,
         "training": training_info,
         "model_card": {
             "created_at_utc": _dt.datetime.utcnow().isoformat() + "Z",
@@ -136,6 +138,42 @@ def load_bundle(bundle_dir: str) -> LoadedBundle:
         scaler_mean=scaler["mean"].numpy(),
         scaler_scale=scaler["scale"].numpy(),
     )
+
+
+def align_window(
+    bundle: LoadedBundle,
+    window: np.ndarray,
+    services: Optional[List[str]] = None,
+    features: Optional[List[str]] = None,
+) -> np.ndarray:
+    """Reorder a named ``[N, F, W]`` window into the bundle's row/column order.
+
+    The model is not permutation-invariant over features and its node rows are
+    tied to ``edge_index``, so a window sent with another service or metric
+    order would silently produce a wrong ranking. When ``services`` /
+    ``features`` are given they must be exactly the bundle's sets (any order);
+    otherwise a ``ValueError`` is raised.
+    """
+    if services is not None:
+        services = list(services)
+        if len(services) != window.shape[0]:
+            raise ValueError(f"{len(services)} service names for N={window.shape[0]} rows")
+        if sorted(services) != sorted(bundle.node_names) or len(set(services)) != len(services):
+            missing = sorted(set(bundle.node_names) - set(services))
+            extra = sorted(set(services) - set(bundle.node_names))
+            raise ValueError(f"services do not match the bundle: missing={missing} extra={extra}")
+        pos = {s: i for i, s in enumerate(services)}
+        window = window[[pos[s] for s in bundle.node_names]]
+    if features is not None:
+        expected = bundle.metadata.get("feature_names")
+        if expected is None:
+            raise ValueError("bundle has no feature_names; cannot check feature order")
+        features = list(features)
+        if sorted(features) != sorted(expected) or len(set(features)) != len(features):
+            raise ValueError(f"features {features} do not match the bundle's {expected}")
+        pos = {f: i for i, f in enumerate(features)}
+        window = window[:, [pos[f] for f in expected]]
+    return window
 
 
 def predict(

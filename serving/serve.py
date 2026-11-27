@@ -28,7 +28,7 @@ from prometheus_client import Counter, Gauge, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
 
-from rca_pipeline.model_bundle import LoadedBundle, load_bundle, predict
+from rca_pipeline.model_bundle import LoadedBundle, align_window, load_bundle, predict
 from serving.logging_config import configure_logging
 
 configure_logging()
@@ -125,6 +125,11 @@ class PredictRequest(BaseModel):
     )
     top_k: int = Field(DEFAULT_TOP_K, ge=1, le=50,
                        description="Number of top candidates to return.")
+    services: Optional[List[str]] = Field(
+        None, description="Service name of each row of `window`; rows are reordered "
+                          "to the bundle order and any mismatch is rejected.")
+    features: Optional[List[str]] = Field(
+        None, description="Metric name of each feature column; guarded like `services`.")
 
 
 class PredictedCandidate(BaseModel):
@@ -203,6 +208,12 @@ def predict_endpoint(req: PredictRequest):
             status_code=400,
             detail=f"F mismatch: model expects {cfg['num_features']}, got {arr.shape[1]}",
         )
+
+    try:
+        arr = align_window(_BUNDLE, arr, services=req.services, features=req.features)
+    except ValueError as exc:
+        PREDICT_COUNTER.labels(status="bad_request").inc()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     t0 = time.time()
     try:
