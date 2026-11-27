@@ -43,6 +43,7 @@ def main() -> int:
     ap.add_argument("--url", default="http://localhost:8080")
     ap.add_argument("--incident", default=str(ROOT / "examples/sockshop_demo/incident.json"))
     ap.add_argument("--top-k", type=int, default=14)
+    ap.add_argument("--repeats", type=int, default=5, help="requests sent (first one is cold)")
     ap.add_argument("--wait", type=float, default=60.0, help="seconds to wait for /ready")
     args = ap.parse_args()
 
@@ -63,14 +64,21 @@ def main() -> int:
     req = urllib.request.Request(
         f"{args.url}/predict", data=body, headers={"Content-Type": "application/json"}
     )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            resp = json.loads(r.read())
-    except urllib.error.HTTPError as e:
-        sys.exit(f"HTTP {e.code}: {e.read().decode()}")
+    lat = []
+    for _ in range(max(1, args.repeats)):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                resp = json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            sys.exit(f"HTTP {e.code}: {e.read().decode()}")
+        lat.append(resp["latency_ms"])
 
     truth = inc.get("true_root_cause")
-    print(f"model {resp['model_version']}  server latency {resp['latency_ms']:.2f} ms\n")
+    warm = sorted(lat[1:])[len(lat[1:]) // 2] if len(lat) > 1 else lat[0]
+    print(
+        f"model {resp['model_version']}  server latency: first call {lat[0]:.1f} ms, "
+        f"then median {warm:.2f} ms over {max(len(lat) - 1, 1)} calls (CPU)\n"
+    )
     print(f"{'rank':>4}  {'service':14s} {'score':>8}")
     for c in resp["candidates"]:
         mark = "  <- true root cause" if c["service"] == truth else ""
