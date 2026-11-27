@@ -60,7 +60,7 @@ data:
         </style>
     </head>
     <body>
-        <h1>🔬 RCA Sandbox - Frontend</h1>
+        <h1>RCA Sandbox - Frontend</h1>
         <div class="card">
             <h3>Backend Status</h3>
             <pre id="result">Loading...</pre>

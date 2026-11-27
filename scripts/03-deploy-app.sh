@@ -44,7 +44,7 @@ echo "=== Application 3-Tiers déployée avec succès ! ==="
 echo ""
 kubectl get pods -n "${NAMESPACE}" -l 'app in (database,backend,frontend)'
 echo ""
-echo "🌐 Accès au Frontend :"
+echo "Accès au Frontend :"
 echo "  kubectl port-forward svc/frontend -n ${NAMESPACE} 8080:80"
 echo "  Puis ouvrir http://localhost:8080"
 echo ""
