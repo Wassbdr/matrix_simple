@@ -176,7 +176,12 @@ def build(repo: Path) -> Dict:
         p = repo / spec["path"]
         if not p.exists():
             raise SystemExit(f"artifact missing, cannot build manifest: {spec['path']}")
-        rows.append({**spec, "size_bytes": p.stat().st_size, "sha256": sha256_file(p)})
+        row = {**spec, "size_bytes": p.stat().st_size, "sha256": sha256_file(p)}
+        if p.suffix == ".json":
+            invocations = json.loads(p.read_text(encoding="utf-8")).get("invocations")
+            if isinstance(invocations, list) and invocations:
+                row["invocations"] = invocations
+        rows.append(row)
     return {
         "manifest_version": "2.0",
         "generated_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),

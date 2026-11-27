@@ -371,12 +371,82 @@ def showcase_json(demo, scaling, demo_eval) -> dict:
             "All showcase numbers come from synthetic, seeded data; real-trace numbers (RCAEval) "
             "need the external dataset and are not regenerated here.",
             "Latency is measured on CPU with untrained weights at batch 1; no GPU numbers.",
-            "BARO needs no training and is competitive on single-service faults; STA's gain is "
+            "BARO needs no training and ties STA on local crash faults; STA's gain is "
             "largest on cascading failures and at larger N.",
         ],
         "role": "TODO",
         "repo": "https://github.com/Wassbdr/matrix_simple",
     }
+
+
+README = ROOT / "README.md"
+RESULTS_START, RESULTS_END = "<!-- results:start -->", "<!-- results:end -->"
+
+
+def readme_results(demo, scaling, demo_eval) -> str:
+    """Key-results block for the README, generated from the same JSON as the poster."""
+    lat = {r["N"]: r["models"] for r in scaling["latency"]}
+    acc = {r["N"]: r for r in scaling.get("accuracy", [])}
+    hw = _hw(scaling)
+    n_max = max(lat)
+    sta, full = lat[n_max]["STA"]["latency"], lat[n_max]["FullGraphGCN"]["latency"]
+    lines = [
+        f"- **CPU latency stays flat:** at N={n_max} services STA answers in "
+        f"{sta['median_ms']:.1f} ms vs {full['median_ms']:.1f} ms for the full-graph GCN "
+        f"({full['median_ms'] / sta['median_ms']:.0f}x). Setup: seeded BA graphs, batch 1, "
+        f"1 thread, {hw}.",
+        "",
+        "| N services | k | top-1 STA | top-1 full-graph GCN | top-1 full-graph GATv2 "
+        "| random | STA ms | GCN ms |",
+        "|---:|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+
+    def fmt(models, name):
+        m = models.get(name)
+        return f"{m['top1_mean']:.2f} ± {m['top1_std']:.2f}" if m else "not run"
+
+    for n in sorted(set(acc) | set(lat)):
+        r = acc.get(n)
+        ms = lat.get(n, {})
+        cells = [
+            str(n),
+            str(r["k"]) if r else "",
+            fmt(r["models"], "STA") if r else "",
+            fmt(r["models"], "FullGraphGCN") if r else "",
+            fmt(r["models"], "LateGATv2") if r else "",
+            f"{r['random_top1']:.3f}" if r else "",
+            f"{ms['STA']['latency']['median_ms']:.1f}" if ms else "",
+            f"{ms['FullGraphGCN']['latency']['median_ms']:.1f}" if ms else "",
+        ]
+        lines.append("| " + " | ".join(cells) + " |")
+    seeds = sorted({s for r in acc.values() for s in r["seeds"]})
+    epochs = sorted({r["epochs"] for r in acc.values()})
+    lines += [
+        "",
+        f"Accuracy: synthetic Barabási-Albert graphs, dataset seed "
+        f"{scaling['config']['dataset_seed']}, training seeds {', '.join(map(str, seeds))} "
+        f"(mean ± std), {', '.join(map(str, epochs))} epochs, trained on CPU. "
+        "Command: `python -m rca_pipeline.scaling_benchmark`.",
+        "",
+    ]
+    a, c, h = demo_eval["all"], demo_eval["cascade"], demo_eval["hard"]
+    lines += [
+        f"- **STA vs BARO, same candidates** (synthetic Sock Shop, 14 services, seed 42): top-1 "
+        f"{a['STA']['avg1']:.2f} vs {a['BARO']['avg1']:.2f} over {a['n']} held-out incidents, "
+        f"{c['STA']['avg1']:.2f} vs {c['BARO']['avg1']:.2f} on the {c['n']} cascading ones. "
+        f"BARO needs no training and ties STA ({h['BARO']['avg1']:.2f} vs {h['STA']['avg1']:.2f}) "
+        f"on the {h['n']} local crash ('hard') faults.",
+        f"- **Demo incident** (`{demo['true_root_cause']}`, {demo['failure_type']}): STA ranks it "
+        f"#{demo['STA']['true_rank']} in {demo['STA']['inference_ms']:.2f} ms, BARO ranks it "
+        f"#{demo['BARO']['true_rank']}. Command: `make demo`.",
+    ]
+    return "\n".join(lines)
+
+
+def write_readme_results(block: str) -> None:
+    text = README.read_text()
+    start, end = text.index(RESULTS_START), text.index(RESULTS_END)
+    README.write_text(text[: start + len(RESULTS_START)] + "\n" + block + "\n" + text[end:])
 
 
 def main():
@@ -389,7 +459,10 @@ def main():
     (OUT / "showcase.json").write_text(
         json.dumps(showcase_json(demo, scaling, demo_eval), indent=2) + "\n"
     )
-    print("wrote showcase/latency_vs_n.png, showcase/poster.png, showcase/showcase.json")
+    write_readme_results(readme_results(demo, scaling, demo_eval))
+    print(
+        "wrote showcase/latency_vs_n.png, showcase/poster.png, showcase/showcase.json, README results"
+    )
 
 
 if __name__ == "__main__":
