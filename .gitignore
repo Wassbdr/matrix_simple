@@ -134,3 +134,6 @@ docs/arxiv/*.pdf
 # Optuna study databases (regenerable from hpo_sta.py)
 *.optuna.db
 results_transmission/hpo_*.db
+
+# Small redistributable demo bundle (synthetic data, rebuilt by `python -m rca_pipeline.demo_incident build`)
+!examples/sockshop_demo/bundle/*.pt
