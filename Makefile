@@ -1,4 +1,4 @@
-.PHONY: help install dev test coverage lint format audit benchmark-smoke benchmark-paper clean report report-clean figures paper verify-manifest manifest demo scaling showcase data
+.PHONY: help install dev test coverage lint format audit benchmark-smoke benchmark-paper clean report report-clean figures paper verify-manifest manifest demo scaling showcase data bench
 
 PYTHON ?= python3
 RCA_DATA ?= $(HOME)/data/rcaeval
@@ -9,6 +9,7 @@ help:
 	@echo "  make dev              Install dev dependencies + pre-commit hooks"
 	@echo "  make test             Run pytest unit tests (rca_pipeline + serving)"
 	@echo "  make data             Download the pinned RCAEval datasets"
+	@echo "  make bench            Compare STA with RCAEval references"
 	@echo "  make coverage         Run tests with the coverage gate"
 	@echo "  make lint             Run ruff linter"
 	@echo "  make format           Run ruff formatter"
@@ -36,6 +37,9 @@ test:
 
 data:
 	$(PYTHON) scripts/download_rcaeval.py --root "$(RCA_DATA)"
+
+bench:
+	$(PYTHON) -m rca_pipeline.bench $(BENCH_ARGS)
 
 coverage:
 	$(PYTHON) -m pytest --cov --cov-report=term

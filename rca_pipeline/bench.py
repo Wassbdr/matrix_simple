@@ -1,0 +1,266 @@
+"""Compare STA and RCAEval references on public service-level ground truth."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import platform
+import random
+import subprocess
+from collections import defaultdict
+from pathlib import Path
+from statistics import fmean, median, pstdev
+
+import torch
+
+from rca_pipeline.bench_data import Case, cases_in, read_window
+from rca_pipeline.bench_reference import METHODS, cache_file, selected
+from rca_pipeline.bench_sta import VARIANTS, fit, prepare, rank
+
+SYSTEMS = {"ob": "Online Boutique", "ss": "Sock Shop", "tt": "Train Ticket"}
+DISPLAY = {
+    "sta": "STA", "baro": "BARO", "nsigma": "Nsigma", "e_diagnosis": "epsilon-Diagnosis",
+    "circa": "CIRCA", "rcd": "RCD",
+}
+METRICS = ("ac1", "ac3", "avg5")
+
+
+def group_split(cases: list[Case], seed: int) -> tuple[list[Case], list[Case]]:
+    by_service: dict[str, set[str]] = defaultdict(set)
+    for case in cases:
+        by_service[case.service].add(case.fault)
+    rng = random.Random(seed)
+    test_groups = {
+        (service, fault)
+        for service, faults in sorted(by_service.items())
+        for fault in rng.sample(sorted(faults), len(faults) // 5 or int(len(faults) > 1))
+    }
+    return (
+        [case for case in cases if case.group not in test_groups],
+        [case for case in cases if case.group in test_groups],
+    )
+
+
+def score(results: list[dict]) -> dict[str, float]:
+    ranks = [
+        result["ranks"].index(result["answer"]) + 1
+        if result["status"] == "ok" and result["answer"] in result["ranks"] else float("inf")
+        for result in results
+    ]
+    hit = [fmean(rank <= k for rank in ranks) for k in range(1, 6)]
+    return {"ac1": hit[0], "ac3": hit[2], "avg5": fmean(hit)}
+
+
+def references(args: argparse.Namespace, suites: list[str]) -> None:
+    groups = [
+        (args.reference_python, METHODS[:-1], min(5, args.workers)),
+        (args.rcd_python, METHODS[-1:], max(1, args.workers - 5)),
+    ]
+    jobs = []
+    for executable, _, _ in groups:
+        if not Path(executable).is_file():
+            raise ValueError(f"Reference Python not found: {executable}. See docs/rcaeval_data.md.")
+    env = {**os.environ, "OMP_NUM_THREADS": "1", "OPENBLAS_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"}
+    try:
+        for executable, methods, workers in groups:
+            jobs.append(subprocess.Popen([
+                executable, "-m", "rca_pipeline.bench_reference",
+                "--data-root", str(args.data_root), "--cache", str(args.cache),
+                "--rows", str(args.rows), "--timeout", str(args.timeout),
+                "--tt-limit", str(args.tt_limit), "--workers", str(workers),
+                "--suites", *suites, "--methods", *methods,
+            ], env=env))
+        if any(job.wait() for job in jobs):
+            raise ValueError("A reference worker exited unsuccessfully; inspect its output and retry.")
+    finally:
+        for job in jobs:
+            if job.poll() is None:
+                job.terminate()
+                job.wait()
+
+
+def rows_for_report(records: list[dict], method: str, cohort: str) -> tuple:
+    matching = [r for r in records if r["method"] == method and cohort in r["cohorts"]]
+    if not matching:
+        return ("n/a",) * 5
+    failures = sum(r["status"] not in ("ok", "pending") for r in matching)
+    pending = sum(r["status"] == "pending" for r in matching)
+    coverage = f"{failures}/{len(matching)}" + (f"; {pending} pending" if pending else "")
+    if pending:
+        return ("pending", "pending", "pending", "pending", coverage)
+    by_seed: dict[int, list[dict]] = defaultdict(list)
+    for item in matching:
+        by_seed[item["seed"]].append(item)
+    values = [score(rs) for rs in by_seed.values()]
+    metrics = [
+        f"{fmean(v[key] for v in values):.3f} ± {pstdev(v[key] for v in values):.3f}"
+        for key in METRICS
+    ]
+    timing = median(r["latency_ms"] for r in matching)
+    return (*metrics, f"{timing:.2f}", coverage)
+
+
+def summarize(outputs: list[dict]) -> str:
+    latest = outputs[-1]
+    lines = [
+        "# Public RCAEval benchmark", "",
+        latest["command"], "",
+        f"CPU: {latest['cpu']}; one thread per ranker. Seeds: {latest['seeds']}; "
+        f"{latest['rows']} samples on each side of injection at most, metrics only. "
+        "Latency is median ranking time in ms, excluding file parsing and feature preparation.", "",
+        "RE1 uses service/fault groups; RE2 is a separate transfer set. "
+        "AC@k is a top-k hit rate; Avg@5 averages AC@1 through AC@5. "
+        "Failures count as misses. Repeated predictions of the same case across seeds are not independent.",
+        "",
+        "MicroRCA: unavailable on the common metrics input. The upstream implementation requires "
+        "call-edge latency and host topology; its example also lacks the expected source latency CSV.",
+        "",
+    ]
+    for suite in ("re1", "re2"):
+        for system, title in SYSTEMS.items():
+            records = [r for r in latest["cases"] if r["system"] == system and r["suite"] == suite]
+            if not records:
+                continue
+            lines += [
+                f"## {suite.upper()} / {title}", "",
+                "| Method | Cohort | AC@1 | AC@3 | Avg@5 | Median ms | Failed / scored attempts |",
+                "|---|---|---:|---:|---:|---:|---:|",
+            ]
+            for method, cohort in [(m, "all") for m in DISPLAY] + [
+                (m, "fixed TT sample") for m in DISPLAY
+            ]:
+                cells = rows_for_report(records, method, cohort)
+                if cells[0] == "n/a":
+                    continue
+                lines.append(f"| {DISPLAY[method]} | {cohort} | " + " | ".join(cells) + " |")
+            lines.append("")
+    for i, out in enumerate(outputs):
+        lines += [
+            f"## Iteration {i}: {VARIANTS[out['variant']]}", "",
+            "| Suite / system | AC@1 | Delta | Avg@5 | Delta |",
+            "|---|---:|---:|---:|---:|",
+        ]
+        for suite in ("re1", "re2"):
+            for system, title in SYSTEMS.items():
+                def sta_metrics(run: dict) -> tuple[float, float] | None:
+                    by_seed: dict[int, list[dict]] = defaultdict(list)
+                    for item in run["cases"]:
+                        if (item["method"], item["suite"], item["system"]) == ("sta", suite, system):
+                            by_seed[item["seed"]].append(item)
+                    values = [score(rs) for rs in by_seed.values()]
+                    if not values:
+                        return None
+                    return fmean(v["ac1"] for v in values), fmean(v["avg5"] for v in values)
+
+                current = sta_metrics(out)
+                if current is None:
+                    continue
+                before = sta_metrics(outputs[i - 1]) if i else None
+                a, b = current
+                da, db = (f"{a - before[0]:+.3f}", f"{b - before[1]:+.3f}") if before else ("n/a", "n/a")
+                lines.append(f"| {suite.upper()} / {title} | {a:.3f} | {da} | {b:.3f} | {db} |")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def run(args: argparse.Namespace) -> None:
+    suites = ["re1"] if args.split == "dev" else ["re1", "re2"]
+    cases = [case for case in cases_in(args.data_root) if case.suite in suites]
+    if not args.skip_references:
+        references(args, suites)
+    torch.set_num_threads(1)
+    records: list[dict] = []
+    sampled_ids = {
+        case.id for case in selected(cases, "circa", args.tt_limit, 42)
+        if args.tt_limit and case.system == "tt"
+    }
+    for system in SYSTEMS:
+        development = [case for case in cases if (case.system, case.suite) == (system, "re1")]
+        holdout = [case for case in cases if (case.system, case.suite) == (system, "re2")]
+        if not development:
+            continue
+        prepared = {
+            case.id: prepare(case, *read_window(case, args.rows), args.variant)
+            for case in development + holdout
+        }
+        for seed in args.seeds:
+            train, dev_test = group_split(development, seed)
+            fitted = fit([prepared[c.id] for c in train], seed, args.epochs, args.variant)
+            print(f"{system} seed={seed}: train={len(train)}, RE1 test={len(dev_test)}, RE2={len(holdout)}",
+                  flush=True)
+            rank(fitted, prepared[train[0].id])
+            for case in dev_test + holdout:
+                extra = ["fixed TT sample"] if case.id in sampled_ids else []
+                meta = {"case": case.id, "suite": case.suite, "system": case.system,
+                        "answer": case.service, "fault": case.fault, "seed": seed}
+                records.append({**meta, "method": "sta", "cohorts": ["all", *extra],
+                                **rank(fitted, prepared[case.id])})
+                for method in METHODS:
+                    restrict = case.system == "tt" and args.tt_limit and method in ("circa", "rcd")
+                    if restrict and not extra:
+                        continue
+                    path = cache_file(args.cache, case, method, args.rows, args.timeout, 42)
+                    value = json.loads(path.read_text()) if path.is_file() else {
+                        "status": "pending", "ranks": [], "latency_ms": 0.0,
+                    }
+                    records.append({**meta, "method": method, "cohorts": extra if restrict else ["all", *extra],
+                                    **value})
+    if not records:
+        raise ValueError("No scored cases. Supply the complete RE1 release for training and development.")
+    args.output.mkdir(parents=True, exist_ok=True)
+    cpu = platform.processor()
+    for line in Path("/proc/cpuinfo").read_text().splitlines():
+        if line.startswith("model name"):
+            cpu = line.split(":", 1)[1].strip()
+            break
+    path = args.output / f"{args.variant}.json"
+    seeded = ",".join(map(str, args.seeds))
+    path.write_text(json.dumps({
+        "cpu": cpu, "seeds": args.seeds, "rows": args.rows, "epochs": args.epochs,
+        "tt_limit": args.tt_limit, "timeout": args.timeout, "variant": args.variant,
+        "command": f"`make bench BENCH_ARGS='--variant {args.variant} --split {args.split} "
+                   f"--seeds {seeded} --epochs {args.epochs} --rows {args.rows} "
+                   f"--tt-limit {args.tt_limit} --timeout {args.timeout}'`",
+        "cases": records,
+    }, indent=2) + "\n")
+    outputs = [
+        json.loads(p.read_text()) for variant in VARIANTS
+        if (p := args.output / f"{variant}.json").is_file()
+    ]
+    (args.output / "results.md").write_text(summarize(outputs))
+    print(f"Wrote {path} and {args.output / 'results.md'}")
+
+
+def main() -> None:
+    root = Path.home() / "data" / "rcaeval"
+    default_data = root / "figshare" / "data"
+    if not default_data.exists() and (root / "hf").exists():
+        default_data = root / "hf"
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--data-root", type=Path, default=default_data)
+    parser.add_argument("--cache", type=Path, default=root / "reference-cache")
+    parser.add_argument("--output", type=Path, default=Path("benchmarks"))
+    parser.add_argument("--reference-python", default=str(Path.home() / ".venv-rcaeval/bin/python"))
+    parser.add_argument("--rcd-python", default=str(Path.home() / ".venv-rcaeval-rcd/bin/python"))
+    parser.add_argument("--seeds", type=lambda value: [int(seed) for seed in value.split(",")],
+                        default=[7, 42, 123])
+    parser.add_argument("--rows", type=int, default=300)
+    parser.add_argument("--epochs", type=int, default=36)
+    parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--timeout", type=int, default=90)
+    parser.add_argument("--tt-limit", type=int, default=12)
+    parser.add_argument("--split", choices=("dev", "all"), default="all")
+    parser.add_argument("--variant", choices=VARIANTS, default="baseline")
+    parser.add_argument("--skip-references", action="store_true", help="Use cached results only.")
+    args = parser.parse_args()
+    if min(args.rows, args.epochs, args.workers, args.timeout) <= 0 or args.tt_limit < 0:
+        parser.error("Rows, epochs, workers and timeout must be positive; TT limit cannot be negative.")
+    try:
+        run(args)
+    except (OSError, ValueError) as exc:
+        parser.exit(1, f"{exc}\n")
+
+
+if __name__ == "__main__":
+    main()

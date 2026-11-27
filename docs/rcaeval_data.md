@@ -11,3 +11,24 @@ python scripts/download_rcaeval.py --source hf --suites re1 re2
 ```
 
 Keep the data outside Git. Each directory name encodes the system, injected service, fault and repetition; use it to evaluate, not as a model input. The benchmark reads `metrics.json` (or `metrics.parquet`) and `inject_time.txt`. It uses service metrics only, even on cases with logs or traces.
+
+## Reference environments
+
+Install the reference methods separately from STA. These commands assume the upstream clone is a sibling of this checkout:
+
+```sh
+git clone https://github.com/phamquiluan/RCAEval ../RCAEval
+git -C ../RCAEval checkout 3c3e25f3f50a511beb777117b63ead4acb8fdf5a
+python3.12 -m venv ~/.venv-rcaeval
+~/.venv-rcaeval/bin/pip install -e '../RCAEval[core]'
+python3.10 -m venv ~/.venv-rcaeval-rcd
+~/.venv-rcaeval-rcd/bin/pip install -e ../RCAEval numpy==1.23.5 pandas==2.0.1 \
+    scipy==1.10.1 scikit-learn==1.2.2 networkx==2.5 causal-learn==0.1.2.3 \
+    matplotlib==3.7.2 tqdm requests
+for file in utils/PCUtils/SkeletonDiscovery.py graph/GraphClass.py utils/Fas.py search/ConstraintBased/FCI.py; do
+    ln -fs "$(realpath ../RCAEval/lib/causallearn)/$file" \
+        "$HOME/.venv-rcaeval-rcd/lib/python3.10/site-packages/causallearn/$file"
+done
+```
+
+Run `make bench` in the STA environment. Outputs are `benchmarks/results.md` and `benchmarks/baseline.json`; reference predictions are cached outside the checkout. Use `BENCH_ARGS='--split dev'` during development. Omit this argument to evaluate the frozen model on RE2. Slow CIRCA and RCD runs use the same seed-42 Train Ticket sample, and the report includes STA and the faster methods on that sample as well as on the full cohort. Timeouts count as misses, not column-order predictions.
