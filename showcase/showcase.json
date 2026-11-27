@@ -1,0 +1,87 @@
+{
+  "slug": "matrix_simple",
+  "title": "STA: root-cause analysis for microservice incidents",
+  "tagline": "Ranks the service that caused a microservice incident from its metrics, and stays accurate as the system grows to hundreds of services.",
+  "problem": "When a microservice system degrades, alerts fire on many services at once and on-call engineers lose time finding the one that started it. Graph models that look at every service pair get slower as the system grows.",
+  "approach": "Select-Then-Analyze (STA) first scores every service cheaply and keeps the k most suspect ones, then runs a spatio-temporal graph network on that k-node subgraph only, so cost is O(N + k^2) instead of O(N^2) for dense full-graph analysis. The model ships as a self-describing bundle served by FastAPI, compared against the BARO statistical baseline on the same candidates.",
+  "stack": [
+    "Python",
+    "PyTorch",
+    "PyTorch Geometric",
+    "FastAPI",
+    "Docker Compose",
+    "MLflow",
+    "Prometheus",
+    "Helm"
+  ],
+  "demo": {
+    "gif": "showcase/demo.gif",
+    "mp4": "showcase/demo.mp4",
+    "poster": "showcase/poster.png",
+    "kind": "synthetic",
+    "caption": "docker-free local run: the FastAPI service ranks the services of a seeded synthetic Sock Shop incident via /predict, then the measured latency-vs-N chart of STA against full-graph models."
+  },
+  "reproduce": [
+    "pip install torch==2.0.1 --index-url https://download.pytorch.org/whl/cpu && pip install -e '.[serve]' -c requirements/constraints-cpu.txt",
+    "docker compose up -d && python scripts/demo_predict.py",
+    "bash showcase/make_showcase.sh"
+  ],
+  "results": [
+    {
+      "label": "Top-1 accuracy at N=500, STA vs full-graph GCN",
+      "value": "0.514 vs 0.463",
+      "command": "python -m rca_pipeline.scaling_benchmark",
+      "setup": "synthetic BA graphs, dataset seed 42, training seeds 42,123,7, 60 epochs, CPU"
+    },
+    {
+      "label": "Top-1 accuracy at N=200, STA vs full-graph GCN",
+      "value": "0.565 vs 0.370",
+      "command": "python -m rca_pipeline.scaling_benchmark",
+      "setup": "synthetic BA graphs, dataset seed 42, training seeds 42,123,7, 60 epochs, CPU"
+    },
+    {
+      "label": "Top-1 accuracy at N=100, STA vs full-graph GCN",
+      "value": "0.591 vs 0.132",
+      "command": "python -m rca_pipeline.scaling_benchmark",
+      "setup": "synthetic BA graphs, dataset seed 42, training seeds 42,123,7, 60 epochs, CPU"
+    },
+    {
+      "label": "Top-1 accuracy at N=50, STA vs full-graph GCN",
+      "value": "0.594 vs 0.210",
+      "command": "python -m rca_pipeline.scaling_benchmark",
+      "setup": "synthetic BA graphs, dataset seed 42, training seeds 42,123,7, 60 epochs, CPU"
+    },
+    {
+      "label": "Top-1 accuracy at N=14, STA vs full-graph GCN",
+      "value": "0.721 vs 0.611",
+      "command": "python -m rca_pipeline.scaling_benchmark",
+      "setup": "synthetic BA graphs, dataset seed 42, training seeds 42,123,7, 60 epochs, CPU"
+    },
+    {
+      "label": "CPU inference latency at N=14 and N=2000: STA vs full-graph GCN",
+      "value": "N=14: 1.0 ms vs 0.6 ms; N=2000: 6.6 ms vs 6.9 ms",
+      "command": "python -m rca_pipeline.scaling_benchmark --latency-only",
+      "setup": "seeded BA graphs, untrained weights, Intel(R) Xeon(R) Processor, 1 thread, batch 1, torch 2.0.1+cpu CPU"
+    },
+    {
+      "label": "Sock Shop held-out incidents, top-1 STA vs BARO",
+      "value": "0.898 vs 0.513 (n=335); cascades 0.801 vs 0.216 (n=171)",
+      "command": "python -m rca_pipeline.demo_incident build",
+      "setup": "synthetic Sock Shop topology (14 services), seed 42, CPU"
+    },
+    {
+      "label": "Demo incident: rank of the true root cause",
+      "value": "STA rank 1 (1.16 ms), BARO rank 5 (0.24 ms)",
+      "command": "python -m rca_pipeline.demo_incident run",
+      "setup": "one held-out cascade incident, root cause carts, seed 42, Intel(R) Xeon(R) Processor, 1 thread, batch 1, torch 2.0.1+cpu CPU"
+    }
+  ],
+  "limits": [
+    "All showcase numbers come from synthetic, seeded data; real-trace numbers (RCAEval) need the external dataset and are not regenerated here.",
+    "Latency is measured on CPU with untrained weights at batch 1; no GPU numbers.",
+    "STA's CPU latency is not flat: its O(N) selector dominates at batch 1 and a sparse full-graph GCN is O(E), so STA is slower than the GCN below N=2000.",
+    "BARO needs no training and ties STA on local crash faults; STA's gain is largest on cascading failures and at larger N."
+  ],
+  "role": "TODO",
+  "repo": "https://github.com/Wassbdr/matrix_simple"
+}
