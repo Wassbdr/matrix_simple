@@ -30,12 +30,15 @@ Usage:
 
 import argparse
 import logging
-from typing import List, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 import networkx as nx
 import numpy as np
 import torch
 from torch_geometric.data import Data
+
+if TYPE_CHECKING:
+    from rca_pipeline.topologies import ServiceTopology
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -135,6 +138,35 @@ def generate_ba_topology(
         N, len(directed_edges), m, 2 * len(directed_edges) / N,
     )
 
+    return node_names, edge_index, P, G_directed
+
+
+def topology_from_service_graph(
+    topology: "ServiceTopology",
+) -> Tuple[List[str], torch.Tensor, torch.Tensor, nx.DiGraph]:
+    """Same outputs as ``generate_ba_topology`` for a fixed, named service graph.
+
+    ``topology.edges`` are (caller, callee) pairs: the caller depends on the
+    callee, so an anomaly at the callee propagates to the caller.
+    """
+    node_names = topology.node_names()
+    idx = {n: i for i, n in enumerate(node_names)}
+    directed_edges = [(idx[s], idx[d]) for s, d in topology.edges]
+    N = len(node_names)
+    G_directed = nx.DiGraph()
+    G_directed.add_nodes_from(range(N))
+    G_directed.add_edges_from(directed_edges)
+    src, dst = [], []
+    for s, d in directed_edges:
+        src.extend([s, d])
+        dst.extend([d, s])
+    edge_index = torch.tensor([src, dst], dtype=torch.long)
+    P = torch.zeros(N, N)
+    for s, d in directed_edges:
+        P[d, s] = 1.0
+    for s, d in directed_edges:
+        if P[s, d] == 0:
+            P[s, d] = 0.2
     return node_names, edge_index, P, G_directed
 
 
@@ -306,9 +338,14 @@ def generate_scalable_dataset(
     gray_failure_ratio: float = 0.15,
     hard_failure_ratio: float = 0.35,
     generate_multimodal: bool = True,
+    topology: Optional["ServiceTopology"] = None,
 ) -> Tuple[List[Data], List[str], torch.Tensor]:
     """
     Generate a scalable simulated RCA dataset on a BA topology.
+
+    If ``topology`` (a ``rca_pipeline.topologies.ServiceTopology``) is given,
+    its named services and dependency edges replace the random BA graph and
+    ``num_nodes`` / ``ba_m`` are ignored.
 
     Args:
         num_nodes:          N in {50, 100, 150, 200}
@@ -340,8 +377,11 @@ def generate_scalable_dataset(
     if gray_failure_ratio + hard_failure_ratio > 1.0:
         raise ValueError("gray_failure_ratio + hard_failure_ratio must be <= 1")
 
-    node_names, edge_index, P_base, G = generate_ba_topology(num_nodes, ba_m, seed)
-    N = num_nodes
+    if topology is not None:
+        node_names, edge_index, P_base, G = topology_from_service_graph(topology)
+    else:
+        node_names, edge_index, P_base, G = generate_ba_topology(num_nodes, ba_m, seed)
+    N = len(node_names)
 
     # Adjacency for distractor propagation (symmetric, weighted)
     A_raw = torch.zeros(N, N)
